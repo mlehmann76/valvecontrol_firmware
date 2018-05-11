@@ -19,6 +19,7 @@ typedef struct {
 
 
 void gpio_task(void *pvParameters);
+void gpio_task_setup(void);
 
 
 #endif /* MAIN_GPIOTASK_H_ */

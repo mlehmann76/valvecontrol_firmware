@@ -13,7 +13,10 @@
 #include "sdkconfig.h"
 #include "esp_log.h"
 
+#include "driver/gpio.h"
+
 #include "gpioTask.h"
+#include "config_user.h"
 
 #define TAG "gpio_task"
 
@@ -23,6 +26,13 @@ static time_t lastStart = 0;
 static void sendStatus(const queueData_t* pData);
 static void disableChan(uint32_t chan);
 static void enableChan(uint32_t chan);
+static void updateGpio(uint32_t chan);
+
+static uint32_t gpioLut[] = {
+		CONTROL0_PIN,
+		CONTROL1_PIN,
+		CONTROL2_PIN,
+		CONTROL3_PIN};
 
 void gpio_task(void *pvParameters) {
 	while (1) {
@@ -47,19 +57,27 @@ void gpio_task(void *pvParameters) {
 					break;
 
 				case mOn:
-					enableChan(rxData.chan);
+					enableChan(1<<rxData.chan);
 					break;
 
 				case mOff:
-					disableChan(rxData.chan);
+					disableChan(1<<rxData.chan);
 					break;
 				}
-
 			}
 		}
+		vTaskDelay(10);
 		taskYIELD();
 	}
 	vTaskDelete(NULL);
+}
+
+void gpio_task_setup(void) {
+	gpio_config_t config = {.pin_bit_mask = (
+			CONTROL0_BIT|CONTROL1_BIT|CONTROL2_BIT|CONTROL3_BIT),
+			.mode = GPIO_MODE_OUTPUT};
+	gpio_config(&config);
+	xTaskCreate(&gpio_task, "gpio_task", 2048, NULL, 5, NULL);
 }
 
 static void sendStatus(const queueData_t* pData) {
@@ -81,6 +99,7 @@ static void enableChan(uint32_t chan) {
 		disableChan(actChan);
 	}
 	actChan = chan;
+	updateGpio(chan);
 	queueData_t data = {chan, mOn};
 	if (hasChanged) sendStatus(&data);
 	time(&lastStart);
@@ -91,6 +110,17 @@ static void disableChan(uint32_t chan) {
 		queueData_t data = {chan, mOff};
 		sendStatus(&data);
 	}
+	updateGpio(chan);
 	actChan = 0;
 	time(&lastStart);
+}
+
+static void updateGpio(uint32_t chan) {
+	for (int i=0; i< (sizeof(gpioLut)/sizeof(gpioLut[0]));i++) {
+		if ((chan & (1<<i)) != 0) {
+			gpio_set_level(gpioLut[i], 1);
+		} else {
+			gpio_set_level(gpioLut[i], 0);
+		}
+	}
 }

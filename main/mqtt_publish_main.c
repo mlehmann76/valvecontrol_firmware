@@ -26,8 +26,6 @@
 
 #include "sdkconfig.h"
 
-#include "MQTTClient.h"
-
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -55,7 +53,8 @@
 #include "mbedtls/error.h"
 #include "mbedtls/certs.h"
 
-#include "driver/gpio.h"
+#include "mqtt_client.h"
+
 
 #include "gpioTask.h"
 
@@ -97,9 +96,6 @@ const int CONNECTED_BIT = BIT0;
 #define MQTT_SUB_MESSAGE "esp32/control1/#"
 #define MQTT_PUB_MESSAGE "esp32/control1/"
 
-static unsigned char mqtt_sendBuf[MQTT_BUF_SIZE];
-static unsigned char mqtt_readBuf[MQTT_BUF_SIZE];
-
 static const char *TAG = "MQTTS";
 static const char* chanNames[] = {"channel0","channel1","channel2","channel3"};
 
@@ -109,7 +105,112 @@ QueueHandle_t subQueue,pubQueue;
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 EventGroupHandle_t wifi_event_group;
+esp_mqtt_client_handle_t client = NULL;
 
+static void mqtt_message_handler(esp_mqtt_event_handle_t event) ;
+
+static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
+{
+    client = event->client;
+    int msg_id;
+    // your_context_t *context = event->context;
+    switch (event->event_id) {
+        case MQTT_EVENT_CONNECTED:
+            ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
+            /*
+            msg_id = esp_mqtt_client_subscribe(client, "/topic/qos0", 0);
+            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+
+            msg_id = esp_mqtt_client_subscribe(client, "/topic/qos1", 1);
+            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+
+            msg_id = esp_mqtt_client_unsubscribe(client, "/topic/qos1");
+            ESP_LOGI(TAG, "sent unsubscribe successful, msg_id=%d", msg_id);
+            */
+			msg_id = esp_mqtt_client_subscribe(client, MQTT_SUB_MESSAGE, 1);
+			            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+            break;
+        case MQTT_EVENT_DISCONNECTED:
+            ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
+            break;
+
+        case MQTT_EVENT_SUBSCRIBED:
+            ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
+            //msg_id = esp_mqtt_client_publish(client, "/topic/qos0", "data", 0, 0, 0);
+            //ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
+            break;
+        case MQTT_EVENT_UNSUBSCRIBED:
+            ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
+            break;
+        case MQTT_EVENT_PUBLISHED:
+            ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+            break;
+        case MQTT_EVENT_DATA:
+            ESP_LOGI(TAG, "MQTT_EVENT_DATA");
+            //printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
+            //printf("DATA=%.*s\r\n", event->data_len, event->data);
+            mqtt_message_handler(event);
+            break;
+        case MQTT_EVENT_ERROR:
+            ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
+            break;
+    }
+    return ESP_OK;
+}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+static void mqtt_message_handler(esp_mqtt_event_handle_t event) {
+
+	const char *pTopic;
+	int chan = -1;
+	gpio_task_mode_t func = mStatus;
+
+	ESP_LOGI(TAG, "Topic received!: %.*s %.*s", event->topic_len,
+			 event->topic, event->data_len,	event->data);
+
+	if (event->topic_len > strlen(MQTT_SUB_MESSAGE)) {
+		pTopic = &event->topic[strlen(MQTT_SUB_MESSAGE)-1];
+
+		ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(MQTT_SUB_MESSAGE) + 1, pTopic);
+
+		if (*pTopic != 0) {
+			chan = -1;
+			for (int i = 0; i < (sizeof(chanNames) / sizeof(chanNames[0]));
+					i++) {
+				if (strncmp(pTopic, chanNames[i], event->topic_len - strlen(MQTT_SUB_MESSAGE) + 1) == 0) {
+					chan = i;
+					ESP_LOGI(TAG,"channel :%d found", i);
+					break;
+				}
+			}
+
+			if (event->data_len == 0) {
+				func = mStatus;
+			} else if (strncmp((const char*) event->data, "on",
+					event->data_len) == 0) {
+				func = mOn;
+			} else if (strncmp((const char*) event->data, "off",
+					event->data_len) == 0) {
+				func = mOff;
+			} else {
+				func = mStatus;
+			}
+
+			if (chan != -1) {
+				queueData_t data = { chan, func };
+				// available if necessary.
+				if ( xQueueSend(subQueue, (void * ) &data,
+						(TickType_t ) 10) != pdPASS) {
+					// Failed to post the message, even after 10 ticks.
+					ESP_LOGI(TAG, "subqueue post failure");
+				}
+			}
+		}
+	}
+}
+
+#pragma GCC diagnostic pop
 static esp_err_t event_handler(void *ctx, system_event_t *event) {
 	switch (event->event_id) {
 	case SYSTEM_EVENT_STA_START:
@@ -166,206 +267,74 @@ static void initialise_wifi(void) {
 
 	ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL));
 
-	wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT()	;
-	ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+	do {
+		wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+		ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-	ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
+		ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
 
-	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-	ESP_ERROR_CHECK(esp_wifi_start());
+		ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+		ESP_ERROR_CHECK(esp_wifi_start());
+
+		ESP_LOGI(TAG, "Waiting for wifi");
+		xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true,
+				portMAX_DELAY);
+
+	} while ((xEventGroupGetBits(wifi_event_group) & CONNECTED_BIT) == 0);
 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
-static void mqtt_message_handler(MessageData *md) {
-
-	const char *pTopic;
-	int chan = -1;
-	gpio_task_mode_t func = mStatus;
-
-	ESP_LOGI(TAG, "Topic received!: %.*s %.*s", md->topicName->lenstring.len,
-			md->topicName->lenstring.data, md->message->payloadlen,
-			(char* )md->message->payload);
-
-	if (md->topicName->lenstring.len > strlen(MQTT_SUB_MESSAGE)) {
-		pTopic = &md->topicName->lenstring.data[strlen(MQTT_SUB_MESSAGE)-1];
-
-		ESP_LOGI(TAG, "%.*s", md->topicName->lenstring.len - strlen(MQTT_SUB_MESSAGE) + 1, pTopic);
-
-		if (*pTopic != 0) {
-			chan = -1;
-			for (int i = 0; i < (sizeof(chanNames) / sizeof(chanNames[0]));
-					i++) {
-				if (strncmp(pTopic, chanNames[i], md->topicName->lenstring.len - strlen(MQTT_SUB_MESSAGE) + 1) == 0) {
-					chan = i;
-					ESP_LOGI(TAG,"channel :%d found", i);
-					break;
-				}
-			}
-
-			if (md->message->payloadlen == 0) {
-				func = mStatus;
-			} else if (strncmp((const char*) md->message->payload, "on",
-					md->message->payloadlen) == 0) {
-				func = mOn;
-			} else if (strncmp((const char*) md->message->payload, "off",
-					md->message->payloadlen) == 0) {
-				func = mOff;
-			} else {
-				func = mStatus;
-			}
-
-			if (chan != -1) {
-				queueData_t data = { 1 << chan, func };
-				// available if necessary.
-				if ( xQueueSend(subQueue, (void * ) &data,
-						(TickType_t ) 10) != pdPASS) {
-					// Failed to post the message, even after 10 ticks.
-					ESP_LOGI(TAG, "subqueue post failure");
-				}
-			}
-		}
-	}
-}
-
-#pragma GCC diagnostic pop
-
-int chan2Index(const queueData_t* rxData,
-		int chan) {
-	for (int i = 0; i < (sizeof(chanNames) / sizeof(chanNames[0])); i++) {
-		if ((rxData->chan & (1 << i)) != 0) {
-			chan = i;
-			break;
-		}
-	}
-	return chan;
-}
 
 void mqtt_task(void *pvParameters) {
-	int ret;
-	Network network;
-
+	int msg_id;
 	while (1) {
-		ESP_LOGD(TAG, "Wait for WiFi ...");
-		/* Wait for the callback to set the CONNECTED_BIT in the
-		 event group.
-		 */
-		xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT,
-		false, true, portMAX_DELAY);
-		ESP_LOGD(TAG, "Connected to AP");
+		// check if we have something to do
+		queueData_t rxData = { 0 };
+		const int maxChanIndex = sizeof(chanNames)/sizeof(chanNames[0]);
 
-		ESP_LOGD(TAG, "Start MQTT Task ...");
-		ESP_LOGI(TAG, "Free Heap...%d", esp_get_free_heap_size())
+		if ((client != NULL)
+				&& (xQueueReceive(pubQueue, &(rxData), (TickType_t ) 10))) {
 
-		MQTTClient client;
-		NetworkInit(&network);
-		network.websocket = MQTT_WEBSOCKET;
+			ESP_LOGI(TAG, "pubQueue work");
 
-		ESP_LOGD(TAG, "NetworkConnect %s:%d ...", MQTT_SERVER, MQTT_PORT);
-		ret = NetworkConnect(&network, MQTT_SERVER, MQTT_PORT);
-		if (ret != 0) {
-			ESP_LOGI(TAG, "NetworkConnect not SUCCESS: %d", ret);
-			goto exit;
-		}
-		ESP_LOGD(TAG, "MQTTClientInit  ...");
-		MQTTClientInit(&client, &network, 2000,            // command_timeout_ms
-				mqtt_sendBuf,         //sendbuf,
-				MQTT_BUF_SIZE, //sendbuf_size,
-				mqtt_readBuf,         //readbuf,
-				MQTT_BUF_SIZE  //readbuf_size
-				);
+			int chan = rxData.chan;
 
-		char buf[30];
-		MQTTString clientId = MQTTString_initializer;
-#if defined(MBEDTLS_MQTT_DEBUG)
-		sprintf(buf, "ESP32MQTT");
-#else
-		sprintf(buf, "ESP32MQTT%08X", esp_random());
-#endif
-		ESP_LOGI(TAG, "MQTTClientInit  %s", buf);
-		clientId.cstring = buf;
+			if (chan != -1 && (chan <maxChanIndex)) {
+				char buf[255] = { 0 };
+				char payload[16] = { 0 };
 
-		MQTTString username = MQTTString_initializer;
-		username.cstring = MQTT_USER;
+				snprintf(buf, sizeof(buf), "%s%s", MQTT_PUB_MESSAGE,
+						chanNames[chan]);
+				snprintf(payload, sizeof(payload), "%s",
+						rxData.mode == mOn ? "on" : "off");
 
-		MQTTString password = MQTTString_initializer;
-		password.cstring = MQTT_PASS;
+				ESP_LOGI(TAG, "publish %.*s : %.*s", strlen(buf), buf,
+						strlen(payload), payload);
+				//
 
-		MQTTPacket_connectData data = MQTTPacket_connectData_initializer;
-		data.clientID = clientId;
-		data.willFlag = 0;
-		data.MQTTVersion = 4; // 3 = 3.1 4 = 3.1.1
-		data.keepAliveInterval = 60;
-		data.cleansession = 1;
-		data.username = username;
-		data.password = password;
+				msg_id = esp_mqtt_client_publish(client, buf, payload,
+						strlen(payload) + 1, 1, 0);
+				ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
 
-		ESP_LOGI(TAG, "MQTTConnect  ...");
-		ret = MQTTConnect(&client, &data);
-		if (ret != SUCCESS) {
-			ESP_LOGI(TAG, "MQTTConnect not SUCCESS: %d", ret);
-			goto exit;
-		}
-
-		ESP_LOGI(TAG, "MQTTSubscribe  ...");
-		ret = MQTTSubscribe(&client, MQTT_SUB_MESSAGE, QOS0,
-				mqtt_message_handler);
-		if (ret != SUCCESS) {
-			ESP_LOGI(TAG, "MQTTSubscribe: %d", ret);
-			goto exit;
-		}
-
-		ESP_LOGI(TAG, "MQTTYield  ...");
-		while (1) {
-			// check if we have something to do
-			queueData_t rxData = { 0 };
-
-			if (xQueueReceive(pubQueue, &(rxData), (TickType_t ) 10)) {
-
-				ESP_LOGI(TAG, "pubQueue work");
-
-				int chan = chan2Index(&rxData, -1);
-
-				if (chan != -1) {
-					char buf[255] = { 0 };
-					char payload[16] = { 0 };
-
-					snprintf(buf, sizeof(buf), "%s%s", MQTT_PUB_MESSAGE, chanNames[chan]);
-					snprintf(payload, sizeof(payload), "%s", rxData.mode == mOn ? "on": "off");
-
-					ESP_LOGI(TAG, "publish %.*s : %.*s", strlen(buf), buf, strlen(payload), payload);
-					//
-					MQTTMessage message;
-					message.qos = QOS1;
-					message.retained = 0;
-					message.dup = 0;
-					message.payload = payload;
-					message.payloadlen = strlen(payload)+1;
-
-					ret = MQTTPublish(&client, buf, &message);
-
-					if (ret != SUCCESS) {
-						ESP_LOGI(TAG, "MQTTPublish: %d", ret);
-						goto exit;
-					}
-				}
-			} else {
-
-				ret = MQTTYield(&client, 1000);
-
-				if (ret != SUCCESS) {
-					ESP_LOGI(TAG, "MQTTYield: %d", ret);
-					goto exit;
-				}
 			}
-
 		}
-		exit: MQTTDisconnect(&client);
-		NetworkDisconnect(&network);
-		ESP_LOGI(TAG, "Starting again!");
+		vTaskDelay(10);
+		taskYIELD();
 	}
 	vTaskDelete(NULL);
 }
+
+static void mqtt_app_start(void)
+{
+    const esp_mqtt_client_config_t mqtt_cfg = {
+        .uri = "mqtt://raspberrypi.fritz.box:1883",
+        .event_handle = mqtt_event_handler,
+        // .user_context = (void *)your_context
+    };
+
+    client = esp_mqtt_client_init(&mqtt_cfg);
+    esp_mqtt_client_start(client);
+}
+
 
 void app_main() {
 
@@ -378,7 +347,6 @@ void app_main() {
 	ESP_ERROR_CHECK(ret);
 
 	initialise_wifi();
-
 
 	// Create a queue capable of containing 10 uint32_t values.
 	subQueue = xQueueCreate(10, sizeof(queueData_t));
@@ -393,8 +361,10 @@ void app_main() {
 		ESP_LOGI(TAG, "pubqueue init failure");
 	}
 
-	xTaskCreate(&mqtt_task, "mqtt_task", 2*8192, NULL, 2, NULL);
-	xTaskCreate(&gpio_task, "gpio_task", 2048, NULL, 1, NULL);
+	xTaskCreate(&mqtt_task, "mqtt_task", 2*8192, NULL, 5, NULL);
+
+	gpio_task_setup();
+	mqtt_app_start();
 
 	while (1) {
 		vTaskDelay(100 / portTICK_RATE_MS);
