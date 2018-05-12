@@ -26,7 +26,8 @@ static time_t lastStart = 0;
 static void sendStatus(const queueData_t* pData);
 static void disableChan(uint32_t chan);
 static void enableChan(uint32_t chan);
-static void updateGpio(uint32_t chan);
+static void updateGpio(void);
+static int32_t bitToIndex(uint32_t bit);
 
 static uint32_t gpioLut[] = {
 		CONTROL0_PIN,
@@ -40,7 +41,7 @@ void gpio_task(void *pvParameters) {
 		if (actChan != 0) {
 			time_t now;
 			time(&now);
-			if (difftime(now, lastStart) > 5) {
+			if (difftime(now, lastStart) > AUTO_OFF_SEC) {
 				disableChan(actChan);
 			}
 		}
@@ -65,6 +66,8 @@ void gpio_task(void *pvParameters) {
 					break;
 				}
 			}
+
+			updateGpio();
 		}
 		vTaskDelay(10);
 		taskYIELD();
@@ -77,6 +80,9 @@ void gpio_task_setup(void) {
 			CONTROL0_BIT|CONTROL1_BIT|CONTROL2_BIT|CONTROL3_BIT),
 			.mode = GPIO_MODE_OUTPUT};
 	gpio_config(&config);
+	for (int i=0; i< (sizeof(gpioLut)/sizeof(gpioLut[0]));i++) {
+		gpio_set_level(gpioLut[i], 1);
+	}
 	xTaskCreate(&gpio_task, "gpio_task", 2048, NULL, 5, NULL);
 }
 
@@ -99,28 +105,39 @@ static void enableChan(uint32_t chan) {
 		disableChan(actChan);
 	}
 	actChan = chan;
-	updateGpio(chan);
-	queueData_t data = {chan, mOn};
+	updateGpio();
+	queueData_t data = {bitToIndex(chan), mOn};
 	if (hasChanged) sendStatus(&data);
 	time(&lastStart);
 }
 
 static void disableChan(uint32_t chan) {
 	if (actChan == chan) {
-		queueData_t data = {chan, mOff};
+		queueData_t data = {bitToIndex(chan), mOff};
 		sendStatus(&data);
+		updateGpio();
+		time(&lastStart);
+		actChan = 0;
 	}
-	updateGpio(chan);
-	actChan = 0;
-	time(&lastStart);
 }
 
-static void updateGpio(uint32_t chan) {
+static void updateGpio(void) {
 	for (int i=0; i< (sizeof(gpioLut)/sizeof(gpioLut[0]));i++) {
-		if ((chan & (1<<i)) != 0) {
-			gpio_set_level(gpioLut[i], 1);
-		} else {
+		if ((actChan & (1<<i)) != 0) {
 			gpio_set_level(gpioLut[i], 0);
+		} else {
+			gpio_set_level(gpioLut[i], 1);
 		}
 	}
+}
+
+static int32_t bitToIndex(uint32_t bit) {
+	int32_t ret = -1;
+	for (uint32_t i=0;i<32;i++) {
+		if ((bit & (1<<i))!=0) {
+			ret = i;
+			break;
+		}
+	}
+	return ret;
 }

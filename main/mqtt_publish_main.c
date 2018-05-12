@@ -78,8 +78,7 @@
 #define LED_GPIO_OUTPUT    27
 #define GPIO_OUTPUT_PIN_SEL  ((1ULL<<LED_GPIO_OUTPUT))
 
-static esp_wps_config_t config =
-				WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
+static esp_wps_config_t config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
 
 /* The event group allows multiple bits for each event,
  but we only care about one event - are we connected
@@ -117,18 +116,18 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-            /*
-            msg_id = esp_mqtt_client_subscribe(client, "/topic/qos0", 0);
-            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
-
-            msg_id = esp_mqtt_client_subscribe(client, "/topic/qos1", 1);
-            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
-
-            msg_id = esp_mqtt_client_unsubscribe(client, "/topic/qos1");
-            ESP_LOGI(TAG, "sent unsubscribe successful, msg_id=%d", msg_id);
-            */
+            /* send status of all avail channels */
+			queueData_t data = { 0, mStatus };
+			for (int i = 0; i < (sizeof(chanNames) / sizeof(chanNames[0])); i++) {
+				data.chan = i;
+				if ( xQueueSend(subQueue, (void * ) &data,
+						(TickType_t ) 10) != pdPASS) {
+					// Failed to post the message, even after 10 ticks.
+					ESP_LOGI(TAG, "subqueue post failure");
+				}
+			}
 			msg_id = esp_mqtt_client_subscribe(client, MQTT_SUB_MESSAGE, 1);
-			            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+			ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
@@ -136,8 +135,6 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
 
         case MQTT_EVENT_SUBSCRIBED:
             ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-            //msg_id = esp_mqtt_client_publish(client, "/topic/qos0", "data", 0, 0, 0);
-            //ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
             break;
         case MQTT_EVENT_UNSUBSCRIBED:
             ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
@@ -147,8 +144,6 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
             break;
         case MQTT_EVENT_DATA:
             ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-            //printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
-            //printf("DATA=%.*s\r\n", event->data_len, event->data);
             mqtt_message_handler(event);
             break;
         case MQTT_EVENT_ERROR:
@@ -194,7 +189,7 @@ static void mqtt_message_handler(esp_mqtt_event_handle_t event) {
 					event->data_len) == 0) {
 				func = mOff;
 			} else {
-				func = mStatus;
+				chan = -1;
 			}
 
 			if (chan != -1) {
@@ -218,14 +213,12 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 		break;
 	case SYSTEM_EVENT_STA_GOT_IP:
 		xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
-		gpio_set_level(LED_GPIO_OUTPUT, 1);
 		break;
 	case SYSTEM_EVENT_STA_DISCONNECTED:
 		/* This is a workaround as ESP32 WiFi libs don't currently
 		 auto-reassociate. */
 		esp_wifi_connect();
 		xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
-		gpio_set_level(LED_GPIO_OUTPUT, 0);
 		break;
 	case SYSTEM_EVENT_STA_WPS_ER_SUCCESS:
 		/*point: the function esp_wifi_wps_start() only get ssid & password
@@ -260,6 +253,9 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 }
 
 static void initialise_wifi(void) {
+
+	const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;
+
 	tcpip_adapter_init();
 	wifi_event_group = xEventGroupCreate();
 
@@ -278,7 +274,7 @@ static void initialise_wifi(void) {
 
 		ESP_LOGI(TAG, "Waiting for wifi");
 		xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true,
-				portMAX_DELAY);
+				xTicksToWait);
 
 	} while ((xEventGroupGetBits(wifi_event_group) & CONNECTED_BIT) == 0);
 }
@@ -298,14 +294,14 @@ void mqtt_task(void *pvParameters) {
 
 			int chan = rxData.chan;
 
-			if (chan != -1 && (chan <maxChanIndex)) {
+			if (chan != -1 && (chan < maxChanIndex)) {
 				char buf[255] = { 0 };
 				char payload[16] = { 0 };
 
 				snprintf(buf, sizeof(buf), "%s%s", MQTT_PUB_MESSAGE,
 						chanNames[chan]);
 				snprintf(payload, sizeof(payload), "%s",
-						rxData.mode == mOn ? "on" : "off");
+						rxData.mode == mOn ? "son" : "soff");
 
 				ESP_LOGI(TAG, "publish %.*s : %.*s", strlen(buf), buf,
 						strlen(payload), payload);
