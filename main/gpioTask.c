@@ -54,6 +54,13 @@ void gpio_task(void *pvParameters) {
 
 				switch (rxData.mode) {
 				case mStatus:
+					if (rxData.chan < (sizeof(gpioLut)/sizeof(gpioLut[0]))) {
+						if ((actChan & (1<<rxData.chan)) != 0) {
+							rxData.mode = mOn;
+						} else {
+							rxData.mode = mOff;
+						}
+					}
 					sendStatus(&rxData);
 					break;
 
