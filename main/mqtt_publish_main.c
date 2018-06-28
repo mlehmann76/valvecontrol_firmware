@@ -53,10 +53,8 @@
 #include "mbedtls/error.h"
 #include "mbedtls/certs.h"
 
-#include "mqtt_client.h"
-
-
 #include "gpioTask.h"
+#include "mqtt_user.h"
 
 /* The examples use simple WiFi configuration that you can set via
  'make menuconfig'.
@@ -85,22 +83,8 @@ static esp_wps_config_t config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
  to the AP with an IP? */
 const int CONNECTED_BIT = BIT0;
 
-/* Constants that aren't configurable in menuconfig */
-#define MQTT_SERVER "raspberrypi"
-#define MQTT_USER "sensor1"
-#define MQTT_PASS "sensor1"
-#define MQTT_PORT 8883
-#define MQTT_BUF_SIZE 1000
-#define MQTT_WEBSOCKET 0 // 0=no 1=yes
+#define TAG "MAIN"
 
-#define MQTT_PUB_MESSAGE_FORMAT "esp32/%02X%02X/%s"
-
-static const char *TAG = "MQTTS";
-static const char* chanNames[] = {"channel0","channel1","channel2","channel3"};
-static const int maxChanIndex = sizeof(chanNames)/sizeof(chanNames[0]);
-
-static char mqtt_sub_msg[32] = {0};
-static char mqtt_pub_msg[32] = {0};
 
 /* subqueue for handling messages to gpio,
  * pubQueue for handling messages from gpio (autoOff) to mqtt */
@@ -108,109 +92,11 @@ QueueHandle_t subQueue,pubQueue;
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 EventGroupHandle_t wifi_event_group;
-esp_mqtt_client_handle_t client = NULL;
 
-static void mqtt_message_handler(esp_mqtt_event_handle_t event) ;
 
-static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
-{
-    client = event->client;
-    int msg_id;
-    // your_context_t *context = event->context;
-    switch (event->event_id) {
-        case MQTT_EVENT_CONNECTED:
-            ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-            /* send status of all avail channels */
-			queueData_t data = { 0, mStatus };
-			for (int i = 0; i < maxChanIndex; i++) {
-				data.chan = i;
-				if ( xQueueSend(subQueue, (void * ) &data,
-						(TickType_t ) 10) != pdPASS) {
-					// Failed to post the message, even after 10 ticks.
-					ESP_LOGI(TAG, "subqueue post failure");
-				}
-			}
-			msg_id = esp_mqtt_client_subscribe(client, mqtt_sub_msg, 1);
-			ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
-            break;
-        case MQTT_EVENT_DISCONNECTED:
-            ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
-            break;
-
-        case MQTT_EVENT_SUBSCRIBED:
-            ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-            break;
-        case MQTT_EVENT_UNSUBSCRIBED:
-            ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
-            break;
-        case MQTT_EVENT_PUBLISHED:
-            ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
-            break;
-        case MQTT_EVENT_DATA:
-            ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-            mqtt_message_handler(event);
-            break;
-        case MQTT_EVENT_ERROR:
-            ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
-            break;
-    }
-    return ESP_OK;
-}
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
-static void mqtt_message_handler(esp_mqtt_event_handle_t event) {
-
-	const char *pTopic;
-	int chan = -1;
-	gpio_task_mode_t func = mStatus;
-
-	ESP_LOGI(TAG, "Topic received!: %.*s %.*s", event->topic_len,
-			 event->topic, event->data_len,	event->data);
-
-	if (event->topic_len > strlen(mqtt_sub_msg)) {
-		pTopic = &event->topic[strlen(mqtt_sub_msg)-1];
-
-		ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(mqtt_sub_msg) + 1, pTopic);
-
-		if (*pTopic != 0) {
-			chan = -1;
-			for (int i = 0; i < maxChanIndex; i++) {
-				/* add /control/channelName to check for messages */
-				char buf[32];
-				snprintf(buf, sizeof(buf), "%s%s", "/control/", chanNames[i]);
-
-				if (strncmp(pTopic, buf, event->topic_len - strlen(mqtt_sub_msg) + 1) == 0) {
-					chan = i;
-					ESP_LOGI(TAG,"channel :%d found", i);
-					break;
-				}
-			}
-
-			if (event->data_len == 0) {
-				func = mStatus;
-			} else if (strncmp((const char*) event->data, "on",
-					event->data_len) == 0) {
-				func = mOn;
-			} else if (strncmp((const char*) event->data, "off",
-					event->data_len) == 0) {
-				func = mOff;
-			} else {
-				chan = -1;
-			}
-
-			if (chan != -1) {
-				queueData_t data = { chan, func };
-				// available if necessary.
-				if ( xQueueSend(subQueue, (void * ) &data,
-						(TickType_t ) 10) != pdPASS) {
-					// Failed to post the message, even after 10 ticks.
-					ESP_LOGI(TAG, "subqueue post failure");
-				}
-			}
-		}
-	}
-}
 
 #pragma GCC diagnostic pop
 static esp_err_t event_handler(void *ctx, system_event_t *event) {
@@ -287,55 +173,6 @@ static void initialise_wifi(void) {
 }
 
 
-void mqtt_task(void *pvParameters) {
-	int msg_id;
-	while (1) {
-		// check if we have something to do
-		queueData_t rxData = { 0 };
-
-		if ((client != NULL)
-				&& (xQueueReceive(pubQueue, &(rxData), (TickType_t ) 10))) {
-
-			ESP_LOGI(TAG, "pubQueue work");
-
-			int chan = rxData.chan;
-
-			if (chan != -1 && (chan < maxChanIndex)) {
-				char buf[255] = { 0 };
-				char payload[16] = { 0 };
-
-				snprintf(buf, sizeof(buf), "%s%s", mqtt_pub_msg, chanNames[chan]);
-				snprintf(payload, sizeof(payload), "%s",
-						rxData.mode == mOn ? "son" : "soff");
-
-				ESP_LOGI(TAG, "publish %.*s : %.*s", strlen(buf), buf,
-						strlen(payload), payload);
-
-				msg_id = esp_mqtt_client_publish(client, buf, payload,
-						strlen(payload) + 1, 1, 0);
-				ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
-
-			}
-		}
-		vTaskDelay(10);
-		taskYIELD();
-	}
-	vTaskDelete(NULL);
-}
-
-static void mqtt_app_start(void)
-{
-    const esp_mqtt_client_config_t mqtt_cfg = {
-        .uri = "mqtt://raspberrypi.fritz.box:1883",
-        .event_handle = mqtt_event_handler,
-        // .user_context = (void *)your_context
-    };
-
-    client = esp_mqtt_client_init(&mqtt_cfg);
-    esp_mqtt_client_start(client);
-}
-
-
 void app_main() {
 
 	/* Initialize NVS — it is used to store PHY calibration data */
@@ -345,13 +182,6 @@ void app_main() {
 		ret = nvs_flash_init();
 	}
 	ESP_ERROR_CHECK(ret);
-
-	uint8_t mac[6] = {0};
-	esp_efuse_mac_get_default(mac);
-	snprintf(mqtt_sub_msg, sizeof(mqtt_sub_msg), MQTT_PUB_MESSAGE_FORMAT, mac[5],mac[4],"#");
-	snprintf(mqtt_pub_msg, sizeof(mqtt_pub_msg), MQTT_PUB_MESSAGE_FORMAT, mac[5],mac[4], "state/");
-
-	ESP_LOGI(TAG, "sub: %s, pub: %s", mqtt_sub_msg, mqtt_pub_msg);
 
 	initialise_wifi();
 
@@ -368,10 +198,9 @@ void app_main() {
 		ESP_LOGI(TAG, "pubqueue init failure");
 	}
 
-	xTaskCreate(&mqtt_task, "mqtt_task", 2*8192, NULL, 5, NULL);
 
 	gpio_task_setup();
-	mqtt_app_start();
+	mqtt_user_init();
 
 	while (1) {
 		vTaskDelay(100 / portTICK_RATE_MS);
