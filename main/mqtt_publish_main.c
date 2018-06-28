@@ -82,9 +82,7 @@ static esp_wps_config_t config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
  but we only care about one event - are we connected
  to the AP with an IP? */
 const int CONNECTED_BIT = BIT0;
-
 #define TAG "MAIN"
-
 
 /* subqueue for handling messages to gpio,
  * pubQueue for handling messages from gpio (autoOff) to mqtt */
@@ -92,11 +90,6 @@ QueueHandle_t subQueue,pubQueue;
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 EventGroupHandle_t wifi_event_group;
-
-
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
 
 #pragma GCC diagnostic pop
 static esp_err_t event_handler(void *ctx, system_event_t *event) {
@@ -171,7 +164,6 @@ static void initialise_wifi(void) {
 
 	} while (((xEventGroupGetBits(wifi_event_group) & CONNECTED_BIT) == 0)&&(gpio_get_level(0) != 0));
 }
-
 
 void app_main() {
 
