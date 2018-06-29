@@ -19,6 +19,7 @@
 
 #include "mqtt_client.h"
 #include "mqtt_user.h"
+#include "mqtt_user_ota.h"
 #include "gpioTask.h"
 
 
@@ -28,7 +29,6 @@ static const int maxChanIndex = sizeof(chanNames)/sizeof(chanNames[0]);
 
 static char mqtt_sub_msg[64] = {0};
 static char mqtt_pub_msg[64] = {0};
-static char mqtt_ota_msg[64] = {0};
 
 esp_mqtt_client_handle_t client = NULL;
 
@@ -104,10 +104,6 @@ static void handleChannelControl(int chan, esp_mqtt_event_handle_t event) {
 			ESP_LOGI(TAG, "subqueue post failure");
 		}
 	}
-}
-
-static void handleOtaMessage(esp_mqtt_event_handle_t event) {
-	ESP_LOGI(TAG,"handle ota message");
 }
 
 static void mqtt_message_handler(esp_mqtt_event_handle_t event) {
@@ -199,7 +195,6 @@ void mqtt_user_init(void) {
 	esp_efuse_mac_get_default(mac);
 	snprintf(mqtt_sub_msg, sizeof(mqtt_sub_msg), MQTT_PUB_MESSAGE_FORMAT, mac[5],mac[4],"#");
 	snprintf(mqtt_pub_msg, sizeof(mqtt_pub_msg), MQTT_PUB_MESSAGE_FORMAT, mac[5],mac[4], "state/");
-	snprintf(mqtt_ota_msg, sizeof(mqtt_pub_msg), MQTT_PUB_MESSAGE_FORMAT, mac[5],mac[4], "ota");
 
 	ESP_LOGI(TAG, "sub: %s, pub: %s", mqtt_sub_msg, mqtt_pub_msg);
 
