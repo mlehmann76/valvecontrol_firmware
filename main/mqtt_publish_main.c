@@ -54,7 +54,9 @@
 #include "mbedtls/certs.h"
 
 #include "gpioTask.h"
+#include "mqtt_client.h"
 #include "mqtt_user.h"
+#include "mqtt_user_ota.h"
 
 /* The examples use simple WiFi configuration that you can set via
  'make menuconfig'.

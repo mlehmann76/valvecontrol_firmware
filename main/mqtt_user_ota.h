@@ -9,7 +9,7 @@
 #define MQTT_USER_OTA_H_
 
 void handleOtaMessage(esp_mqtt_event_handle_t event);
-
+void handleOta();
 
 
 #endif /* MQTT_USER_OTA_H_ */

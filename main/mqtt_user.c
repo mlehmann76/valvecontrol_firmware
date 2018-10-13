@@ -28,7 +28,7 @@ static const char* chanNames[] = {"channel0","channel1","channel2","channel3"};
 static const int maxChanIndex = sizeof(chanNames)/sizeof(chanNames[0]);
 
 static char mqtt_sub_msg[64] = {0};
-static char mqtt_pub_msg[64] = {0};
+char mqtt_pub_msg[64] = {0};
 
 esp_mqtt_client_handle_t client = NULL;
 
@@ -172,6 +172,7 @@ void mqtt_task(void *pvParameters) {
 				ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
 
 			}
+			handleOta();
 		}
 		vTaskDelay(10);
 		taskYIELD();
