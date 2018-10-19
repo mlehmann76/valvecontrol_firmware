@@ -10,6 +10,6 @@
 
 void handleOtaMessage(esp_mqtt_event_handle_t event);
 void handleOta();
-
+void mqtt_ota_task(void *pvParameters);
 
 #endif /* MQTT_USER_OTA_H_ */
