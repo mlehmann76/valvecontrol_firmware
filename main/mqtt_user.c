@@ -28,13 +28,13 @@ static const char* chanNames[] = { "channel0", "channel1", "channel2",
 		"channel3" };
 static const int maxChanIndex = sizeof(chanNames) / sizeof(chanNames[0]);
 
-static char mqtt_sub_msg[64] = { 0 };
+char mqtt_sub_msg[64] = { 0 };
 char mqtt_pub_msg[64] = { 0 };
 
 esp_mqtt_client_handle_t client = NULL;
 
 static void mqtt_message_handler(esp_mqtt_event_handle_t event);
-static void handleControlMsg(const char* data);
+static int handleControlMsg(esp_mqtt_event_handle_t event);
 static void handleChannelControl(cJSON* chan);
 
 static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
@@ -91,29 +91,38 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 
 static void mqtt_message_handler(esp_mqtt_event_handle_t event) {
 
-	ESP_LOGI(TAG, "Topic received!: %.*s %.*s", event->topic_len, event->topic,
-			event->data_len < 50 ? event->data_len : 50, event->data);
+//	size_t len = event->data_len < 50 ? event->data_len : 50;
+//	ESP_LOGI(TAG, "Topic received!: (%d) %.*s (%d) %.*s", event->topic_len,
+//			event->topic_len, event->topic, event->data_len, len, event->data);
+	ESP_LOGI(TAG, "Topic received!: (%d) %.*s", event->topic_len,
+			event->topic_len, event->topic);
 
+	if (handleControlMsg(event)) {
+
+	} else if (handleOtaMessage(event)) {
+
+	}
+}
+
+
+static int handleControlMsg(esp_mqtt_event_handle_t event) {
+	int ret = 0;
 	if (event->topic_len > strlen(mqtt_sub_msg)) {
 		const char* pTopic = &event->topic[strlen(mqtt_sub_msg) - 1];
 		ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(mqtt_sub_msg) + 1,
 				pTopic);
 		//check for control messages
 		if (strcmp(pTopic, "control") == 0) {
-			handleControlMsg(event->data);
+			cJSON *root = cJSON_Parse(event->data);
+			cJSON *chan = cJSON_GetObjectItem(root, "channel");
+			if (chan != NULL) {
+				handleChannelControl(chan);
+			}
+			cJSON_Delete(root);
+			ret = 1;
 		}
 	}
-}
-
-
-static void handleControlMsg(const char* data) {
-
-	cJSON *root = cJSON_Parse(data);
-	cJSON *chan = cJSON_GetObjectItem(root, "channel");
-	if (chan != NULL) {
-		handleChannelControl(chan);
-	}
-	cJSON_Delete(root);
+	return ret;
 }
 
 /**
@@ -203,7 +212,7 @@ void mqtt_task(void *pvParameters) {
 
 				int msg_id = esp_mqtt_client_publish(client, mqtt_pub_msg,
 						string, strlen(string) + 1, 1, 0);
-				//ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
+				ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
 				free(string);
 			}
 			end:
@@ -219,7 +228,8 @@ static void mqtt_app_start(void) {
 	const esp_mqtt_client_config_t mqtt_cfg = { .uri = MQTT_SERVER,
 			.event_handle = mqtt_event_handler,
 			// .user_context = (void *)your_context
-			.buffer_size = 4096 };
+			.buffer_size = 1024
+	};
 
 	client = esp_mqtt_client_init(&mqtt_cfg);
 	esp_mqtt_client_start(client);

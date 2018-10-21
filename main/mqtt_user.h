@@ -17,6 +17,8 @@
 
 #define MQTT_PUB_MESSAGE_FORMAT "esp32/%02X%02X/%s"
 
+extern char mqtt_sub_msg[64];
+extern char mqtt_pub_msg[64];
 
 void mqtt_user_init(void);
 
