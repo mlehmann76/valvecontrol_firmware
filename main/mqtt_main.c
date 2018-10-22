@@ -38,21 +38,6 @@
 #include "nvs_flash.h"
 #include "esp_task_wdt.h"
 
-#include "lwip/err.h"
-#include "lwip/sockets.h"
-#include "lwip/sys.h"
-#include "lwip/netdb.h"
-#include "lwip/dns.h"
-
-#include "mbedtls/platform.h"
-#include "mbedtls/net.h"
-#include "mbedtls/debug.h"
-#include "mbedtls/ssl.h"
-#include "mbedtls/entropy.h"
-#include "mbedtls/ctr_drbg.h"
-#include "mbedtls/error.h"
-#include "mbedtls/certs.h"
-
 #include "gpioTask.h"
 #include "mqtt_client.h"
 #include "mqtt_user.h"
@@ -88,7 +73,7 @@ const int CONNECTED_BIT = BIT0;
 
 /* subqueue for handling messages to gpio,
  * pubQueue for handling messages from gpio (autoOff) to mqtt */
-QueueHandle_t subQueue,pubQueue;
+QueueHandle_t subQueue,pubQueue,otaQueue;
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 EventGroupHandle_t wifi_event_group;
@@ -190,6 +175,12 @@ void app_main() {
 	if (pubQueue == 0) {
 		// Queue was not created and must not be used.
 		ESP_LOGI(TAG, "pubqueue init failure");
+	}
+
+	otaQueue = xQueueCreate(2, sizeof(md5_update_t));
+	if (otaQueue == 0) {
+		// Queue was not created and must not be used.
+		ESP_LOGI(TAG, "otaQueue init failure");
 	}
 
 

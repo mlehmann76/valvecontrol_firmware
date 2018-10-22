@@ -8,11 +8,13 @@
 #ifndef MQTT_USER_OTA_H_
 #define MQTT_USER_OTA_H_
 
-typedef enum {
-	OTA_IDLE, OTA_DATA, OTA_FINISH
-} ota_state_t;
-
 #define DECODEBUFSIZE 2048
+#define DATA_RCV (1<<0)
+#define UPDATE_REQ (1<<1)
+
+typedef enum {
+	OTA_IDLE, OTA_START, OTA_DATA, OTA_FINISH
+} ota_state_t;
 
 typedef struct {
 	uint32_t decodePos;
@@ -20,6 +22,11 @@ typedef struct {
 	uint8_t buffer[DECODEBUFSIZE];
 	uint8_t decoded[DECODEBUFSIZE];
 } decode_t;
+
+typedef struct {
+	uint8_t md5[16];
+	size_t len;
+} md5_update_t;
 
 
 int handleOtaMessage(esp_mqtt_event_handle_t event);

@@ -20,6 +20,8 @@
 extern char mqtt_sub_msg[64];
 extern char mqtt_pub_msg[64];
 
+extern QueueHandle_t otaQueue;
+
 void mqtt_user_init(void);
 
 

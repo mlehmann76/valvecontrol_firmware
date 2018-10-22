@@ -24,18 +24,18 @@
 #include "gpioTask.h"
 
 static const char *TAG = "MQTTS";
-static const char* chanNames[] = { "channel0", "channel1", "channel2",
-		"channel3" };
-static const int maxChanIndex = sizeof(chanNames) / sizeof(chanNames[0]);
+static const int maxChanIndex = 4; //TODO
 
-char mqtt_sub_msg[64] = { 0 };
-char mqtt_pub_msg[64] = { 0 };
+char mqtt_sub_msg[64] = { 0 }; //TODO
+char mqtt_pub_msg[64] = { 0 }; //TODO
 
 esp_mqtt_client_handle_t client = NULL;
 
 static void mqtt_message_handler(esp_mqtt_event_handle_t event);
+static int handleSysMessage(esp_mqtt_event_handle_t event);
 static int handleControlMsg(esp_mqtt_event_handle_t event);
 static void handleChannelControl(cJSON* chan);
+static void handleFirmwareMsg(cJSON* firmware);
 
 static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 	client = event->client;
@@ -43,8 +43,7 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 	// your_context_t *context = event->context;
 	switch (event->event_id) {
 	case MQTT_EVENT_CONNECTED:
-		ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED")
-		;
+		ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
 		/* send status of all avail channels */
 		queueData_t data = { 0, mStatus };
 		for (int i = 0; i < maxChanIndex; i++) {
@@ -91,28 +90,123 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 
 static void mqtt_message_handler(esp_mqtt_event_handle_t event) {
 
-//	size_t len = event->data_len < 50 ? event->data_len : 50;
-//	ESP_LOGI(TAG, "Topic received!: (%d) %.*s (%d) %.*s", event->topic_len,
-//			event->topic_len, event->topic, event->data_len, len, event->data);
 	ESP_LOGI(TAG, "Topic received!: (%d) %.*s", event->topic_len,
 			event->topic_len, event->topic);
 
-	if (handleControlMsg(event)) {
+	if (handleSysMessage(event)) {
 
 	} else if (handleOtaMessage(event)) {
 
+	} else if (handleControlMsg(event)) {
+
 	}
 }
+static int handleSysMessage(esp_mqtt_event_handle_t event) {
+	int ret = 0;
+	if (event->topic_len > strlen(mqtt_sub_msg)) {
+		const char* pTopic = &event->topic[strlen(mqtt_sub_msg) - 1];
+		//check for control messages
+		if (strcmp(pTopic, "system") == 0) {
+			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(mqtt_sub_msg) + 1,
+					pTopic);
+			cJSON *root = cJSON_Parse(event->data);
+			cJSON *firmware = cJSON_GetObjectItem(root, "firmware");
+			if (firmware != NULL) {
+				handleFirmwareMsg(firmware);
+			}
+			cJSON_Delete(root);
+			ret = 1;
+		}
+	}
+	return ret;
+}
 
+/* */
+int md5StrToAr(char* pMD5, uint8_t* md5) {
+	int error = 0;
+	for (int i = 0; i < 32; i++) {
+		int temp = 0;
+		if (pMD5[i] <= '9' && pMD5[i] >= '0') {
+			temp = pMD5[i] - '0';
+		} else if (pMD5[i] <= 'f' && pMD5[i] >= 'a') {
+			temp = pMD5[i] - 'a' + 10;
+		} else if (pMD5[i] <= 'F' && pMD5[i] >= 'A') {
+			temp = pMD5[i] - 'A' + 10;
+		} else {
+			error = 1;
+			break;
+		}
+
+		if ((i & 1) == 0) {
+			temp *= 16;
+			md5[i / 2] = temp;
+		} else {
+			md5[i / 2] += temp;
+		}
+	}
+	return error;
+}
+
+static void handleFirmwareMsg(cJSON* firmware) {
+	int error = 0;
+	md5_update_t md5_update;
+	char* pMD5;
+
+	if (cJSON_GetObjectItem(firmware, "update") != NULL) {
+		char* pUpdate = cJSON_GetStringValue(
+				cJSON_GetObjectItem(firmware, "update"));
+		if (strcmp(pUpdate, "ota") != 0) {
+			error = 1;
+		}
+
+		if (!error && cJSON_GetObjectItem(firmware, "md5") == NULL) {
+			error = 2;
+		} else {
+			pMD5 = cJSON_GetStringValue(cJSON_GetObjectItem(firmware, "md5"));
+		}
+
+		if (!error && (strlen(pMD5) != 32)) {
+			error = 3;
+		}
+
+		if(!error && md5StrToAr(pMD5, md5_update.md5) !=0) {
+			error = 4;
+		}
+
+		if (!error && cJSON_GetObjectItem(firmware, "len") == NULL) {
+			error = 5;
+		} else {
+			md5_update.len = cJSON_GetObjectItem(firmware, "len")->valueint;
+		}
+
+		if (error) {
+			ESP_LOGI(TAG, "handleFirmwareMsg error %d", error);
+		} else {
+			ESP_LOGI(TAG,
+					"fileSize :%d ->md5: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+					md5_update.len, md5_update.md5[0], md5_update.md5[1],
+					md5_update.md5[2], md5_update.md5[3], md5_update.md5[4],
+					md5_update.md5[5], md5_update.md5[6], md5_update.md5[7],
+					md5_update.md5[8], md5_update.md5[9], md5_update.md5[10],
+					md5_update.md5[11], md5_update.md5[12], md5_update.md5[13],
+					md5_update.md5[14], md5_update.md5[15]);
+
+			if (xQueueSend(otaQueue, (void * ) &md5_update,
+					(TickType_t ) 10) != pdPASS) {
+				ESP_LOGI(TAG, "otaqueue post failure");
+			}
+		}
+	}
+}
 
 static int handleControlMsg(esp_mqtt_event_handle_t event) {
 	int ret = 0;
 	if (event->topic_len > strlen(mqtt_sub_msg)) {
 		const char* pTopic = &event->topic[strlen(mqtt_sub_msg) - 1];
-		ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(mqtt_sub_msg) + 1,
-				pTopic);
 		//check for control messages
 		if (strcmp(pTopic, "control") == 0) {
+			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(mqtt_sub_msg) + 1,
+					pTopic);
 			cJSON *root = cJSON_Parse(event->data);
 			cJSON *chan = cJSON_GetObjectItem(root, "channel");
 			if (chan != NULL) {

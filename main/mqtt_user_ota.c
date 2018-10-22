@@ -27,13 +27,11 @@
 
 #define TAG "OTA"
 
-char payload[2048];
-int payload_len = 0;
-mbedtls_md5_context ctx;
-EventGroupHandle_t mqtt_ota_event_group;
-#define DATA_RCV (1<<0)
+static mbedtls_md5_context ctx;
 static decode_t decodeCtx;
+static md5_update_t md5Updata;
 
+EventGroupHandle_t mqtt_ota_event_group;
 ota_state_t ota_state = OTA_IDLE;
 
 void b85DecodeInit(decode_t *src){
@@ -80,7 +78,7 @@ int handleOtaMessage(esp_mqtt_event_handle_t event) {
 			event->topic_len >= strlen(mqtt_sub_msg) ?
 					&event->topic[strlen(mqtt_sub_msg) - 1] : "";
 
-	if (mqtt_ota_event_group != NULL) {
+	if ((ota_state != OTA_IDLE) && (mqtt_ota_event_group != NULL)) {
 		if (((event->topic_len == 0) || (strcmp(pTopic, "ota") == 0))) {
 			ESP_LOGI(TAG, "handle ota message, len %d", event->data_len);
 
@@ -117,21 +115,30 @@ void handleOta() {
 
 		switch (ota_state) {
 		case OTA_IDLE:
+			/*
 			if (xEventGroupWaitBits(mqtt_ota_event_group, DATA_RCV, pdTRUE, pdFALSE, (TickType_t) 1)) {
 				last = now;
 				ota_state = OTA_DATA;
 			}
+			*/
+			break;
+
+		case OTA_START:
+			ESP_LOGI(TAG, "ota start");
+			last = now;
+			ota_state = OTA_DATA;
 			break;
 
 		case OTA_DATA:
 			if (xEventGroupWaitBits(mqtt_ota_event_group, DATA_RCV, pdTRUE, pdFALSE, (TickType_t) 1)) {
 				last = now;
 			} else {
-				if ((now - last) > 2) { //TODO
+				if ((now - last) > 5) { //TODO
 					ota_state = OTA_FINISH;
 				}
 			}
 			break;
+
 		case OTA_FINISH:
 			mbedtls_md5_finish(&ctx, output);
 			ESP_LOGI(TAG,
@@ -150,7 +157,17 @@ void mqtt_ota_task(void *pvParameters) {
 	mqtt_ota_event_group = xEventGroupCreate();
 	ESP_LOGI(TAG, "init md5");
 	mbedtls_md5_init(&ctx);
+
 	for (;;) {
+		if (otaQueue != NULL) {
+			md5_update_t rxData = { 0 };
+			// Receive a message on the created queue.  Block for 10 ticks if a
+			// message is not immediately available.
+			if (xQueueReceive(otaQueue, &(rxData), (TickType_t ) 10)) {
+				md5Updata = rxData;
+				ota_state = OTA_START;
+			}
+		}
 		handleOta();
 		vTaskDelay(1);
 		taskYIELD();
