@@ -43,7 +43,7 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 	// your_context_t *context = event->context;
 	switch (event->event_id) {
 	case MQTT_EVENT_CONNECTED:
-		ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
+		ESP_LOGD(TAG, "MQTT_EVENT_CONNECTED");
 		/* send status of all avail channels */
 		queueData_t data = { 0, mStatus };
 		for (int i = 0; i < maxChanIndex; i++) {
@@ -51,38 +51,31 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 			if ( xQueueSend(subQueue, (void * ) &data,
 					(TickType_t ) 10) != pdPASS) {
 				// Failed to post the message, even after 10 ticks.
-				ESP_LOGI(TAG, "subqueue post failure");
+				ESP_LOGW(TAG, "subqueue post failure");
 			}
 		}
 		msg_id = esp_mqtt_client_subscribe(client, mqtt_sub_msg, 1);
-		ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id)
-		;
+		ESP_LOGD(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 		break;
 	case MQTT_EVENT_DISCONNECTED:
-		ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED")
-		;
+		ESP_LOGD(TAG, "MQTT_EVENT_DISCONNECTED");
 		break;
 
 	case MQTT_EVENT_SUBSCRIBED:
-		ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id)
-		;
+		ESP_LOGD(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
 		break;
 	case MQTT_EVENT_UNSUBSCRIBED:
-		ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id)
-		;
+		ESP_LOGD(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
 		break;
 	case MQTT_EVENT_PUBLISHED:
-		ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id)
-		;
+		ESP_LOGD(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id)	;
 		break;
 	case MQTT_EVENT_DATA:
-		ESP_LOGI(TAG, "MQTT_EVENT_DATA")
-		;
+		ESP_LOGD(TAG, "MQTT_EVENT_DATA");
 		mqtt_message_handler(event);
 		break;
 	case MQTT_EVENT_ERROR:
-		ESP_LOGI(TAG, "MQTT_EVENT_ERROR")
-		;
+		ESP_LOGE(TAG, "MQTT_EVENT_ERROR")	;
 		break;
 	}
 	return ESP_OK;
@@ -90,8 +83,13 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 
 static void mqtt_message_handler(esp_mqtt_event_handle_t event) {
 
-	ESP_LOGI(TAG, "Topic received!: (%d) %.*s", event->topic_len,
-			event->topic_len, event->topic);
+	if (event->data_len < 64) {
+		ESP_LOGD(TAG, "Topic received!: (%d) %.*s (%d) %.*s", event->topic_len,
+				event->topic_len, event->topic, event->data_len, event->data_len, event->data);
+	} else {
+		ESP_LOGD(TAG, "Topic received!: (%d) %.*s", event->topic_len,
+				event->topic_len, event->topic);
+	}
 
 	if (handleSysMessage(event)) {
 
