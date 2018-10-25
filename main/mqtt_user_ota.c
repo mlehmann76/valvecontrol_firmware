@@ -33,8 +33,8 @@
 static mbedtls_md5_context ctx;
 static decode_t decodeCtx;
 static md5_update_t md5Updata;
+static QueueHandle_t dataQueue;
 
-EventGroupHandle_t mqtt_ota_event_group;
 ota_state_t ota_state = OTA_IDLE;
 SemaphoreHandle_t xSemaphore = NULL;
 
@@ -70,9 +70,6 @@ static int b85Decode(const uint8_t *src, size_t len, decode_t *dest) {
 			memcpy(&dest->buffer[dest->decodePos], src, len);
 			//decode
 			int ret = decode_85((char*)dest->decoded, (const char*)dest->buffer, decLen / 5 * 4);
-			if (dest->sumLen == 0) {
-				ESP_LOGI(TAG, "first %02x, second %02x", dest->decoded[0], dest->decoded[1]);
-			}
 
 			if (ret == 0) {
 				//copy rest to buffer
@@ -82,6 +79,7 @@ static int b85Decode(const uint8_t *src, size_t len, decode_t *dest) {
 				dest->decodePos = decRest;
 				dest->len = decLen / 5 * 4;
 				dest->sumLen += decLen / 5 * 4;
+				ESP_LOGV(TAG, "decode %d", dest->len);
 			} else {
 				ESP_LOGE(TAG, "decode error %d", ret);
 			}
@@ -98,18 +96,23 @@ int handleOtaMessage(esp_mqtt_event_handle_t event) {
 				event->topic_len >= strlen(mqtt_sub_msg) ?
 						&event->topic[strlen(mqtt_sub_msg) - 1] : "";
 
-		if ((ota_state != OTA_IDLE) && (mqtt_ota_event_group != NULL)) {
+		if ((ota_state != OTA_IDLE)) {
 			if (((event->topic_len == 0)
 					|| (strcmp(pTopic, "ota/$implementation/binary") == 0))) {
 
+				//block till data was processed by ota task
+				if (xQueueSend(dataQueue, (void * ) &decodeCtx.len,	(TickType_t ) 1000) != pdPASS) {
+					// Failed to post the message, even after 100 ticks.
+					ESP_LOGI(TAG, "dataqueue post failure");
+				}
 				//ESP_LOGI(TAG, "handle ota message, len (%d) %.*s", event->data_len, event->data_len, event->data);{
-				if ( xSemaphoreTake( xSemaphore, ( TickType_t ) 10 ) == pdTRUE) {
+				if ( xSemaphoreTake( xSemaphore, ( TickType_t ) 1000 ) == pdTRUE) {
+
 					int len = b85Decode((uint8_t*) event->data, event->data_len,&decodeCtx);
 					if (len > 0) {
 						mbedtls_md5_update(&ctx, decodeCtx.decoded, len);
 					}
 
-					xEventGroupSetBits(mqtt_ota_event_group, DATA_RCV);
 					ret = 1;
 					xSemaphoreGive(xSemaphore);
 				}
@@ -120,7 +123,7 @@ int handleOtaMessage(esp_mqtt_event_handle_t event) {
 }
 
 void mqtt_ota_task(void *pvParameters) {
-	static uint32_t last = 0;
+	static uint32_t last = 0, temp;
     esp_err_t err;
     /* update handle : set by esp_ota_begin(), must be freed via esp_ota_end() */
     esp_ota_handle_t update_handle = 0 ;
@@ -128,11 +131,18 @@ void mqtt_ota_task(void *pvParameters) {
     const esp_partition_t *configured = esp_ota_get_boot_partition();
     const esp_partition_t *running = esp_ota_get_running_partition();
 
-	mqtt_ota_event_group = xEventGroupCreate();
 	xSemaphore = xSemaphoreCreateBinary();
 
 	if( xSemaphore == NULL ) {
 		ESP_LOGE(TAG, "error creating semaphore");
+	} else {
+		xSemaphoreGive(xSemaphore);
+	}
+
+	dataQueue = xQueueCreate(1, sizeof(uint32_t));
+	if (dataQueue == NULL) {
+		// Queue was not created and must not be used.
+		ESP_LOGI(TAG, "dataQueue init failure");
 	}
 
 	ESP_LOGI(TAG, "init md5");
@@ -148,7 +158,7 @@ void mqtt_ota_task(void *pvParameters) {
 				ota_state = OTA_START;
 			}
 		}
-		if (mqtt_ota_event_group != NULL && xSemaphore != NULL) {
+		if (xSemaphore != NULL) {
 			struct timeval tv;
 			gettimeofday(&tv, NULL);
 
@@ -200,9 +210,7 @@ void mqtt_ota_task(void *pvParameters) {
 					break;
 
 				case OTA_DATA:
-					if (xEventGroupWaitBits(mqtt_ota_event_group, DATA_RCV,
-							pdTRUE,
-							pdFALSE, (TickType_t) 1)) {
+					if (xQueueReceive(dataQueue, &(temp), (TickType_t ) 1)) {
 						last = now;
 						if (decodeCtx.len > 0) {
 							err = esp_ota_write(update_handle,
@@ -213,6 +221,8 @@ void mqtt_ota_task(void *pvParameters) {
 								ESP_LOGE(TAG, "esp_ota_write failed (%s)",
 										esp_err_to_name(err));
 								task_fatal_error();
+							} else {
+								ESP_LOGI(TAG, "esp_ota_write %d%%", decodeCtx.sumLen*100/md5Updata.len);
 							}
 
 							if (decodeCtx.sumLen == md5Updata.len) {

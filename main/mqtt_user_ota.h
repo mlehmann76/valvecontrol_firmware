@@ -8,7 +8,7 @@
 #ifndef MQTT_USER_OTA_H_
 #define MQTT_USER_OTA_H_
 
-#define DECODEBUFSIZE 2048
+#define DECODEBUFSIZE (CONFIG_MQTT_BUFFER_SIZE+5)
 #define DATA_RCV (1<<0)
 #define UPDATE_REQ (1<<1)
 

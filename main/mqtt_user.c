@@ -178,9 +178,9 @@ static void handleFirmwareMsg(cJSON* firmware) {
 		}
 
 		if (error) {
-			ESP_LOGI(TAG, "handleFirmwareMsg error %d", error);
+			ESP_LOGE(TAG, "handleFirmwareMsg error %d", error);
 		} else {
-			ESP_LOGI(TAG,
+			ESP_LOGV(TAG,
 					"fileSize :%d ->md5: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
 					md5_update.len, md5_update.md5[0], md5_update.md5[1],
 					md5_update.md5[2], md5_update.md5[3], md5_update.md5[4],
@@ -191,7 +191,7 @@ static void handleFirmwareMsg(cJSON* firmware) {
 
 			if (xQueueSend(otaQueue, (void * ) &md5_update,
 					(TickType_t ) 10) != pdPASS) {
-				ESP_LOGI(TAG, "otaqueue post failure");
+				ESP_LOGW(TAG, "otaqueue post failure");
 			}
 		}
 	}
@@ -235,7 +235,7 @@ static void handleChannelControl(cJSON* chan) {
 			chanVal = cJSON_GetObjectItem(chan, "val")->valueint;
 		}
 
-		ESP_LOGI(TAG, "channel :%d found ->%d", chanNum, chanVal);
+		ESP_LOGD(TAG, "channel :%d found ->%d", chanNum, chanVal);
 		gpio_task_mode_t func = mStatus;
 
 		if (chanVal == 1) {
@@ -249,7 +249,7 @@ static void handleChannelControl(cJSON* chan) {
 		if (xQueueSend(subQueue, (void * ) &cdata,
 				(TickType_t ) 10) != pdPASS) {
 			// Failed to post the message, even after 10 ticks.
-			ESP_LOGI(TAG, "subqueue post failure");
+			ESP_LOGW(TAG, "subqueue post failure");
 		}
 	}
 }
@@ -263,7 +263,7 @@ void mqtt_task(void *pvParameters) {
 		if ((client != NULL)
 				&& (xQueueReceive(pubQueue, &(rxData), (TickType_t ) 10))) {
 
-			ESP_LOGI(TAG, "pubQueue work");
+			ESP_LOGD(TAG, "pubQueue work");
 
 			int chan = rxData.chan;
 			cJSON *root = NULL;
@@ -299,12 +299,12 @@ void mqtt_task(void *pvParameters) {
 					goto end;
 				}
 
-				ESP_LOGI(TAG, "publish %.*s : %.*s", strlen(mqtt_pub_msg),
+				ESP_LOGD(TAG, "publish %.*s : %.*s", strlen(mqtt_pub_msg),
 						mqtt_pub_msg, strlen(string), string);
 
 				int msg_id = esp_mqtt_client_publish(client, mqtt_pub_msg,
 						string, strlen(string) + 1, 1, 0);
-				ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
+				ESP_LOGD(TAG, "sent publish successful, msg_id=%d", msg_id);
 				free(string);
 			}
 			end:
@@ -320,7 +320,7 @@ static void mqtt_app_start(void) {
 	const esp_mqtt_client_config_t mqtt_cfg = { .uri = MQTT_SERVER,
 			.event_handle = mqtt_event_handler,
 			// .user_context = (void *)your_context
-			.buffer_size = 1024
+			//.buffer_size = 4096 /*not set here, set in config */
 	};
 
 	client = esp_mqtt_client_init(&mqtt_cfg);
@@ -336,7 +336,7 @@ void mqtt_user_init(void) {
 	ESP_LOGI(TAG, "sub: %s, pub: %s", mqtt_sub_msg, mqtt_pub_msg);
 
 	xTaskCreatePinnedToCore(&mqtt_task, "mqtt_task", 2 * 8192, NULL, 5, NULL, 0);
-	xTaskCreatePinnedToCore(&mqtt_ota_task, "mqtt_ota_task", 2 * 8192, NULL, 20, NULL, 0);
+	xTaskCreatePinnedToCore(&mqtt_ota_task, "mqtt_ota_task", 2 * 8192, NULL, 5, NULL, 0);
 
 	mqtt_app_start();
 }
