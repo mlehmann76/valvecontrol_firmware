@@ -24,6 +24,7 @@
 #include "mqtt_client.h"
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
+#include "mqtt_config.h"
 
 #include "mbedtls/md5.h"
 #include "base85.h"
@@ -93,20 +94,21 @@ int handleOtaMessage(esp_mqtt_event_handle_t event) {
 	int ret = 0;
 	if (xSemaphore != NULL) {
 		const char* pTopic =
-				event->topic_len >= strlen(mqtt_sub_msg) ?
-						&event->topic[strlen(mqtt_sub_msg) - 1] : "";
+				event->topic_len >= strlen(getSubMsg()) ?
+						&event->topic[strlen(getSubMsg()) - 1] : "";
 
 		if ((ota_state != OTA_IDLE)) {
 			if (((event->topic_len == 0)
 					|| (strcmp(pTopic, "ota/$implementation/binary") == 0))) {
 
 				//block till data was processed by ota task
-				if (xQueueSend(dataQueue, (void * ) &decodeCtx.len,	(TickType_t ) 1000) != pdPASS) {
+				const TickType_t xTicksToWait = 1000 / portTICK_PERIOD_MS;
+				if (xQueueSend(dataQueue, (void * ) &decodeCtx.len,	xTicksToWait) != pdPASS) {
 					// Failed to post the message, even after 100 ticks.
 					ESP_LOGI(TAG, "dataqueue post failure");
 				}
 				//ESP_LOGI(TAG, "handle ota message, len (%d) %.*s", event->data_len, event->data_len, event->data);{
-				if ( xSemaphoreTake( xSemaphore, ( TickType_t ) 1000 ) == pdTRUE) {
+				if ( xSemaphoreTake( xSemaphore, xTicksToWait) == pdTRUE) {
 
 					int len = b85Decode((uint8_t*) event->data, event->data_len,&decodeCtx);
 					if (len > 0) {
@@ -153,7 +155,8 @@ void mqtt_ota_task(void *pvParameters) {
 			md5_update_t rxData = { 0 };
 			// Receive a message on the created queue.  Block for 10 ticks if a
 			// message is not immediately available.
-			if (xQueueReceive(otaQueue, &(rxData), (TickType_t ) 10)) {
+			const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
+			if (xQueueReceive(otaQueue, &(rxData), xTicksToWait)) {
 				md5Updata = rxData;
 				ota_state = OTA_START;
 			}
@@ -165,7 +168,8 @@ void mqtt_ota_task(void *pvParameters) {
 			uint32_t now = tv.tv_sec;
 			unsigned char output[16];
 
-			if ( xSemaphoreTake( xSemaphore, ( TickType_t ) 10 ) == pdTRUE) {
+			const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
+			if ( xSemaphoreTake( xSemaphore, xTicksToWait ) == pdTRUE) {
 				switch (ota_state) {
 				case OTA_IDLE:
 					break;

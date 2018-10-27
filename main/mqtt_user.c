@@ -21,15 +21,16 @@
 #include "mqtt_client.h"
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
+#include "mqtt_config.h"
 #include "gpioTask.h"
 
 static const char *TAG = "MQTTS";
 static const int maxChanIndex = 4; //TODO
+static esp_mqtt_client_handle_t client = NULL;
 
-char mqtt_sub_msg[64] = { 0 }; //TODO
-char mqtt_pub_msg[64] = { 0 }; //TODO
-
-esp_mqtt_client_handle_t client = NULL;
+/* subqueue for handling messages to gpio,
+ * pubQueue for handling messages from gpio (autoOff) to mqtt */
+QueueHandle_t subQueue,pubQueue,otaQueue;
 
 static void mqtt_message_handler(esp_mqtt_event_handle_t event);
 static int handleSysMessage(esp_mqtt_event_handle_t event);
@@ -39,22 +40,21 @@ static void handleFirmwareMsg(cJSON* firmware);
 
 static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 	client = event->client;
-	int msg_id;
 	// your_context_t *context = event->context;
 	switch (event->event_id) {
 	case MQTT_EVENT_CONNECTED:
 		ESP_LOGD(TAG, "MQTT_EVENT_CONNECTED");
 		/* send status of all avail channels */
+		const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
 		queueData_t data = { 0, mStatus };
 		for (int i = 0; i < maxChanIndex; i++) {
 			data.chan = i;
-			if ( xQueueSend(subQueue, (void * ) &data,
-					(TickType_t ) 10) != pdPASS) {
+			if ( xQueueSend(subQueue, (void * ) &data,	xTicksToWait) != pdPASS) {
 				// Failed to post the message, even after 10 ticks.
 				ESP_LOGW(TAG, "subqueue post failure");
 			}
 		}
-		msg_id = esp_mqtt_client_subscribe(client, mqtt_sub_msg, 1);
+		int msg_id = esp_mqtt_client_subscribe(client, getSubMsg(), 1);
 		ESP_LOGD(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 		break;
 	case MQTT_EVENT_DISCONNECTED:
@@ -101,11 +101,11 @@ static void mqtt_message_handler(esp_mqtt_event_handle_t event) {
 }
 static int handleSysMessage(esp_mqtt_event_handle_t event) {
 	int ret = 0;
-	if (event->topic_len > strlen(mqtt_sub_msg)) {
-		const char* pTopic = &event->topic[strlen(mqtt_sub_msg) - 1];
+	if (event->topic_len > strlen(getSubMsg())) {
+		const char* pTopic = &event->topic[strlen(getSubMsg()) - 1];
 		//check for control messages
 		if (strcmp(pTopic, "system") == 0) {
-			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(mqtt_sub_msg) + 1,
+			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(getSubMsg()) + 1,
 					pTopic);
 			cJSON *root = cJSON_Parse(event->data);
 			cJSON *firmware = cJSON_GetObjectItem(root, "firmware");
@@ -149,6 +149,7 @@ static void handleFirmwareMsg(cJSON* firmware) {
 	int error = 0;
 	md5_update_t md5_update;
 	char* pMD5;
+	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
 
 	if (cJSON_GetObjectItem(firmware, "update") != NULL) {
 		char* pUpdate = cJSON_GetStringValue(
@@ -190,7 +191,7 @@ static void handleFirmwareMsg(cJSON* firmware) {
 					md5_update.md5[14], md5_update.md5[15]);
 
 			if (xQueueSend(otaQueue, (void * ) &md5_update,
-					(TickType_t ) 10) != pdPASS) {
+					xTicksToWait) != pdPASS) {
 				ESP_LOGW(TAG, "otaqueue post failure");
 			}
 		}
@@ -199,11 +200,11 @@ static void handleFirmwareMsg(cJSON* firmware) {
 
 static int handleControlMsg(esp_mqtt_event_handle_t event) {
 	int ret = 0;
-	if (event->topic_len > strlen(mqtt_sub_msg)) {
-		const char* pTopic = &event->topic[strlen(mqtt_sub_msg) - 1];
+	if (event->topic_len > strlen(getSubMsg())) {
+		const char* pTopic = &event->topic[strlen(getSubMsg()) - 1];
 		//check for control messages
 		if (strcmp(pTopic, "control") == 0) {
-			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(mqtt_sub_msg) + 1,
+			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(getSubMsg()) + 1,
 					pTopic);
 			cJSON *root = cJSON_Parse(event->data);
 			cJSON *chan = cJSON_GetObjectItem(root, "channel");
@@ -242,12 +243,14 @@ static void handleChannelControl(cJSON* chan) {
 			func = mOn;
 		} else if (chanVal == 0) {
 			func = mOff;
+		} else {
+			func = mStatus;
 		}
 
 		queueData_t cdata = { chanNum, func };
+		const TickType_t tick = 10 / portTICK_PERIOD_MS;
 		// available if necessary.
-		if (xQueueSend(subQueue, (void * ) &cdata,
-				(TickType_t ) 10) != pdPASS) {
+		if (xQueueSend(subQueue, (void * ) &cdata,	tick) != pdPASS) {
 			// Failed to post the message, even after 10 ticks.
 			ESP_LOGW(TAG, "subqueue post failure");
 		}
@@ -255,13 +258,13 @@ static void handleChannelControl(cJSON* chan) {
 }
 
 void mqtt_task(void *pvParameters) {
-
+	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
 	while (1) {
 		// check if we have something to do
 		queueData_t rxData = { 0 };
 
 		if ((client != NULL)
-				&& (xQueueReceive(pubQueue, &(rxData), (TickType_t ) 10))) {
+				&& (xQueueReceive(pubQueue, &(rxData), xTicksToWait))) {
 
 			ESP_LOGD(TAG, "pubQueue work");
 
@@ -275,23 +278,18 @@ void mqtt_task(void *pvParameters) {
 					goto end;
 				}
 
-				cJSON *channel = cJSON_CreateObject();
+				cJSON *channel = cJSON_AddObjectToObject(root, "channel");
 				if (channel == NULL) {
 					goto end;
 				}
-				cJSON_AddItemToObject(root, "channel", channel);
 
-				cJSON *chanNum = cJSON_CreateNumber(chan);
-				if (chanNum == NULL) {
+				if (cJSON_AddNumberToObject(channel, "num", chan) == NULL) {
 					goto end;
 				}
-				cJSON_AddItemToObject(channel, "num", chanNum);
 
-				cJSON *chanVal = cJSON_CreateNumber(rxData.mode == mOn ? 1 : 0);
-				if (chanVal == NULL) {
+				if( cJSON_AddNumberToObject(channel, "val", rxData.mode == mOn ? 1 : 0) == NULL) {
 					goto end;
 				}
-				cJSON_AddItemToObject(channel, "val", chanVal);
 
 				char *string = cJSON_Print(root);
 				if (string == NULL) {
@@ -299,11 +297,12 @@ void mqtt_task(void *pvParameters) {
 					goto end;
 				}
 
-				ESP_LOGD(TAG, "publish %.*s : %.*s", strlen(mqtt_pub_msg),
-						mqtt_pub_msg, strlen(string), string);
+				ESP_LOGD(TAG, "publish %.*s : %.*s", strlen(getPubMsg()),
+						getPubMsg(), strlen(string), string);
 
-				int msg_id = esp_mqtt_client_publish(client, mqtt_pub_msg,
+				int msg_id = esp_mqtt_client_publish(client, getPubMsg(),
 						string, strlen(string) + 1, 1, 0);
+
 				ESP_LOGD(TAG, "sent publish successful, msg_id=%d", msg_id);
 				free(string);
 			}
@@ -316,8 +315,29 @@ void mqtt_task(void *pvParameters) {
 	vTaskDelete(NULL);
 }
 
-static void mqtt_app_start(void) {
-	const esp_mqtt_client_config_t mqtt_cfg = { .uri = MQTT_SERVER,
+void mqtt_user_init(void) {
+
+	// Create a queue capable of containing 10 uint32_t values.
+	subQueue = xQueueCreate(10, sizeof(queueData_t));
+	if (subQueue == 0) {
+		// Queue was not created and must not be used.
+		ESP_LOGI(TAG, "subqueue init failure");
+	}
+
+	pubQueue = xQueueCreate(10, sizeof(queueData_t));
+	if (pubQueue == 0) {
+		// Queue was not created and must not be used.
+		ESP_LOGI(TAG, "pubqueue init failure");
+	}
+
+	otaQueue = xQueueCreate(2, sizeof(md5_update_t));
+	if (otaQueue == 0) {
+		// Queue was not created and must not be used.
+		ESP_LOGI(TAG, "otaQueue init failure");
+	}
+
+	const esp_mqtt_client_config_t mqtt_cfg = {
+			.uri = getMqttServer(),
 			.event_handle = mqtt_event_handler,
 			// .user_context = (void *)your_context
 			//.buffer_size = 4096 /*not set here, set in config */
@@ -325,19 +345,9 @@ static void mqtt_app_start(void) {
 
 	client = esp_mqtt_client_init(&mqtt_cfg);
 	esp_mqtt_client_start(client);
-}
-
-void mqtt_user_init(void) {
-	uint8_t mac[6] = { 0 };
-	esp_efuse_mac_get_default(mac);
-	snprintf(mqtt_sub_msg, sizeof(mqtt_sub_msg), MQTT_PUB_MESSAGE_FORMAT, mac[5], mac[4], "#");
-	snprintf(mqtt_pub_msg, sizeof(mqtt_pub_msg), MQTT_PUB_MESSAGE_FORMAT, mac[5], mac[4], "state/");
-
-	ESP_LOGI(TAG, "sub: %s, pub: %s", mqtt_sub_msg, mqtt_pub_msg);
 
 	xTaskCreatePinnedToCore(&mqtt_task, "mqtt_task", 2 * 8192, NULL, 5, NULL, 0);
 	xTaskCreatePinnedToCore(&mqtt_ota_task, "mqtt_ota_task", 2 * 8192, NULL, 5, NULL, 0);
 
-	mqtt_app_start();
 }
 

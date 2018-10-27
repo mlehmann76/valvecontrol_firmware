@@ -8,21 +8,17 @@
 #ifndef MAIN_MQTT_USER_H_
 #define MAIN_MQTT_USER_H_
 
-/* Constants that aren't configurable in menuconfig */
-#define MQTT_SERVER "mqtt://raspberrypi.fritz.box:1883"
-#define MQTT_USER "sensor1"
-#define MQTT_PASS "sensor1"
-#define MQTT_BUF_SIZE 1000
-#define MQTT_WEBSOCKET 0 // 0=no 1=yes
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#define MQTT_PUB_MESSAGE_FORMAT "esp32/%02X%02X/%s"
-
-extern char mqtt_sub_msg[64];
-extern char mqtt_pub_msg[64];
-
-extern QueueHandle_t otaQueue;
+QueueHandle_t subQueue,pubQueue,otaQueue;
 
 void mqtt_user_init(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 
 

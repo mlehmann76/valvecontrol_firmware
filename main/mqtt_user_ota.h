@@ -8,6 +8,10 @@
 #ifndef MQTT_USER_OTA_H_
 #define MQTT_USER_OTA_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define DECODEBUFSIZE (CONFIG_MQTT_BUFFER_SIZE+5)
 #define DATA_RCV (1<<0)
 #define UPDATE_REQ (1<<1)
@@ -33,5 +37,9 @@ typedef struct {
 int handleOtaMessage(esp_mqtt_event_handle_t event);
 void handleOta();
 void mqtt_ota_task(void *pvParameters);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* MQTT_USER_OTA_H_ */

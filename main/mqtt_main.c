@@ -39,6 +39,7 @@
 #include "esp_task_wdt.h"
 
 #include "gpioTask.h"
+#include "mqtt_config.h"
 #include "mqtt_client.h"
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
@@ -70,10 +71,6 @@ static esp_wps_config_t config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
  to the AP with an IP? */
 const int CONNECTED_BIT = BIT0;
 #define TAG "MAIN"
-
-/* subqueue for handling messages to gpio,
- * pubQueue for handling messages from gpio (autoOff) to mqtt */
-QueueHandle_t subQueue,pubQueue,otaQueue;
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 EventGroupHandle_t wifi_event_group;
@@ -146,6 +143,7 @@ static void initialise_wifi(void) {
 		ESP_ERROR_CHECK(esp_wifi_start());
 
 		ESP_LOGI(TAG, "Waiting for wifi");
+
 		xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true,
 				xTicksToWait);
 
@@ -164,27 +162,8 @@ void app_main() {
 
 	initialise_wifi();
 
-	// Create a queue capable of containing 10 uint32_t values.
-	subQueue = xQueueCreate(10, sizeof(queueData_t));
-	if (subQueue == 0) {
-		// Queue was not created and must not be used.
-		ESP_LOGI(TAG, "subqueue init failure");
-	}
-
-	pubQueue = xQueueCreate(10, sizeof(queueData_t));
-	if (pubQueue == 0) {
-		// Queue was not created and must not be used.
-		ESP_LOGI(TAG, "pubqueue init failure");
-	}
-
-	otaQueue = xQueueCreate(2, sizeof(md5_update_t));
-	if (otaQueue == 0) {
-		// Queue was not created and must not be used.
-		ESP_LOGI(TAG, "otaQueue init failure");
-	}
-
-
 	gpio_task_setup();
+	mqtt_config_init();
 	mqtt_user_init();
 
 	while (1) {
