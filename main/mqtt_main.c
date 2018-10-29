@@ -44,6 +44,9 @@
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
 
+#include <http_server.h>
+#include "http_config_server.h"
+
 /* The examples use simple WiFi configuration that you can set via
  'make menuconfig'.
 
@@ -77,18 +80,29 @@ EventGroupHandle_t wifi_event_group;
 
 #pragma GCC diagnostic pop
 static esp_err_t event_handler(void *ctx, system_event_t *event) {
+	httpd_handle_t *server = (httpd_handle_t *) ctx;
+
 	switch (event->event_id) {
 	case SYSTEM_EVENT_STA_START:
-		esp_wifi_connect();
+		ESP_ERROR_CHECK(esp_wifi_connect());
 		break;
 	case SYSTEM_EVENT_STA_GOT_IP:
 		xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
+        /* Start the web server */
+        if (*server == NULL) {
+            *server = start_webserver();
+        }
 		break;
 	case SYSTEM_EVENT_STA_DISCONNECTED:
 		/* This is a workaround as ESP32 WiFi libs don't currently
 		 auto-reassociate. */
 		esp_wifi_connect();
 		xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
+        /* Stop the web server */
+        if (*server) {
+            stop_webserver(*server);
+            *server = NULL;
+        }
 		break;
 	case SYSTEM_EVENT_STA_WPS_ER_SUCCESS:
 		/*point: the function esp_wifi_wps_start() only get ssid & password
@@ -122,7 +136,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 	return ESP_OK;
 }
 
-static void initialise_wifi(void) {
+static void initialise_wifi(void *arg) {
 
 	const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;
 
@@ -131,7 +145,7 @@ static void initialise_wifi(void) {
 
 	tcpip_adapter_init();
 
-	ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL));
+	ESP_ERROR_CHECK(esp_event_loop_init(event_handler, arg));
 
 	do {
 		wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -152,6 +166,8 @@ static void initialise_wifi(void) {
 
 void app_main() {
 
+    static httpd_handle_t server = NULL;
+
 	/* Initialize NVS — it is used to store PHY calibration data */
 	esp_err_t ret = nvs_flash_init();
 	if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
@@ -160,11 +176,13 @@ void app_main() {
 	}
 	ESP_ERROR_CHECK(ret);
 
-	initialise_wifi();
+	initialise_wifi(&server);
 
 	gpio_task_setup();
 	mqtt_config_init();
 	mqtt_user_init();
+
+	ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
 
 	while (1) {
 		vTaskDelay(100 / portTICK_RATE_MS);

@@ -7,8 +7,7 @@
 # please read the ESP-IDF documents if you need to do this.
 #
 
-COMPONENT_ADD_INCLUDEDIRS := . MQTTClient-C/src MQTTClient-C/src/mbedtls MQTTPacket/src
+#COMPONENT_ADD_INCLUDEDIRS := . MQTTClient-C/src MQTTClient-C/src/mbedtls MQTTPacket/src
+#COMPONENT_SRCDIRS := $(COMPONENT_ADD_INCLUDEDIRS)
 
-COMPONENT_SRCDIRS := $(COMPONENT_ADD_INCLUDEDIRS)
-
-#COMPONENT_EMBED_TXTFILES := server_root_cert.pem
+COMPONENT_EMBED_TXTFILES := raspberrypi.pem

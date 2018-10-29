@@ -60,9 +60,7 @@ static void b85DecodeInit(decode_t *src){
 }
 
 static int b85Decode(const uint8_t *src, size_t len, decode_t *dest) {
-
 	dest->len = 0;
-
 	if (dest != NULL) {
 		int decLen = ((len + dest->decodePos) / 5) * 5;
 		int decRest = (len + dest->decodePos) % 5;
@@ -102,7 +100,7 @@ int handleOtaMessage(esp_mqtt_event_handle_t event) {
 					|| (strcmp(pTopic, "ota/$implementation/binary") == 0))) {
 
 				//block till data was processed by ota task
-				const TickType_t xTicksToWait = 1000 / portTICK_PERIOD_MS;
+				const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;
 				if (xQueueSend(dataQueue, (void * ) &decodeCtx.len,	xTicksToWait) != pdPASS) {
 					// Failed to post the message, even after 100 ticks.
 					ESP_LOGI(TAG, "dataqueue post failure");

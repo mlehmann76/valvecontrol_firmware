@@ -19,12 +19,14 @@
 
 static const char *TAG = "MQTT_CNF";
 
-char def_mqtt_sub_msg[64] = { 0 }; //TODO
-char def_mqtt_pub_msg[64] = { 0 }; //TODO
-char *mqtt_server = NULL;
-char *mqtt_sub_msg = NULL;
-char *mqtt_pub_msg = NULL;
-char *mqtt_device_name = NULL;
+static char def_mqtt_sub_msg[64] = { 0 }; //TODO
+static char def_mqtt_pub_msg[64] = { 0 }; //TODO
+static char *mqtt_server = (char*)MQTT_SERVER;
+static char *mqtt_sub_msg = NULL;
+static char *mqtt_pub_msg = NULL;
+static char *mqtt_device_name = NULL;
+static char *mqtt_user = (char*)MQTT_USER;
+static char *mqtt_pass = (char*)MQTT_PASS;
 
 const char* getSubMsg() {
 	if (mqtt_sub_msg != NULL) {
@@ -43,11 +45,31 @@ const char* getPubMsg() {
 }
 
 const char* getMqttServer() {
-	if (mqtt_server == NULL) {
-		return MQTT_SERVER;
-	} else {
-		return mqtt_server;
+	return mqtt_server;
+}
+
+const char* getMqttUser() {
+	return mqtt_user;
+}
+
+const char* getMqttPass() {
+	return mqtt_pass;
+}
+
+static esp_err_t readStr(nvs_handle *pHandle, const char *pName, char **dest) {
+	size_t required_size;
+	char * temp;
+	esp_err_t err = nvs_get_str(*pHandle, pName, NULL, &required_size);
+	if (err == ESP_OK) {
+		temp = malloc(required_size);
+		if (temp != NULL) {
+			nvs_get_str(*pHandle, pName, temp, &required_size);
+			*dest = temp;
+		} else {
+			err = ESP_ERR_NO_MEM;
+		}
 	}
+	return err;
 }
 
 void mqtt_config_init() {
@@ -68,22 +90,18 @@ void mqtt_config_init() {
 		ESP_LOGE(TAG, "nvs_open storage failed (%s)", esp_err_to_name(err));
 	}
 
-	/* read mqtt server name */
-	size_t required_size;
-	err = nvs_get_str(my_handle, "server_name", NULL, &required_size);
-	if (err == ESP_OK) {
-		mqtt_server = malloc(required_size);
-		nvs_get_str(my_handle, "server_name", mqtt_server, &required_size);
-	}
-
+	/* set default pub/sub messages */
 	uint8_t mac[6] = { 0 };
 	esp_efuse_mac_get_default(mac);
+	snprintf(def_mqtt_sub_msg, sizeof(def_mqtt_sub_msg), MQTT_PUB_MESSAGE_FORMAT,
+			mac[0], mac[1],mac[2], mac[3],mac[4], mac[5], "#");
+
+	snprintf(def_mqtt_pub_msg, sizeof(def_mqtt_pub_msg), MQTT_PUB_MESSAGE_FORMAT,
+			mac[0], mac[1],mac[2], mac[3],mac[4], mac[5], "state/");
 
 	/* read mqtt device name */
-	err = nvs_get_str(my_handle, "mqtt_device_name", NULL, &required_size);
-	if (err == ESP_OK) {
-		mqtt_device_name = malloc(required_size);
-		nvs_get_str(my_handle, "mqtt_device_name", mqtt_device_name, &required_size);
+	if (ESP_OK == readStr(&my_handle, "mqtt_device_name", &mqtt_device_name)) {
+		size_t required_size = strlen(mqtt_device_name);//TODO strlen is risky here
 		mqtt_sub_msg = malloc(required_size+sizeof("/")+1);
 		mqtt_pub_msg = malloc(required_size+sizeof("/state/")+1);
 
@@ -93,11 +111,14 @@ void mqtt_config_init() {
 		}
 	}
 
-	snprintf(def_mqtt_sub_msg, sizeof(def_mqtt_sub_msg), MQTT_PUB_MESSAGE_FORMAT,
-			mac[0], mac[1],mac[2], mac[3],mac[4], mac[5], "#");
+	/* read mqtt server name */
+	readStr(&my_handle, "server_name", &mqtt_server);
 
-	snprintf(def_mqtt_pub_msg, sizeof(def_mqtt_pub_msg), MQTT_PUB_MESSAGE_FORMAT,
-			mac[0], mac[1],mac[2], mac[3],mac[4], mac[5], "state/");
+	/* read mqtt user name */
+	readStr(&my_handle, "mqtt_user", &mqtt_user);
+
+	/* read mqtt user pass */
+	readStr(&my_handle, "mqtt_pass", &mqtt_pass);
 
 	ESP_LOGI(TAG, "sub: (%s) pub (%s)", getSubMsg(),getPubMsg());
 }

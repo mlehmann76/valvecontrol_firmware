@@ -24,6 +24,9 @@
 #include "mqtt_config.h"
 #include "gpioTask.h"
 
+extern const uint8_t iot_eclipse_org_pem_start[] asm("_binary_raspberrypi_pem_start");
+//extern const uint8_t iot_eclipse_org_pem_end[]   asm("_binary_iot_eclipse_org_pem_end");
+
 static const char *TAG = "MQTTS";
 static const int maxChanIndex = 4; //TODO
 static esp_mqtt_client_handle_t client = NULL;
@@ -339,6 +342,9 @@ void mqtt_user_init(void) {
 	const esp_mqtt_client_config_t mqtt_cfg = {
 			.uri = getMqttServer(),
 			.event_handle = mqtt_event_handler,
+			.username = getMqttUser(),
+			.password = getMqttPass(),
+			.cert_pem = (const char *)iot_eclipse_org_pem_start,
 			// .user_context = (void *)your_context
 			//.buffer_size = 4096 /*not set here, set in config */
 	};

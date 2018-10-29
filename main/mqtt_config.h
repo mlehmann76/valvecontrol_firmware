@@ -13,7 +13,7 @@ extern "C" {
 #endif
 
 /* Constants that aren't configurable in menuconfig */
-#define MQTT_SERVER "mqtt://raspberrypi.fritz.box:1883"
+#define MQTT_SERVER "mqtt://raspberrypi.fritz.box"
 #define MQTT_USER "sensor1"
 #define MQTT_PASS "sensor1"
 
@@ -27,6 +27,8 @@ typedef enum nvs_type nvs_type_t;
 const char* getSubMsg();
 const char* getPubMsg();
 const char* getMqttServer();
+const char* getMqttUser();
+const char* getMqttPass();
 
 void mqtt_config_init();
 
