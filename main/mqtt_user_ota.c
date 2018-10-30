@@ -21,6 +21,7 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 
+#include "cJSON.h"
 #include "mqtt_client.h"
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"

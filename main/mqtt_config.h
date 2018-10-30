@@ -14,10 +14,11 @@ extern "C" {
 
 /* Constants that aren't configurable in menuconfig */
 #define MQTT_SERVER "mqtt://raspberrypi.fritz.box"
+#define MQTT_DEVICE "esp32/"
 #define MQTT_USER "sensor1"
 #define MQTT_PASS "sensor1"
 
-#define MQTT_PUB_MESSAGE_FORMAT "esp32/%02X%02X%02X%02X%02X%02X/%s"
+#define MQTT_PUB_MESSAGE_FORMAT "%s%02X%02X%02X%02X%02X%02X%s"
 
 /*
 enum {eUINT8, eINT8, eUINT16, eINT16, eUINT32, eINT32, eSTR, eBLOB} nvs_type;
@@ -29,6 +30,7 @@ const char* getPubMsg();
 const char* getMqttServer();
 const char* getMqttUser();
 const char* getMqttPass();
+esp_err_t setMqttConfig(cJSON* config);
 
 void mqtt_config_init();
 

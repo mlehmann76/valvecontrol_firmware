@@ -37,6 +37,7 @@
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "esp_task_wdt.h"
+#include "cJSON.h"
 
 #include "gpioTask.h"
 #include "mqtt_config.h"

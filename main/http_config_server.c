@@ -20,6 +20,7 @@
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "esp_task_wdt.h"
+#include "cJSON.h"
 
 #include "gpioTask.h"
 #include "mqtt_config.h"
@@ -135,6 +136,62 @@ httpd_uri_t post = {
      * context to demonstrate it's usage */
 };
 
+/* An HTTP GET handler */
+esp_err_t _config_handler(httpd_req_t *req) {
+	ESP_LOGI(TAG, "/config handler read content length %d", req->content_len);
+
+	char* buf = malloc(req->content_len + 1);
+	size_t off = 0;
+	int ret;
+
+	if (!buf) {
+		httpd_resp_set_status(req, HTTPD_500);
+		return ESP_FAIL;
+	}
+
+	while (off < req->content_len) {
+		/* Read data received in the request */
+		ret = httpd_req_recv(req, buf + off, req->content_len - off);
+		if (ret <= 0) {
+			{
+				httpd_resp_set_status(req, HTTPD_500);
+			}
+			free(buf);
+			return ESP_FAIL;
+		}
+		off += ret;
+		ESP_LOGI(TAG, "/config handler recv length %d", ret);
+	}
+	buf[off] = '\0';
+
+	if (req->content_len < 128) {
+		ESP_LOGI(TAG, "/config handler read %s", buf);
+	}
+
+	/* read mqtt config */
+	cJSON *root = cJSON_Parse(buf);
+	cJSON *mqtt_config = cJSON_GetObjectItem(root, "mqtt");
+
+	if (mqtt_config != NULL) {
+		setMqttConfig(mqtt_config);
+	}
+
+	cJSON_Delete(root);
+
+	httpd_resp_set_type(req, HTTPD_TYPE_JSON);
+	httpd_resp_send(req, buf, 0);
+	free(buf);
+	return ESP_OK;
+}
+
+httpd_uri_t put_config = {
+    .uri       = "/config",
+    .method    = HTTP_PUT,
+    .handler   = _config_handler,
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
+};
+
 httpd_handle_t start_webserver(void)
 {
     httpd_handle_t server = NULL;
@@ -147,7 +204,7 @@ httpd_handle_t start_webserver(void)
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(server, &hello);
         httpd_register_uri_handler(server, &post);
-        //httpd_register_uri_handler(server, &ctrl);
+        httpd_register_uri_handler(server, &put_config);
         return server;
     }
 
