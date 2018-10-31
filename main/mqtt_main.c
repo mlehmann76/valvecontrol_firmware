@@ -45,13 +45,11 @@
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
 
-#include <http_server.h>
+#include "http_server.h"
 #include "http_config_server.h"
+#include "driver/gpio.h"
+#include "config_user.h"
 
-/* The examples use simple WiFi configuration that you can set via
- 'make menuconfig'.
-
- */
 #if CONFIG_EXAMPLE_WPS_TYPE_PBC
 #define WPS_TEST_MODE WPS_TYPE_PBC
 #elif CONFIG_EXAMPLE_WPS_TYPE_PIN
@@ -65,9 +63,6 @@
 #define PINSTR "%c%c%c%c%c%c%c%c"
 #endif
 
-#define LED_GPIO_OUTPUT    27
-#define GPIO_OUTPUT_PIN_SEL  ((1ULL<<LED_GPIO_OUTPUT))
-
 static esp_wps_config_t config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
 
 /* The event group allows multiple bits for each event,
@@ -77,7 +72,7 @@ const int CONNECTED_BIT = BIT0;
 #define TAG "MAIN"
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
-EventGroupHandle_t wifi_event_group;
+EventGroupHandle_t wifi_event_group, button_event_group;
 
 #pragma GCC diagnostic pop
 static esp_err_t event_handler(void *ctx, system_event_t *event) {
@@ -109,27 +104,27 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 		/*point: the function esp_wifi_wps_start() only get ssid & password
 		 * so call the function esp_wifi_connect() here
 		 * */
-		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_SUCCESS")		;
-		ESP_ERROR_CHECK(esp_wifi_wps_disable())		;
-		ESP_ERROR_CHECK(esp_wifi_connect())		;
+		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_SUCCESS");
+		ESP_ERROR_CHECK(esp_wifi_wps_disable());
+		ESP_ERROR_CHECK(esp_wifi_connect());
 		break;
 	case SYSTEM_EVENT_STA_WPS_ER_FAILED:
-		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_FAILED")		;
-		ESP_ERROR_CHECK(esp_wifi_wps_disable())		;
-		ESP_ERROR_CHECK(esp_wifi_wps_enable(&config))		;
-		ESP_ERROR_CHECK(esp_wifi_wps_start(0))		;
+		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_FAILED");
+		ESP_ERROR_CHECK(esp_wifi_wps_disable());
+		ESP_ERROR_CHECK(esp_wifi_wps_enable(&config));
+		ESP_ERROR_CHECK(esp_wifi_wps_start(0));
 		break;
 	case SYSTEM_EVENT_STA_WPS_ER_TIMEOUT:
-		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_TIMEOUT")		;
-		ESP_ERROR_CHECK(esp_wifi_wps_disable())		;
-		ESP_ERROR_CHECK(esp_wifi_wps_enable(&config))		;
-		ESP_ERROR_CHECK(esp_wifi_wps_start(0))		;
+		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_TIMEOUT");
+		ESP_ERROR_CHECK(esp_wifi_wps_disable());
+		ESP_ERROR_CHECK(esp_wifi_wps_enable(&config));
+		ESP_ERROR_CHECK(esp_wifi_wps_start(0));
 		break;
 	case SYSTEM_EVENT_STA_WPS_ER_PIN:
-		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_PIN")		;
+		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_PIN");
 		/*show the PIN code here*/
 		ESP_LOGI(TAG, "WPS_PIN = "PINSTR,
-				PIN2STR(event->event_info.sta_er_pin.pin_code))		;
+				PIN2STR(event->event_info.sta_er_pin.pin_code))	;
 		break;
 	default:
 		break;
@@ -139,8 +134,6 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 
 static void initialise_wifi(void *arg) {
 
-	const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;
-
 	tcpip_adapter_init();
 	wifi_event_group = xEventGroupCreate();
 
@@ -148,26 +141,22 @@ static void initialise_wifi(void *arg) {
 
 	ESP_ERROR_CHECK(esp_event_loop_init(event_handler, arg));
 
-	do {
-		wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-		ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+	wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+	ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-		ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
+	ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
 
-		ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-		ESP_ERROR_CHECK(esp_wifi_start());
+	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+	ESP_ERROR_CHECK(esp_wifi_start());
 
-		ESP_LOGI(TAG, "Waiting for wifi");
-
-		xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true,
-				xTicksToWait);
-
-	} while (((xEventGroupGetBits(wifi_event_group) & CONNECTED_BIT) == 0)&&(gpio_get_level(0) != 0));
+	ESP_LOGI(TAG, "Waiting for wifi");
 }
 
 void app_main() {
 
     static httpd_handle_t server = NULL;
+    button_event_group = xEventGroupCreate();
+
 
 	/* Initialize NVS — it is used to store PHY calibration data */
 	esp_err_t ret = nvs_flash_init();
@@ -186,8 +175,7 @@ void app_main() {
 	ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
 
 	while (1) {
-		vTaskDelay(100 / portTICK_RATE_MS);
-		if (gpio_get_level(0) == 0) {
+		if (xEventGroupWaitBits(button_event_group, WPS_SHORT_BIT, true, true,10)) {
 			ESP_LOGI(TAG, "start wps...");
 
 			ESP_ERROR_CHECK(esp_wifi_wps_enable(&config));

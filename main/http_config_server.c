@@ -41,12 +41,6 @@ const static char http_index_hml[] =
 		"<!DOCTYPE html>"
 		"<html>"
 		"<body>"
-		"<form class=\"form-signin\" action=\"echo\" method=\"POST\">"
-		"<h2 class=\"form-signin-heading\">Simple Form</h2>"
-		"<input class=\"form-control\" name=\"Enter SSID\" required=\"\" type=\"text\" placeholder=\"ssid\" />"
-		"<input class=\"form-control\" name=\"password\" required=\"\" type=\"password\" placeholder=\"Password\" /> <label class=\"checkbox\"></label><br>"
-		"<button class=\"btn btn-lg btn-primary btn-block\" type=\"submit\">Reset</button> &nbsp;&nbsp;"
-		"<button class=\"btn btn-lg btn-primary btn-block\" type=\"submit\">Launch</button>"
 		"</body>"
 		"</html>";
 

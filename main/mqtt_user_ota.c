@@ -29,6 +29,7 @@
 
 #include "mbedtls/md5.h"
 #include "base85.h"
+#include "config_user.h"
 
 #define TAG "OTA"
 
@@ -98,7 +99,7 @@ int handleOtaMessage(esp_mqtt_event_handle_t event) {
 
 		if ((ota_state != OTA_IDLE)) {
 			if (((event->topic_len == 0)
-					|| (strcmp(pTopic, "ota/$implementation/binary") == 0))) {
+					|| (strcmp(pTopic, "/ota/$implementation/binary") == 0))) {
 
 				//block till data was processed by ota task
 				const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;
@@ -113,7 +114,7 @@ int handleOtaMessage(esp_mqtt_event_handle_t event) {
 					if (len > 0) {
 						mbedtls_md5_update(&ctx, decodeCtx.decoded, len);
 					}
-
+					LED_TOGGLE();
 					ret = 1;
 					xSemaphoreGive(xSemaphore);
 				}

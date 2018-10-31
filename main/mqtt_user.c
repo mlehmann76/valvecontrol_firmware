@@ -107,7 +107,7 @@ static int handleSysMessage(esp_mqtt_event_handle_t event) {
 	if (event->topic_len > strlen(getSubMsg())) {
 		const char* pTopic = &event->topic[strlen(getSubMsg()) - 1];
 		//check for control messages
-		if (strcmp(pTopic, "system") == 0) {
+		if (strcmp(pTopic, "/system") == 0) {
 			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(getSubMsg()) + 1,
 					pTopic);
 			cJSON *root = cJSON_Parse(event->data);
@@ -262,6 +262,20 @@ static void handleChannelControl(cJSON* chan) {
 
 void mqtt_task(void *pvParameters) {
 	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
+	const esp_mqtt_client_config_t mqtt_cfg = {
+			.uri = getMqttServer(),
+			.event_handle = mqtt_event_handler,
+			.username = getMqttUser(),
+			.password = getMqttPass(),
+			.cert_pem = (const char *)iot_eclipse_org_pem_start,
+			// .user_context = (void *)your_context
+			//.buffer_size = 4096 /*not set here, set in config */
+	};
+
+	xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, pdFALSE, pdTRUE, 10000/portTICK_PERIOD_MS);
+	client = esp_mqtt_client_init(&mqtt_cfg);
+	esp_mqtt_client_start(client);
+
 	while (1) {
 		// check if we have something to do
 		queueData_t rxData = { 0 };
@@ -338,19 +352,6 @@ void mqtt_user_init(void) {
 		// Queue was not created and must not be used.
 		ESP_LOGI(TAG, "otaQueue init failure");
 	}
-
-	const esp_mqtt_client_config_t mqtt_cfg = {
-			.uri = getMqttServer(),
-			.event_handle = mqtt_event_handler,
-			.username = getMqttUser(),
-			.password = getMqttPass(),
-			.cert_pem = (const char *)iot_eclipse_org_pem_start,
-			// .user_context = (void *)your_context
-			//.buffer_size = 4096 /*not set here, set in config */
-	};
-
-	client = esp_mqtt_client_init(&mqtt_cfg);
-	esp_mqtt_client_start(client);
 
 	xTaskCreatePinnedToCore(&mqtt_task, "mqtt_task", 2 * 8192, NULL, 5, NULL, 0);
 	xTaskCreatePinnedToCore(&mqtt_ota_task, "mqtt_ota_task", 2 * 8192, NULL, 5, NULL, 0);

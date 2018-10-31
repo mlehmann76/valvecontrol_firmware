@@ -9,6 +9,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "freertos/event_groups.h"
 
 #include "sdkconfig.h"
 #include "esp_log.h"
@@ -35,7 +36,25 @@ static uint32_t gpioLut[] = {
 		CONTROL2_PIN,
 		CONTROL3_PIN};
 
+static int checkButton() {
+	static int wps_button_count = 0;
+	if ((gpio_get_level(WPS_BUTTON) == 0)) {
+		wps_button_count++;
+		if (wps_button_count > (WPS_LONG_MS / portTICK_PERIOD_MS)) {
+			xEventGroupSetBits(button_event_group, WPS_LONG_BIT);
+			wps_button_count = 0;
+		}
+	} else {
+		if (wps_button_count > (WPS_SHORT_MS / portTICK_PERIOD_MS)) {
+			xEventGroupSetBits(button_event_group, WPS_SHORT_BIT);
+		}
+		wps_button_count = 0;
+	}
+	return wps_button_count;
+}
+
 void gpio_task(void *pvParameters) {
+
 	while (1) {
 		// timekeeping for auto off
 		if (actChan != 0) {
@@ -47,9 +66,8 @@ void gpio_task(void *pvParameters) {
 		}
 		if (subQueue != 0) {
 			queueData_t rxData = { 0 };
-			// Receive a message on the created queue.  Block for 10 ticks if a
-			// message is not immediately available.
-			if (xQueueReceive(subQueue, &(rxData), (TickType_t ) 10)) {
+			// Receive a message on the created queue.
+			if (xQueueReceive(subQueue, &(rxData), (TickType_t ) 1)) {
 				ESP_LOGI(TAG, "received %08X, %d", rxData.chan, rxData.mode);
 
 				switch (rxData.mode) {
@@ -72,11 +90,15 @@ void gpio_task(void *pvParameters) {
 					disableChan(1<<rxData.chan);
 					break;
 				}
+			} else {
+				vTaskDelay(1);
 			}
-
 			updateGpio();
+		} else {
+			vTaskDelay(1);
 		}
-		vTaskDelay(10);
+
+		checkButton();
 		taskYIELD();
 	}
 	vTaskDelete(NULL);
@@ -84,12 +106,13 @@ void gpio_task(void *pvParameters) {
 
 void gpio_task_setup(void) {
 	gpio_config_t config = {.pin_bit_mask = (
-			CONTROL0_BIT|CONTROL1_BIT|CONTROL2_BIT|CONTROL3_BIT),
+			CONTROL0_BIT|CONTROL1_BIT|CONTROL2_BIT|CONTROL3_BIT|LED_GPIO_BIT),
 			.mode = GPIO_MODE_OUTPUT};
 	gpio_config(&config);
 	for (int i=0; i< (sizeof(gpioLut)/sizeof(gpioLut[0]));i++) {
 		gpio_set_level(gpioLut[i], 1);
 	}
+	LED_OFF();
 	xTaskCreate(&gpio_task, "gpio_task", 2048, NULL, 5, NULL);
 }
 

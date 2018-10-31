@@ -12,7 +12,9 @@
 extern "C" {
 #endif
 
-QueueHandle_t subQueue,pubQueue,otaQueue;
+extern QueueHandle_t subQueue,pubQueue,otaQueue;
+extern EventGroupHandle_t wifi_event_group;
+extern const int CONNECTED_BIT;
 
 void mqtt_user_init(void);
 
