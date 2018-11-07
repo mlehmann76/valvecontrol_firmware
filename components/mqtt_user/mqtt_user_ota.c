@@ -33,6 +33,8 @@
 
 #define TAG "OTA"
 
+extern QueueHandle_t otaQueue;
+
 static mbedtls_md5_context ctx;
 static decode_t decodeCtx;
 static md5_update_t md5Updata;
@@ -40,6 +42,7 @@ static QueueHandle_t dataQueue;
 
 ota_state_t ota_state = OTA_IDLE;
 SemaphoreHandle_t xSemaphore = NULL;
+messageHandler_t otaHandler = {.pUserctx = NULL, .onMessage = handleOtaMessage};
 
 static void __attribute__((noreturn)) task_fatal_error()
 {
@@ -90,7 +93,7 @@ static int b85Decode(const uint8_t *src, size_t len, decode_t *dest) {
 	return dest->len;
 }
 
-int handleOtaMessage(esp_mqtt_event_handle_t event) {
+int handleOtaMessage(pCtx_t p, esp_mqtt_event_handle_t event) {
 	int ret = 0;
 	if (xSemaphore != NULL) {
 		const char* pTopic =

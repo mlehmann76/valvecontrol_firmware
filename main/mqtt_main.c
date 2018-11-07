@@ -37,18 +37,17 @@
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "esp_task_wdt.h"
+#include "esp_http_server.h"
 #include "cJSON.h"
 
-#include "gpioTask.h"
 #include "mqtt_config.h"
 #include "mqtt_client.h"
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
 
-#include "http_server.h"
 #include "http_config_server.h"
-#include "driver/gpio.h"
 #include "config_user.h"
+#include "controlTask.h"
 
 #if CONFIG_EXAMPLE_WPS_TYPE_PBC
 #define WPS_TEST_MODE WPS_TYPE_PBC
@@ -171,6 +170,8 @@ void app_main() {
 	gpio_task_setup();
 	mqtt_config_init();
 	mqtt_user_init();
+	mqtt_user_addHandler(&controlHandler);
+	mqtt_user_addHandler(&otaHandler);
 
 	ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
 
