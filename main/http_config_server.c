@@ -22,14 +22,15 @@
 #include "esp_task_wdt.h"
 #include "cJSON.h"
 
-#include "gpioTask.h"
 #include "mqtt_config.h"
 #include "mqtt_client.h"
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
 
-#include <http_server.h>
+#include "esp_http_server.h"
 #include "http_config_server.h"
+
+#include "controlTask.h"
 
 #define TAG "HTTP"
 

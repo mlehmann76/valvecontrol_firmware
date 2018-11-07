@@ -16,6 +16,7 @@
 
 QueueHandle_t subQueue,pubQueue;
 EventGroupHandle_t button_event_group;
+messageHandler_t controlHandler;
 
 typedef enum {mStatus, mOn, mOff} gpio_task_mode_t;
 
@@ -24,9 +25,10 @@ typedef struct {
 	gpio_task_mode_t mode;
 } queueData_t;
 
-
+int handleControlMsg(pCtx_t, esp_mqtt_event_handle_t );
 void gpio_task(void *pvParameters);
 void gpio_task_setup(void);
+void gpio_onConnect(void);
 
 
 #endif /* MAIN_GPIOTASK_H_ */

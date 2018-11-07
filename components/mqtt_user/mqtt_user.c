@@ -22,23 +22,22 @@
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
 #include "mqtt_config.h"
-#include "gpioTask.h"
 
 extern const uint8_t iot_eclipse_org_pem_start[] asm("_binary_raspberrypi_pem_start");
 //extern const uint8_t iot_eclipse_org_pem_end[]   asm("_binary_iot_eclipse_org_pem_end");
+extern const int CONNECTED_BIT;
 
 static const char *TAG = "MQTTS";
-static const int maxChanIndex = 4; //TODO
 static esp_mqtt_client_handle_t client = NULL;
+static messageHandler_t* messageHandle[8] = {0};
 
 /* subqueue for handling messages to gpio,
  * pubQueue for handling messages from gpio (autoOff) to mqtt */
-QueueHandle_t subQueue,pubQueue,otaQueue;
+QueueHandle_t pubQueue,otaQueue;
+EventGroupHandle_t mqtt_event_group;
 
 static void mqtt_message_handler(esp_mqtt_event_handle_t event);
 static int handleSysMessage(esp_mqtt_event_handle_t event);
-static int handleControlMsg(esp_mqtt_event_handle_t event);
-static void handleChannelControl(cJSON* chan);
 static void handleFirmwareMsg(cJSON* firmware);
 
 static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
@@ -47,20 +46,12 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 	switch (event->event_id) {
 	case MQTT_EVENT_CONNECTED:
 		ESP_LOGD(TAG, "MQTT_EVENT_CONNECTED");
-		/* send status of all avail channels */
-		const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
-		queueData_t data = { 0, mStatus };
-		for (int i = 0; i < maxChanIndex; i++) {
-			data.chan = i;
-			if ( xQueueSend(subQueue, (void * ) &data,	xTicksToWait) != pdPASS) {
-				// Failed to post the message, even after 10 ticks.
-				ESP_LOGW(TAG, "subqueue post failure");
-			}
-		}
+		xEventGroupSetBits(mqtt_event_group, MQTT_CONNECTED_BIT);
 		int msg_id = esp_mqtt_client_subscribe(client, getSubMsg(), 1);
 		ESP_LOGD(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 		break;
 	case MQTT_EVENT_DISCONNECTED:
+		xEventGroupClearBits(mqtt_event_group, MQTT_CONNECTED_BIT);
 		ESP_LOGD(TAG, "MQTT_EVENT_DISCONNECTED");
 		break;
 
@@ -96,12 +87,17 @@ static void mqtt_message_handler(esp_mqtt_event_handle_t event) {
 
 	if (handleSysMessage(event)) {
 
-	} else if (handleOtaMessage(event)) {
-
-	} else if (handleControlMsg(event)) {
-
+	} else {
+		for (int i=0; i< (sizeof(messageHandle)/sizeof(messageHandle[0]));i++) {
+			if ((messageHandle[i] != NULL) && (messageHandle[i]->onMessage !=NULL)) {
+				if (messageHandle[i]->onMessage(messageHandle[i]->pUserctx, event)) {
+					break;
+				}
+			}
+		}
 	}
 }
+
 static int handleSysMessage(esp_mqtt_event_handle_t event) {
 	int ret = 0;
 	if (event->topic_len > strlen(getSubMsg())) {
@@ -201,65 +197,6 @@ static void handleFirmwareMsg(cJSON* firmware) {
 	}
 }
 
-static int handleControlMsg(esp_mqtt_event_handle_t event) {
-	int ret = 0;
-	if (event->topic_len > strlen(getSubMsg())) {
-		const char* pTopic = &event->topic[strlen(getSubMsg()) - 1];
-		//check for control messages
-		if (strcmp(pTopic, "control") == 0) {
-			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(getSubMsg()) + 1,
-					pTopic);
-			cJSON *root = cJSON_Parse(event->data);
-			cJSON *chan = cJSON_GetObjectItem(root, "channel");
-			if (chan != NULL) {
-				handleChannelControl(chan);
-			}
-			cJSON_Delete(root);
-			ret = 1;
-		}
-	}
-	return ret;
-}
-
-/**
- * control format for channel control
- * {
- * 		"channel":
- * 		{
- * 			"num": 1,
- * 			"val": 1
- * 		}
- * }
- */
-static void handleChannelControl(cJSON* chan) {
-	if (cJSON_GetObjectItem(chan, "num") != NULL) {
-		int chanNum = cJSON_GetObjectItem(chan, "num")->valueint;
-		int chanVal = -1;
-		if (cJSON_GetObjectItem(chan, "val") != NULL) {
-			chanVal = cJSON_GetObjectItem(chan, "val")->valueint;
-		}
-
-		ESP_LOGD(TAG, "channel :%d found ->%d", chanNum, chanVal);
-		gpio_task_mode_t func = mStatus;
-
-		if (chanVal == 1) {
-			func = mOn;
-		} else if (chanVal == 0) {
-			func = mOff;
-		} else {
-			func = mStatus;
-		}
-
-		queueData_t cdata = { chanNum, func };
-		const TickType_t tick = 10 / portTICK_PERIOD_MS;
-		// available if necessary.
-		if (xQueueSend(subQueue, (void * ) &cdata,	tick) != pdPASS) {
-			// Failed to post the message, even after 10 ticks.
-			ESP_LOGW(TAG, "subqueue post failure");
-		}
-	}
-}
-
 void mqtt_task(void *pvParameters) {
 	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
 	const esp_mqtt_client_config_t mqtt_cfg = {
@@ -278,53 +215,25 @@ void mqtt_task(void *pvParameters) {
 
 	while (1) {
 		// check if we have something to do
-		queueData_t rxData = { 0 };
+		// queueData_t rxData = { 0 };
+		message_t rxData = {0};
 
 		if ((client != NULL)
 				&& (xQueueReceive(pubQueue, &(rxData), xTicksToWait))) {
 
-			ESP_LOGD(TAG, "pubQueue work");
+			ESP_LOGD(TAG, "publish %.*s : %.*s", strlen(rxData.pTopic),
+					rxData.pTopic, strlen(rxData.pData), rxData.pData);
 
-			int chan = rxData.chan;
-			cJSON *root = NULL;
+			int msg_id = esp_mqtt_client_publish(client, rxData.pTopic,
+					rxData.pData, strlen(rxData.pData) + 1, 1, 0);
 
-			if (chan != -1 && (chan < maxChanIndex)) {
-
-				root = cJSON_CreateObject();
-				if (root == NULL) {
-					goto end;
-				}
-
-				cJSON *channel = cJSON_AddObjectToObject(root, "channel");
-				if (channel == NULL) {
-					goto end;
-				}
-
-				if (cJSON_AddNumberToObject(channel, "num", chan) == NULL) {
-					goto end;
-				}
-
-				if( cJSON_AddNumberToObject(channel, "val", rxData.mode == mOn ? 1 : 0) == NULL) {
-					goto end;
-				}
-
-				char *string = cJSON_Print(root);
-				if (string == NULL) {
-					fprintf(stderr, "Failed to print channel.\n");
-					goto end;
-				}
-
-				ESP_LOGD(TAG, "publish %.*s : %.*s", strlen(getPubMsg()),
-						getPubMsg(), strlen(string), string);
-
-				int msg_id = esp_mqtt_client_publish(client, getPubMsg(),
-						string, strlen(string) + 1, 1, 0);
-
-				ESP_LOGD(TAG, "sent publish successful, msg_id=%d", msg_id);
-				free(string);
+			ESP_LOGD(TAG, "sent publish successful, msg_id=%d", msg_id);
+			if (rxData.topic_len > 0) {
+				free(rxData.pTopic);
 			}
-			end:
-			cJSON_Delete(root);
+			if (rxData.data_len > 0) {
+				free(rxData.pData);
+			}
 		}
 		vTaskDelay(10);
 		taskYIELD();
@@ -334,14 +243,7 @@ void mqtt_task(void *pvParameters) {
 
 void mqtt_user_init(void) {
 
-	// Create a queue capable of containing 10 uint32_t values.
-	subQueue = xQueueCreate(10, sizeof(queueData_t));
-	if (subQueue == 0) {
-		// Queue was not created and must not be used.
-		ESP_LOGI(TAG, "subqueue init failure");
-	}
-
-	pubQueue = xQueueCreate(10, sizeof(queueData_t));
+	pubQueue = xQueueCreate(10, sizeof(message_t));
 	if (pubQueue == 0) {
 		// Queue was not created and must not be used.
 		ESP_LOGI(TAG, "pubqueue init failure");
@@ -353,8 +255,22 @@ void mqtt_user_init(void) {
 		ESP_LOGI(TAG, "otaQueue init failure");
 	}
 
+	mqtt_event_group = xEventGroupCreate();
+
 	xTaskCreatePinnedToCore(&mqtt_task, "mqtt_task", 2 * 8192, NULL, 5, NULL, 0);
 	xTaskCreatePinnedToCore(&mqtt_ota_task, "mqtt_ota_task", 2 * 8192, NULL, 5, NULL, 0);
 
+}
+
+int  mqtt_user_addHandler(messageHandler_t *pHandle) {
+	int ret = 0;
+	for (int i=0; i< (sizeof(messageHandle)/sizeof(messageHandle[0]));i++) {
+		if (messageHandle[i] == NULL) {
+			messageHandle[i] = pHandle;
+			ret = 1;
+			break;
+		}
+	}
+	return ret;
 }
 
