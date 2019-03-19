@@ -147,7 +147,7 @@ int md5StrToAr(char* pMD5, uint8_t* md5) {
 static void handleFirmwareMsg(cJSON* firmware) {
 	int error = 0;
 	md5_update_t md5_update;
-	char* pMD5;
+	char* pMD5 = NULL;
 	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
 
 	if (cJSON_GetObjectItem(firmware, "update") != NULL) {
@@ -235,7 +235,7 @@ void mqtt_task(void *pvParameters) {
 				free(rxData.pData);
 			}
 		}
-		vTaskDelay(10);
+		vTaskDelay(10 / portTICK_PERIOD_MS);
 		taskYIELD();
 	}
 	vTaskDelete(NULL);
@@ -254,8 +254,6 @@ void mqtt_user_init(void) {
 		// Queue was not created and must not be used.
 		ESP_LOGI(TAG, "otaQueue init failure");
 	}
-
-	mqtt_event_group = xEventGroupCreate();
 
 	xTaskCreatePinnedToCore(&mqtt_task, "mqtt_task", 2 * 8192, NULL, 5, NULL, 0);
 	xTaskCreatePinnedToCore(&mqtt_ota_task, "mqtt_ota_task", 2 * 8192, NULL, 5, NULL, 0);

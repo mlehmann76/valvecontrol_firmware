@@ -32,3 +32,35 @@ config EXAMPLE_WPS_TYPE_DISABLE
 endchoice
 
 endmenu
+
+menu "OutPut Configuration"
+
+config CHANOUTPUT1
+    int "Chan1"
+    default "16"
+config CHANOUTPUT2
+    int "Chan2"
+    default "17"
+config CHANOUTPUT3
+    int "Chan3"
+    default "18"
+config CHANOUTPUT4
+    int "Chan4"
+    default "19"
+    
+config CHANOUT_USE_PWM
+    bool "Use Pwm on Outputs"
+    default n
+
+config CHANOUT_PWM_FREQ
+    int
+    depends on CHANOUT_USE_PWM
+    default 50
+
+config CHANOUT_PWM_DUTY
+    int
+    depends on CHANOUT_USE_PWM
+    default 50
+    
+
+endmenu

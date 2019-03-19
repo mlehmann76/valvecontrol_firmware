@@ -282,7 +282,7 @@ void mqtt_ota_task(void *pvParameters) {
 				xSemaphoreGive(xSemaphore);
 			}
 		}
-		vTaskDelay(1);
+		vTaskDelay(10 / portTICK_PERIOD_MS);
 		taskYIELD();
 	}
 }

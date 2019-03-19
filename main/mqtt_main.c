@@ -63,6 +63,7 @@
 #endif
 
 static esp_wps_config_t config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
+static bool enableWPS = false;
 
 /* The event group allows multiple bits for each event,
  but we only care about one event - are we connected
@@ -73,13 +74,45 @@ const int CONNECTED_BIT = BIT0;
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 EventGroupHandle_t wifi_event_group, button_event_group;
 
+void activateWPS(const esp_wps_config_t* config) {
+	ESP_LOGI(TAG, "start wps...");
+	ESP_ERROR_CHECK(esp_wifi_wps_enable(config));
+	ESP_ERROR_CHECK(esp_wifi_wps_start(0));
+}
+
 #pragma GCC diagnostic pop
 static esp_err_t event_handler(void *ctx, system_event_t *event) {
 	httpd_handle_t *server = (httpd_handle_t *) ctx;
-
+	enableWPS = false;
 	switch (event->event_id) {
 	case SYSTEM_EVENT_STA_START:
-		ESP_ERROR_CHECK(esp_wifi_connect());
+		switch (esp_wifi_connect()) {
+		case ESP_OK:
+			ESP_LOGI(TAG, "connected successfully");
+			break;
+
+		case ESP_ERR_WIFI_NOT_INIT:
+			ESP_LOGE(TAG, "WiFi is not initialized by eps_wifi_init");
+			break;
+
+		case ESP_ERR_WIFI_NOT_STARTED:
+			ESP_LOGE(TAG, "WiFi is not started by esp_wifi_start");
+			break;
+
+		case ESP_ERR_WIFI_CONN:
+			ESP_LOGE(TAG,
+					"WiFi internal error, station or soft-AP control block wrong");
+			break;
+
+		case ESP_ERR_WIFI_SSID:
+			ESP_LOGE(TAG, "SSID of AP which station connects is invalid");
+			enableWPS = true;
+			break;
+
+		default:
+			ESP_LOGE(TAG, "Unknown return code");
+			break;
+		}
 		break;
 	case SYSTEM_EVENT_STA_GOT_IP:
 		xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
@@ -151,10 +184,12 @@ static void initialise_wifi(void *arg) {
 	ESP_LOGI(TAG, "Waiting for wifi");
 }
 
+
 void app_main() {
 
     static httpd_handle_t server = NULL;
     button_event_group = xEventGroupCreate();
+	mqtt_event_group = xEventGroupCreate();
 
 
 	/* Initialize NVS — it is used to store PHY calibration data */
@@ -176,11 +211,10 @@ void app_main() {
 	ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
 
 	while (1) {
-		if (xEventGroupWaitBits(button_event_group, WPS_SHORT_BIT, true, true,10)) {
-			ESP_LOGI(TAG, "start wps...");
-
-			ESP_ERROR_CHECK(esp_wifi_wps_enable(&config));
-			ESP_ERROR_CHECK(esp_wifi_wps_start(0));
+		//if (xEventGroupWaitBits(button_event_group, WPS_SHORT_BIT, true, true,10)) {
+		if (enableWPS) {
+			activateWPS(&config);
+			enableWPS = false;
 		}
 	}
 }

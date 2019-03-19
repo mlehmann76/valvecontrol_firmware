@@ -20,32 +20,72 @@
 #include "mqtt_user.h"
 
 #include "driver/gpio.h"
+#include "driver/ledc.h"
 
 #include "controlTask.h"
 #include "config_user.h"
 
 #define TAG "gpio_task"
 
+#define LEDC_RESOLUTION        LEDC_TIMER_13_BIT
+#define LED_C_OFF			   ((1<<LEDC_RESOLUTION)-1)
+#define LED_C_HALF			   0
+#define LED_C_ON			   0
+#define LED_C_TIME			   1000
+
 
 messageHandler_t controlHandler = {.pUserctx = NULL, .onMessage = handleControlMsg};
 
+//static uint32_t actChan = 0;
+typedef enum {pOFF, pHALF, pON} channelMode_t;
+static struct {
+	channelMode_t mode;
+	time_t time;
+} chanMode[NUM_CONTROL] = {0};
 
-static uint32_t actChan = 0;
-static time_t lastStart = 0;
 static bool isConnected = false;
 
 static void handleChannelControl(cJSON* chan);
 static void sendStatus(const queueData_t* pData);
 static void disableChan(uint32_t chan);
 static void enableChan(uint32_t chan);
-static void updateGpio(void);
+static void updateChannel(uint32_t chan);
 static int32_t bitToIndex(uint32_t bit);
 
-static uint32_t gpioLut[] = {
-		CONTROL0_PIN,
-		CONTROL1_PIN,
-		CONTROL2_PIN,
-		CONTROL3_PIN};
+static ledc_channel_config_t ledc_channel[NUM_CONTROL] = {
+    {
+        .channel    = LEDC_CHANNEL_0,
+        .duty       = LED_C_OFF,
+        .gpio_num   = CONTROL0_PIN,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .hpoint     = 0,
+        .timer_sel  = LEDC_TIMER_0
+    },
+    {
+        .channel    = LEDC_CHANNEL_1,
+        .duty       = LED_C_OFF,
+        .gpio_num   = CONTROL1_PIN,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .hpoint     = 0,
+        .timer_sel  = LEDC_TIMER_0
+    },
+    {
+        .channel    = LEDC_CHANNEL_2,
+        .duty       = LED_C_OFF,
+        .gpio_num   = CONTROL2_PIN,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .hpoint     = 0,
+        .timer_sel  = LEDC_TIMER_0
+    },
+    {
+        .channel    = LEDC_CHANNEL_3,
+        .duty       = LED_C_OFF,
+        .gpio_num   = CONTROL3_PIN,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .hpoint     = 0,
+        .timer_sel  = LEDC_TIMER_0
+    },
+};
 
 static int checkButton() {
 	static int wps_button_count = 0;
@@ -138,13 +178,24 @@ void gpio_task(void *pvParameters) {
 		}
 
 		// timekeeping for auto off
-		if (actChan != 0) {
-			time_t now;
-			time(&now);
-			if (difftime(now, lastStart) > AUTO_OFF_SEC) {
-				disableChan(actChan);
+		for (int i = 0; i < NUM_CONTROL; i++) {
+			if (chanMode[i].mode != pOFF) {
+				time_t now;
+				// test for duty cycle switch
+				time(&now);
+				if ((difftime(now, chanMode[i].time) > LED_C_TIME) && (chanMode[i].mode != pON)) {
+					chanMode[i].mode = pON;
+					updateChannel(i);
+				}
+				// test for auto off
+				time(&now);
+				if (difftime(now, chanMode[i].time) > AUTO_OFF_SEC) {
+					chanMode[i].mode = pOFF;
+					disableChan(i);
+				}
 			}
 		}
+
 		if (subQueue != 0) {
 			queueData_t rxData = { 0 };
 			// Receive a message on the created queue.
@@ -153,8 +204,8 @@ void gpio_task(void *pvParameters) {
 
 				switch (rxData.mode) {
 				case mStatus:
-					if (rxData.chan < (sizeof(gpioLut)/sizeof(gpioLut[0]))) {
-						if ((actChan & (1<<rxData.chan)) != 0) {
+					if (rxData.chan < NUM_CONTROL) {
+						if (chanMode[rxData.chan].mode != pOFF) {
 							rxData.mode = mOn;
 						} else {
 							rxData.mode = mOff;
@@ -164,35 +215,44 @@ void gpio_task(void *pvParameters) {
 					break;
 
 				case mOn:
-					enableChan(1<<rxData.chan);
+					enableChan(rxData.chan);
 					break;
 
 				case mOff:
-					disableChan(1<<rxData.chan);
+					disableChan(rxData.chan);
 					break;
 				}
-			} else {
-				vTaskDelay(1);
 			}
-			updateGpio();
-		} else {
-			vTaskDelay(1);
 		}
 
 		checkButton();
-		taskYIELD();
+		vTaskDelay(10 / portTICK_PERIOD_MS);
 	}
 	vTaskDelete(NULL);
 }
 
 void gpio_task_setup(void) {
-	gpio_config_t config = {.pin_bit_mask = (
-			CONTROL0_BIT|CONTROL1_BIT|CONTROL2_BIT|CONTROL3_BIT|LED_GPIO_BIT),
-			.mode = GPIO_MODE_OUTPUT};
-	gpio_config(&config);
-	for (int i=0; i< (sizeof(gpioLut)/sizeof(gpioLut[0]));i++) {
-		gpio_set_level(gpioLut[i], 1);
-	}
+
+	ledc_timer_config_t ledc_timer = {
+	        .duty_resolution = LEDC_TIMER_13_BIT, // resolution of PWM duty
+	        .freq_hz = 50,                      // frequency of PWM signal
+	        .speed_mode = LEDC_LOW_SPEED_MODE,           // timer mode
+	        .timer_num = LEDC_TIMER_0            // timer index
+	    };
+	    // Set configuration of timer0 for high speed channels
+
+	ledc_timer_config(&ledc_timer);
+
+
+    // Set LED Controller with previously prepared configuration
+    for (int ch = 0; ch < NUM_CONTROL; ch++) {
+        ledc_channel_config(&ledc_channel[ch]);
+        ledc_set_duty(
+        		ledc_channel[ch].speed_mode,
+        		ledc_channel[ch].channel,
+				ledc_channel[ch].duty);
+    }
+
 	LED_OFF();
 
 	// Create a queue capable of containing 10 messages.
@@ -208,7 +268,7 @@ void gpio_task_setup(void) {
 void gpio_onConnect(void) {
 	/* send status of all avail channels */
 	queueData_t data = { 0, mStatus };
-	for (int i = 0; i < (sizeof(gpioLut)/sizeof(gpioLut[0])); i++) {
+	for (int i = 0; i < NUM_CONTROL; i++) {
 		data.chan = i;
 		sendStatus(&data);
 	}
@@ -261,34 +321,54 @@ static void sendStatus(const queueData_t* pData) {
 }
 
 static void enableChan(uint32_t chan) {
-	bool hasChanged = (actChan != 0) && (actChan != chan);
-	if (hasChanged) {
-		disableChan(actChan);
+	if (chan < NUM_CONTROL) {
+		// single channel mode, disable all other
+		for (int i=0;i<NUM_CONTROL;i++) {
+			if ((i != chan) && chanMode[i].mode != pOFF) {
+				disableChan(i);
+			}
+		}
+		// enable if not enabled
+		if (chanMode[chan].mode == pOFF) {
+			chanMode[chan].mode = pHALF;
+			updateChannel(chan);
+			queueData_t data = { bitToIndex(chan), mOn };
+			sendStatus(&data);
+		}
+		time(&chanMode[chan].time);
 	}
-	actChan = chan;
-	updateGpio();
-	queueData_t data = {bitToIndex(chan), mOn};
-	if (hasChanged) sendStatus(&data);
-	time(&lastStart);
 }
 
 static void disableChan(uint32_t chan) {
-	if (actChan == chan) {
+	if ((chan < NUM_CONTROL) && (chanMode[chan].mode != pOFF)) {
 		queueData_t data = {bitToIndex(chan), mOff};
 		sendStatus(&data);
-		updateGpio();
-		time(&lastStart);
-		actChan = 0;
+		chanMode[chan].mode = pOFF;
+		updateChannel(chan);
+		time(&chanMode[chan].time);
 	}
 }
 
-static void updateGpio(void) {
-	for (int i=0; i< (sizeof(gpioLut)/sizeof(gpioLut[0]));i++) {
-		if ((actChan & (1<<i)) != 0) {
-			gpio_set_level(gpioLut[i], 0);
-		} else {
-			gpio_set_level(gpioLut[i], 1);
-		}
+static void updateChannel(uint32_t chan) {
+	switch(chanMode[chan].mode){
+	case pON:
+	        ledc_set_duty(
+	        		ledc_channel[chan].speed_mode,
+	        		ledc_channel[chan].channel,
+					LED_C_ON);
+	        break;
+	case pHALF:
+	        ledc_set_duty(
+	        		ledc_channel[chan].speed_mode,
+	        		ledc_channel[chan].channel,
+					LED_C_HALF);
+	        break;
+	case pOFF:
+	        ledc_set_duty(
+	        		ledc_channel[chan].speed_mode,
+	        		ledc_channel[chan].channel,
+					LED_C_OFF);
+	        break;
 	}
 }
 

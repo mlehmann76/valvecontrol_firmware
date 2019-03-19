@@ -14,21 +14,17 @@ extern "C" {
 
 #define LED_GPIO_PIN   (GPIO_NUM_27)
 #define LED_GPIO_BIT   (GPIO_SEL_27)
-#define LED_ON()		while(0) {gpio_set_level(LED_GPIO_PIN,0);}
-#define LED_OFF()   	while(0) {gpio_set_level(LED_GPIO_PIN,1);}
-#define LED_TOGGLE()   	while(0) {gpio_set_level(LED_GPIO_PIN,gpio_get_level(LED_GPIO_PIN)?0:1);}
+#define LED_ON()		/*while(0) {gpio_set_level(LED_GPIO_PIN,0);}*/
+#define LED_OFF()   	/*while(0) {gpio_set_level(LED_GPIO_PIN,1);}*/
+#define LED_TOGGLE()   	/*while(0) {gpio_set_level(LED_GPIO_PIN,gpio_get_level(LED_GPIO_PIN)?0:1);}*/
 
 #define WPS_BUTTON		(GPIO_SEL_0)
 
-#define CONTROL0_PIN	(GPIO_NUM_18)
-#define CONTROL1_PIN	(GPIO_NUM_5)
-#define CONTROL2_PIN	(GPIO_NUM_17)
-#define CONTROL3_PIN	(GPIO_NUM_16)
-
-#define CONTROL0_BIT	(GPIO_SEL_18)
-#define CONTROL1_BIT	(GPIO_SEL_5)
-#define CONTROL2_BIT	(GPIO_SEL_17)
-#define CONTROL3_BIT	(GPIO_SEL_16)
+#define NUM_CONTROL		(4)
+#define CONTROL0_PIN	(CONFIG_CHANOUTPUT1)
+#define CONTROL1_PIN	(CONFIG_CHANOUTPUT2)
+#define CONTROL2_PIN	(CONFIG_CHANOUTPUT3)
+#define CONTROL3_PIN	(CONFIG_CHANOUTPUT4)
 
 #define AUTO_OFF_SEC	(35U*60U)
 
