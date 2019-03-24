@@ -64,12 +64,15 @@
 
 static esp_wps_config_t config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
 static bool enableWPS = false;
+static bool g_wifi_reconnect_flag = true;
+static bool g_wifi_wps_flag = true;
 
 /* The event group allows multiple bits for each event,
  but we only care about one event - are we connected
  to the AP with an IP? */
 const int CONNECTED_BIT = BIT0;
 #define TAG "MAIN"
+char task_debug_buf[512];
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 EventGroupHandle_t wifi_event_group, button_event_group;
@@ -78,6 +81,7 @@ void activateWPS(const esp_wps_config_t* config) {
 	ESP_LOGI(TAG, "start wps...");
 	ESP_ERROR_CHECK(esp_wifi_wps_enable(config));
 	ESP_ERROR_CHECK(esp_wifi_wps_start(0));
+	g_wifi_wps_flag = true;
 }
 
 #pragma GCC diagnostic pop
@@ -163,7 +167,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 	}
 	return ESP_OK;
 }
-
+/*
 static void initialise_wifi(void *arg) {
 
 	tcpip_adapter_init();
@@ -183,7 +187,39 @@ static void initialise_wifi(void *arg) {
 
 	ESP_LOGI(TAG, "Waiting for wifi");
 }
+*/
+void wifi_init_sta(void *param)
+{
+    wifi_event_group = xEventGroupCreate();
 
+    tcpip_adapter_init();
+    ESP_ERROR_CHECK(esp_event_loop_init(event_handler, param) );
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+
+    while(1) {
+    	if (!(xEventGroupGetBits(wifi_event_group) & CONNECTED_BIT)) {
+    		g_wifi_reconnect_flag = true;
+			ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+			ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
+			ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
+
+			ESP_ERROR_CHECK(esp_wifi_start() );
+
+			vTaskDelay(5000/portTICK_PERIOD_MS);
+    	}
+    	if (!(xEventGroupGetBits(wifi_event_group) & CONNECTED_BIT)) {
+
+    		g_wifi_reconnect_flag = false;
+
+			ESP_LOGI(TAG, "wifi_init_sta stop sta");
+			ESP_ERROR_CHECK(esp_wifi_stop() );
+			ESP_LOGI(TAG, "wifi_init_sta deinit sta");
+			ESP_ERROR_CHECK(esp_wifi_deinit() );
+    	}
+		vTaskDelay(100/portTICK_PERIOD_MS);
+    }
+}
 
 void app_main() {
 
@@ -200,7 +236,9 @@ void app_main() {
 	}
 	ESP_ERROR_CHECK(ret);
 
-	initialise_wifi(&server);
+	//initialise_wifi(&server);
+    ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
+    xTaskCreate(wifi_init_sta, "testTask", 4096, &server, 10, NULL);
 
 	gpio_task_setup();
 	mqtt_config_init();
@@ -210,11 +248,24 @@ void app_main() {
 
 	ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
 
+	time_t now, last;
+	time(&last);
+	time(&now);
+
 	while (1) {
 		//if (xEventGroupWaitBits(button_event_group, WPS_SHORT_BIT, true, true,10)) {
 		if (enableWPS) {
 			activateWPS(&config);
 			enableWPS = false;
 		}
+		/*
+		time(&now);
+		if (difftime(now,last) >=2 ) {
+			vTaskGetRunTimeStats(task_debug_buf);
+			ESP_LOGI(TAG, "%s", task_debug_buf);
+			last = now;
+		}
+		*/
+		vTaskDelay(100/portTICK_PERIOD_MS);
 	}
 }

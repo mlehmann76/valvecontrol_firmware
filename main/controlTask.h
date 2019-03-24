@@ -25,6 +25,7 @@ typedef struct {
 	gpio_task_mode_t mode;
 } queueData_t;
 
+void handleChannelControl(const cJSON* const chan);
 int handleControlMsg(pCtx_t, esp_mqtt_event_handle_t );
 void gpio_task(void *pvParameters);
 void gpio_task_setup(void);
