@@ -22,6 +22,7 @@
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 
+#include "status.h"
 #include "controlTask.h"
 #include "config_user.h"
 
@@ -47,11 +48,10 @@ const char* const channel_str[NUM_CONTROL] = {"Channel0" , "Channel1", "Channel2
 
 static bool isConnected = false;
 
-static void sendStatus(const queueData_t* pData);
+static void updateStatus(void);
 static void disableChan(uint32_t chan);
 static void enableChan(uint32_t chan);
 static void updateChannel(uint32_t chan);
-static int32_t bitToIndex(uint32_t bit);
 
 static ledc_channel_config_t ledc_channel[NUM_CONTROL] = {
     {
@@ -180,7 +180,7 @@ void gpio_task(void *pvParameters) {
 
 		if (!isConnected && (xEventGroupGetBits(mqtt_event_group) & MQTT_CONNECTED_BIT)) {
 			isConnected = true;
-			gpio_onConnect();
+			updateStatus();
 		}
 
 		if (!(xEventGroupGetBits(mqtt_event_group) & MQTT_CONNECTED_BIT)) {
@@ -221,7 +221,7 @@ void gpio_task(void *pvParameters) {
 							rxData.mode = mOff;
 						}
 					}
-					sendStatus(&rxData);
+					updateStatus();
 					break;
 
 				case mOn:
@@ -276,22 +276,15 @@ void gpio_task_setup(void) {
 	xTaskCreate(&gpio_task, "gpio_task", 2048, NULL, 5, NULL);
 }
 
-void gpio_onConnect(void) {
-	/* send status of all avail channels */
-	queueData_t data = { 0, mStatus };
-	//for (int i = 0; i < NUM_CONTROL; i++) {
-		//data.chan = i;
-		sendStatus(&data);
-	//}
+
+static void updateStatus(void) {
+	if (status_event_group != NULL) {
+		xEventGroupSetBits(status_event_group, STATUS_EVENT_CONTROL);
+	}
 }
 
-static void sendStatus(const queueData_t* pData) {
+void addChannelStatus(cJSON *root) {
 
-	cJSON *root = NULL;
-
-	if (pData && pData->chan != -1) {
-
-		root = cJSON_CreateObject();
 		if (root == NULL) {
 			goto end;
 		}
@@ -313,22 +306,9 @@ static void sendStatus(const queueData_t* pData) {
 			}
 		}
 
-		char *string = cJSON_Print(root);
-		if (string == NULL) {
-			ESP_LOGI(TAG, "Failed to print channel.");
-			goto end;
-		}
+		end:
 
-		message_t message = { .pTopic = (char*) getPubMsg(), .topic_len = 0,
-				.pData = string, .data_len = strlen(string) };
-
-		if ( xQueueSendToBack(pubQueue, &message, 10) != pdPASS) {
-			// Failed to post the message, even after 10 ticks.
-			ESP_LOGI(TAG, "pubqueue post failure");
-		}
-
-		end: cJSON_Delete(root);
-	}
+		return;
 }
 
 static void enableChan(uint32_t chan) {
@@ -340,12 +320,11 @@ static void enableChan(uint32_t chan) {
 			}
 		}
 		// enable if not enabled
-		queueData_t data = { bitToIndex(chan), mOn };
 		if (chanMode[chan].mode == pOFF) {
 			chanMode[chan].mode = pHALF;
 			updateChannel(chan);
 		}
-		sendStatus(&data);
+		updateStatus();
 		time(&chanMode[chan].time);
 	}
 }
@@ -353,10 +332,9 @@ static void enableChan(uint32_t chan) {
 static void disableChan(uint32_t chan) {
 //	if ((chan < NUM_CONTROL) && (chanMode[chan].mode != pOFF)) {
 	if ((chan < NUM_CONTROL)) {
-		queueData_t data = {bitToIndex(chan), mOff};
 		chanMode[chan].mode = pOFF;
 		updateChannel(chan);
-		sendStatus(&data);
+		updateStatus();
 		time(&chanMode[chan].time);
 	}
 }
@@ -383,15 +361,4 @@ static void updateChannel(uint32_t chan) {
 		}
 		ledc_update_duty(ledc_channel[chan].speed_mode, ledc_channel[chan].channel);
 	}
-}
-
-static int32_t bitToIndex(uint32_t bit) {
-	int32_t ret = -1;
-	for (uint32_t i=0;i<32;i++) {
-		if ((bit & (1<<i))!=0) {
-			ret = i;
-			break;
-		}
-	}
-	return ret;
 }

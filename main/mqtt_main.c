@@ -48,6 +48,7 @@
 #include "http_config_server.h"
 #include "config_user.h"
 #include "controlTask.h"
+#include "status.h"
 
 #if CONFIG_EXAMPLE_WPS_TYPE_PBC
 #define WPS_TEST_MODE WPS_TYPE_PBC
@@ -167,27 +168,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 	}
 	return ESP_OK;
 }
-/*
-static void initialise_wifi(void *arg) {
 
-	tcpip_adapter_init();
-	wifi_event_group = xEventGroupCreate();
-
-	tcpip_adapter_init();
-
-	ESP_ERROR_CHECK(esp_event_loop_init(event_handler, arg));
-
-	wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-	ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-	ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
-
-	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-	ESP_ERROR_CHECK(esp_wifi_start());
-
-	ESP_LOGI(TAG, "Waiting for wifi");
-}
-*/
 void wifi_init_sta(void *param)
 {
     wifi_event_group = xEventGroupCreate();
@@ -240,6 +221,7 @@ void app_main() {
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
     xTaskCreate(wifi_init_sta, "testTask", 4096, &server, 10, NULL);
 
+    status_task_setup();
 	gpio_task_setup();
 	mqtt_config_init();
 	mqtt_user_init();
