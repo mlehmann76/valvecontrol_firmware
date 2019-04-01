@@ -29,22 +29,33 @@
 #define TAG "gpio_task"
 
 #define LEDC_RESOLUTION        LEDC_TIMER_13_BIT
-#define LED_C_OFF			   ((1<<LEDC_RESOLUTION)-1)
+#define LEDC_MAX			   ((1<<LEDC_RESOLUTION)-1)
+#define LED_C_OFF			   LEDC_MAX
+
+#if defined(CHANOUT_USE_PWM) && (CHANOUT_USE_PWM==y)
+#define LED_C_HALF			   0
+#define LED_C_ON			   ((LEDC_MAX*CHANOUT_PWM_DUTY)/100)
+#define LED_C_TIME			   1
+#define LED_FREQ			   (CHANOUT_PWM_FREQ)
+#else
 #define LED_C_HALF			   0
 #define LED_C_ON			   0
 #define LED_C_TIME			   1
+#define LED_FREQ			   50
+#endif
 
-
-messageHandler_t controlHandler = {.pUserctx = NULL, .onMessage = handleControlMsg};
+messageHandler_t controlHandler = { .pUserctx = NULL, .onMessage = handleControlMsg };
 
 //static uint32_t actChan = 0;
-typedef enum {pOFF, pHALF, pON} channelMode_t;
+typedef enum {
+	pOFF, pHALF, pON
+} channelMode_t;
 static struct {
 	channelMode_t mode;
 	time_t time;
-} chanMode[NUM_CONTROL] = {0};
+} chanMode[NUM_CONTROL] = { 0 };
 
-const char* const channel_str[NUM_CONTROL] = {"Channel0" , "Channel1", "Channel2" , "Channel3"};
+const char* const channel_str[NUM_CONTROL] = { "Channel0", "Channel1", "Channel2", "Channel3" };
 
 static bool isConnected = false;
 
@@ -53,40 +64,31 @@ static void disableChan(uint32_t chan);
 static void enableChan(uint32_t chan);
 static void updateChannel(uint32_t chan);
 
-static ledc_channel_config_t ledc_channel[NUM_CONTROL] = {
-    {
-        .channel    = LEDC_CHANNEL_0,
-        .duty       = LED_C_OFF,
-        .gpio_num   = CONTROL0_PIN,
-        .speed_mode = LEDC_LOW_SPEED_MODE,
-        .hpoint     = 0,
-        .timer_sel  = LEDC_TIMER_0
-    },
-    {
-        .channel    = LEDC_CHANNEL_1,
-        .duty       = LED_C_OFF,
-        .gpio_num   = CONTROL1_PIN,
-        .speed_mode = LEDC_LOW_SPEED_MODE,
-        .hpoint     = 0,
-        .timer_sel  = LEDC_TIMER_0
-    },
-    {
-        .channel    = LEDC_CHANNEL_2,
-        .duty       = LED_C_OFF,
-        .gpio_num   = CONTROL2_PIN,
-        .speed_mode = LEDC_LOW_SPEED_MODE,
-        .hpoint     = 0,
-        .timer_sel  = LEDC_TIMER_0
-    },
-    {
-        .channel    = LEDC_CHANNEL_3,
-        .duty       = LED_C_OFF,
-        .gpio_num   = CONTROL3_PIN,
-        .speed_mode = LEDC_LOW_SPEED_MODE,
-        .hpoint     = 0,
-        .timer_sel  = LEDC_TIMER_0
-    },
-};
+static ledc_channel_config_t ledc_channel[NUM_CONTROL] = { //
+		{ .channel = LEDC_CHANNEL_0, //
+				.duty = LED_C_OFF, //
+				.gpio_num = CONTROL0_PIN, //
+				.speed_mode = LEDC_LOW_SPEED_MODE, //
+				.hpoint = 0, //
+				.timer_sel = LEDC_TIMER_0 }, //
+		{ .channel = LEDC_CHANNEL_1, //
+				.duty = LED_C_OFF, //
+				.gpio_num = CONTROL1_PIN, //
+				.speed_mode = LEDC_LOW_SPEED_MODE, //
+				.hpoint = 0,		//
+				.timer_sel = LEDC_TIMER_0 }, //
+		{ .channel = LEDC_CHANNEL_2, //
+				.duty = LED_C_OFF, //
+				.gpio_num = CONTROL2_PIN, //
+				.speed_mode = LEDC_LOW_SPEED_MODE, //
+				.hpoint = 0, //
+				.timer_sel = LEDC_TIMER_0 }, ///
+		{ .channel = LEDC_CHANNEL_3, //
+				.duty = LED_C_OFF, //
+				.gpio_num = CONTROL3_PIN, //
+				.speed_mode = LEDC_LOW_SPEED_MODE, //
+				.hpoint = 0, //
+				.timer_sel = LEDC_TIMER_0 }, }; //
 
 static int checkButton() {
 	static int wps_button_count = 0;
@@ -110,11 +112,9 @@ int handleControlMsg(pCtx_t ctx, esp_mqtt_event_handle_t event) {
 	if (event->topic_len > strlen(getSubMsg())) {
 		const char* pTopic = &event->topic[strlen(getSubMsg()) - 1];
 		//check for control messages
-		int c = strncmp(pTopic, "control", sizeof("control")-1);
-		ESP_LOGI(TAG, "control:%d", c);
-		if ( c == 0) {
-			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(getSubMsg()) + 1,
-								pTopic);
+		int c = strncmp(pTopic, "control", sizeof("control") - 1);
+		if (c == 0) {
+			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(getSubMsg()) + 1, pTopic);
 
 			cJSON *root = cJSON_Parse(event->data);
 			if (root != NULL) {
@@ -133,8 +133,8 @@ int handleControlMsg(pCtx_t ctx, esp_mqtt_event_handle_t event) {
 /**
  * control format for channel control
  {
- 		"channel": { "channel1": { "val": 1 } }
-  }
+ "channel": { "channel1": { "val": 1 } }
+ }
  */
 void handleChannelControl(const cJSON* const chan) {
 	for (int i = 0; i < NUM_CONTROL; i++) {
@@ -143,7 +143,7 @@ void handleChannelControl(const cJSON* const chan) {
 
 			int chanVal = -1;
 			cJSON* pJsonChanVal = cJSON_GetObjectItem(pChanObj, "val");
-			if ( pJsonChanVal != NULL) {
+			if (pJsonChanVal != NULL) {
 				if (cJSON_IsString(pJsonChanVal)) {
 					const char * pS = pJsonChanVal->valuestring;
 					if (strncmp(pS, "ON", 2) == 0) {
@@ -243,26 +243,22 @@ void gpio_task(void *pvParameters) {
 
 void gpio_task_setup(void) {
 
-	ledc_timer_config_t ledc_timer = {
-	        .duty_resolution = LEDC_TIMER_13_BIT, // resolution of PWM duty
-	        .freq_hz = 50,                      // frequency of PWM signal
-	        .speed_mode = LEDC_LOW_SPEED_MODE,           // timer mode
-	        .timer_num = LEDC_TIMER_0            // timer index
-	    };
-	    // Set configuration of timer0 for high speed channels
+	ledc_timer_config_t ledc_timer = { //
+			.duty_resolution = LEDC_TIMER_13_BIT, // resolution of PWM duty
+			.freq_hz = LED_FREQ,                      // frequency of PWM signal
+			.speed_mode = LEDC_LOW_SPEED_MODE,           // timer mode
+			.timer_num = LEDC_TIMER_0            // timer index
+			};
+	// Set configuration of timer0 for high speed channels
 
 	ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
 
-
-    // Set LED Controller with previously prepared configuration
-    for (int ch = 0; ch < NUM_CONTROL; ch++) {
-        ledc_channel_config(&ledc_channel[ch]);
-        ledc_set_duty(
-        		ledc_channel[ch].speed_mode,
-        		ledc_channel[ch].channel,
-				ledc_channel[ch].duty);
-        ledc_update_duty(ledc_channel[ch].speed_mode, ledc_channel[ch].channel);
-    }
+	// Set LED Controller with previously prepared configuration
+	for (int ch = 0; ch < NUM_CONTROL; ch++) {
+		ledc_channel_config(&ledc_channel[ch]);
+		ledc_set_duty(ledc_channel[ch].speed_mode, ledc_channel[ch].channel, ledc_channel[ch].duty);
+		ledc_update_duty(ledc_channel[ch].speed_mode, ledc_channel[ch].channel);
+	}
 
 	LED_OFF();
 
@@ -276,7 +272,6 @@ void gpio_task_setup(void) {
 	xTaskCreate(&gpio_task, "gpio_task", 2048, NULL, 5, NULL);
 }
 
-
 static void updateStatus(void) {
 	if (status_event_group != NULL) {
 		xEventGroupSetBits(status_event_group, STATUS_EVENT_CONTROL);
@@ -285,36 +280,35 @@ static void updateStatus(void) {
 
 void addChannelStatus(cJSON *root) {
 
-		if (root == NULL) {
+	if (root == NULL) {
+		goto end;
+	}
+
+	cJSON *channel = cJSON_AddObjectToObject(root, "channel");
+	if (channel == NULL) {
+		goto end;
+	}
+
+	for (int i = 0; i < NUM_CONTROL; i++) {
+		cJSON *channelv = cJSON_AddObjectToObject(channel, channel_str[i]);
+		if (channelv == NULL) {
 			goto end;
 		}
 
-		cJSON *channel = cJSON_AddObjectToObject(root, "channel");
-		if (channel == NULL) {
+		if (cJSON_AddStringToObject(channelv, "val", chanMode[i].mode != pOFF ? "ON" : "OFF") == NULL) {
 			goto end;
 		}
+	}
 
-		for (int i = 0; i < NUM_CONTROL; i++) {
-			cJSON *channelv = cJSON_AddObjectToObject(channel, channel_str[i]);
-			if (channelv == NULL) {
-				goto end;
-			}
+	end:
 
-			if (cJSON_AddStringToObject(channelv, "val",
-					chanMode[i].mode != pOFF ? "ON" : "OFF") == NULL) {
-				goto end;
-			}
-		}
-
-		end:
-
-		return;
+	return;
 }
 
 static void enableChan(uint32_t chan) {
 	if (chan < NUM_CONTROL) {
 		// single channel mode, disable all other
-		for (int i=0;i<NUM_CONTROL;i++) {
+		for (int i = 0; i < NUM_CONTROL; i++) {
 			if ((i != chan) && chanMode[i].mode != pOFF) {
 				disableChan(i);
 			}
@@ -344,19 +338,16 @@ static void updateChannel(uint32_t chan) {
 		ESP_LOGI(TAG, "update channel %d -> %d", chan, chanMode[chan].mode);
 		switch (chanMode[chan].mode) {
 		case pON:
-			ledc_set_duty(ledc_channel[chan].speed_mode,
-					ledc_channel[chan].channel,
-					LED_C_ON);
+			ledc_set_duty(ledc_channel[chan].speed_mode, ledc_channel[chan].channel,
+			LED_C_ON);
 			break;
 		case pHALF:
-			ledc_set_duty(ledc_channel[chan].speed_mode,
-					ledc_channel[chan].channel,
-					LED_C_HALF);
+			ledc_set_duty(ledc_channel[chan].speed_mode, ledc_channel[chan].channel,
+			LED_C_HALF);
 			break;
 		case pOFF:
-			ledc_set_duty(ledc_channel[chan].speed_mode,
-					ledc_channel[chan].channel,
-					LED_C_OFF);
+			ledc_set_duty(ledc_channel[chan].speed_mode, ledc_channel[chan].channel,
+			LED_C_OFF);
 			break;
 		}
 		ledc_update_duty(ledc_channel[chan].speed_mode, ledc_channel[chan].channel);

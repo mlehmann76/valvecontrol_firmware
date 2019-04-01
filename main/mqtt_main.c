@@ -73,7 +73,7 @@ static bool g_wifi_wps_flag = true;
  to the AP with an IP? */
 const int CONNECTED_BIT = BIT0;
 #define TAG "MAIN"
-char task_debug_buf[512];
+//static char task_debug_buf[512];
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 EventGroupHandle_t wifi_event_group, button_event_group;
@@ -94,6 +94,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 		switch (esp_wifi_connect()) {
 		case ESP_OK:
 			ESP_LOGI(TAG, "connected successfully");
+			xEventGroupSetBits(status_event_group, STATUS_EVENT_FIRMWARE);
 			break;
 
 		case ESP_ERR_WIFI_NOT_INIT:

@@ -23,7 +23,7 @@
 #include "mqtt_user_ota.h"
 #include "mqtt_config.h"
 
-extern const uint8_t iot_eclipse_org_pem_start[] asm("_binary_raspberrypi_pem_start");
+//extern const uint8_t iot_eclipse_org_pem_start[] asm("_binary_raspberrypi_pem_start");
 //extern const uint8_t iot_eclipse_org_pem_end[]   asm("_binary_iot_eclipse_org_pem_end");
 extern const int CONNECTED_BIT;
 
@@ -42,7 +42,6 @@ static void handleFirmwareMsg(cJSON* firmware);
 
 static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 	client = event->client;
-	// your_context_t *context = event->context;
 	switch (event->event_id) {
 	case MQTT_EVENT_CONNECTED:
 		ESP_LOGD(TAG, "MQTT_EVENT_CONNECTED");
@@ -103,7 +102,7 @@ static int handleSysMessage(esp_mqtt_event_handle_t event) {
 	if (event->topic_len > strlen(getSubMsg())) {
 		const char* pTopic = &event->topic[strlen(getSubMsg()) - 1];
 		//check for control messages
-		if (strcmp(pTopic, "/system") == 0) {
+		if (strncmp(pTopic, "/system", strlen("/system")) == 0) {
 			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(getSubMsg()) + 1,
 					pTopic);
 			cJSON *root = cJSON_Parse(event->data);
@@ -204,7 +203,7 @@ void mqtt_task(void *pvParameters) {
 			.event_handle = mqtt_event_handler,
 			.username = getMqttUser(),
 			.password = getMqttPass(),
-			.cert_pem = (const char *)iot_eclipse_org_pem_start,
+			//.cert_pem = (const char *)iot_eclipse_org_pem_start,
 			// .user_context = (void *)your_context
 			//.buffer_size = 4096 /*not set here, set in config */
 	};

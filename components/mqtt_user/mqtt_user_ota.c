@@ -102,15 +102,16 @@ int handleOtaMessage(pCtx_t p, esp_mqtt_event_handle_t event) {
 
 		if ((ota_state != OTA_IDLE)) {
 			if (((event->topic_len == 0)
-					|| (strcmp(pTopic, "/ota/$implementation/binary") == 0))) {
+					|| (strncmp(pTopic, "/ota/$implementation/binary", strlen("/ota/$implementation/binary")) == 0))) {
 
 				//block till data was processed by ota task
 				const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;
 				if (xQueueSend(dataQueue, (void * ) &decodeCtx.len,	xTicksToWait) != pdPASS) {
 					// Failed to post the message, even after 100 ticks.
 					ESP_LOGI(TAG, "dataqueue post failure");
+					task_fatal_error();
 				}
-				//ESP_LOGI(TAG, "handle ota message, len (%d) %.*s", event->data_len, event->data_len, event->data);{
+
 				if ( xSemaphoreTake( xSemaphore, xTicksToWait) == pdTRUE) {
 
 					int len = b85Decode((uint8_t*) event->data, event->data_len,&decodeCtx);

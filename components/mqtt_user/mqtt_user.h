@@ -15,7 +15,7 @@ extern "C" {
 EventGroupHandle_t wifi_event_group;
 EventGroupHandle_t mqtt_event_group;
 
-#define MQTT_CONNECTED_BIT BIT0
+#define MQTT_CONNECTED_BIT (1u<<0)
 
 typedef int* pCtx_t;
 typedef int (*pOnMessageFunc)(pCtx_t, esp_mqtt_event_handle_t);

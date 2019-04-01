@@ -10,7 +10,8 @@
 
 EventGroupHandle_t status_event_group;
 
-#define STATUS_EVENT_CONTROL BIT0
+#define STATUS_EVENT_CONTROL (1u<<0)
+#define STATUS_EVENT_FIRMWARE (1u<<1)
 
 void status_task_setup(void);
 void status_task(void *pvParameters);

@@ -52,15 +52,20 @@ config CHANOUT_USE_PWM
     bool "Use Pwm on Outputs"
     default n
 
+#menu "PWM Output Config"
+#    visible if CHANOUT_USE_PWM
+
 config CHANOUT_PWM_FREQ
-    int
+    int "PWM Freq"
     depends on CHANOUT_USE_PWM
     default 50
+    range 10 100
 
 config CHANOUT_PWM_DUTY
-    int
+    int "PWM Duty"
     depends on CHANOUT_USE_PWM
     default 50
-    
+    range 25 100
+   
 
 endmenu
