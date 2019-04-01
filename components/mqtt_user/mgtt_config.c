@@ -32,7 +32,6 @@ static char *mqtt_pass = (char*)MQTT_PASS;
 static esp_err_t readStr(nvs_handle *pHandle, const char *pName, char **dest);
 static esp_err_t writeStr(nvs_handle *pHandle, const char *pName, const char *str);
 
-
 const char* getSubMsg() {
 	return mqtt_sub_msg;
 }

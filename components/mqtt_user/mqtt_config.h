@@ -19,7 +19,6 @@ extern "C" {
 #define MQTT_PASS "sensor1"
 
 #define MQTT_PUB_MESSAGE_FORMAT "%s%02X%02X%02X%02X%02X%02X%s"
-
 /*
 enum {eUINT8, eINT8, eUINT16, eINT16, eUINT32, eINT32, eSTR, eBLOB} nvs_type;
 typedef enum nvs_type nvs_type_t;

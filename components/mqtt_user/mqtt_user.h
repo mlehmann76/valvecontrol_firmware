@@ -23,6 +23,7 @@ typedef int (*pOnMessageFunc)(pCtx_t, esp_mqtt_event_handle_t);
 typedef struct {
 	pCtx_t pUserctx;
 	pOnMessageFunc onMessage;
+	const char* handlerName;
 } messageHandler_t;
 
 typedef struct {

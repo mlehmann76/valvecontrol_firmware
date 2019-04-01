@@ -44,7 +44,7 @@
 #define LED_FREQ			   50
 #endif
 
-messageHandler_t controlHandler = { .pUserctx = NULL, .onMessage = handleControlMsg };
+messageHandler_t controlHandler = { .pUserctx = NULL, .onMessage = handleControlMsg, "control event" };
 
 //static uint32_t actChan = 0;
 typedef enum {
@@ -112,7 +112,7 @@ int handleControlMsg(pCtx_t ctx, esp_mqtt_event_handle_t event) {
 	if (event->topic_len > strlen(getSubMsg())) {
 		const char* pTopic = &event->topic[strlen(getSubMsg()) - 1];
 		//check for control messages
-		int c = strncmp(pTopic, "control", sizeof("control") - 1);
+		int c = strncmp(pTopic, "/control", strlen("/control"));
 		if (c == 0) {
 			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(getSubMsg()) + 1, pTopic);
 

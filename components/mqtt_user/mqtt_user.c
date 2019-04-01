@@ -29,16 +29,19 @@ extern const int CONNECTED_BIT;
 
 static const char *TAG = "MQTTS";
 static esp_mqtt_client_handle_t client = NULL;
-static messageHandler_t* messageHandle[8] = {0};
+static messageHandler_t* messageHandle[8] = { 0 };
 
-/* subqueue for handling messages to gpio,
- * pubQueue for handling messages from gpio (autoOff) to mqtt */
-QueueHandle_t pubQueue,otaQueue;
+QueueHandle_t pubQueue, otaQueue;
 EventGroupHandle_t mqtt_event_group;
 
 static void mqtt_message_handler(esp_mqtt_event_handle_t event);
-static int handleSysMessage(esp_mqtt_event_handle_t event);
 static void handleFirmwareMsg(cJSON* firmware);
+
+int handleSysMessage(pCtx_t ctx, esp_mqtt_event_handle_t event);
+int handleConfigMsg(pCtx_t ctx, esp_mqtt_event_handle_t event);
+
+messageHandler_t mqttConfigHandler = { .pUserctx = NULL, .onMessage = handleConfigMsg, "config event" };
+messageHandler_t sysConfigHandler = { .pUserctx = NULL, .onMessage = handleSysMessage, "sys event" };
 
 static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 	client = event->client;
@@ -61,14 +64,14 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 		ESP_LOGD(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
 		break;
 	case MQTT_EVENT_PUBLISHED:
-		ESP_LOGD(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id)	;
+		ESP_LOGD(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
 		break;
 	case MQTT_EVENT_DATA:
 		ESP_LOGD(TAG, "MQTT_EVENT_DATA");
 		mqtt_message_handler(event);
 		break;
 	case MQTT_EVENT_ERROR:
-		ESP_LOGE(TAG, "MQTT_EVENT_ERROR")	;
+		ESP_LOGE(TAG, "MQTT_EVENT_ERROR");
 		break;
 	}
 	return ESP_OK;
@@ -77,34 +80,30 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 static void mqtt_message_handler(esp_mqtt_event_handle_t event) {
 
 	if (event->data_len < 64) {
-		ESP_LOGD(TAG, "Topic received!: (%d) %.*s (%d) %.*s", event->topic_len,
-				event->topic_len, event->topic, event->data_len, event->data_len, event->data);
+		ESP_LOGD(TAG, "Topic received!: (%d) %.*s (%d) %.*s", event->topic_len, event->topic_len, event->topic,
+				event->data_len, event->data_len, event->data);
 	} else {
-		ESP_LOGD(TAG, "Topic received!: (%d) %.*s", event->topic_len,
-				event->topic_len, event->topic);
+		ESP_LOGD(TAG, "Topic received!: (%d) %.*s", event->topic_len, event->topic_len, event->topic);
 	}
 
-	if (handleSysMessage(event)) {
-
-	} else {
-		for (int i=0; i< (sizeof(messageHandle)/sizeof(messageHandle[0]));i++) {
-			if ((messageHandle[i] != NULL) && (messageHandle[i]->onMessage !=NULL)) {
-				if (messageHandle[i]->onMessage(messageHandle[i]->pUserctx, event)) {
-					break;
-				}
+	for (int i = 0; i < (sizeof(messageHandle) / sizeof(messageHandle[0])); i++) {
+		if ((messageHandle[i] != NULL) && (messageHandle[i]->onMessage != NULL)) {
+			if (messageHandle[i]->onMessage(messageHandle[i]->pUserctx, event)) {
+				ESP_LOGI(TAG, "%s handled", messageHandle[i]->handlerName);
+				break;
 			}
 		}
 	}
+
 }
 
-static int handleSysMessage(esp_mqtt_event_handle_t event) {
+int handleSysMessage(pCtx_t ctx, esp_mqtt_event_handle_t event) {
 	int ret = 0;
 	if (event->topic_len > strlen(getSubMsg())) {
 		const char* pTopic = &event->topic[strlen(getSubMsg()) - 1];
 		//check for control messages
 		if (strncmp(pTopic, "/system", strlen("/system")) == 0) {
-			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(getSubMsg()) + 1,
-					pTopic);
+			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(getSubMsg()) + 1, pTopic);
 			cJSON *root = cJSON_Parse(event->data);
 			cJSON *firmware = cJSON_GetObjectItem(root, "firmware");
 			if (firmware != NULL) {
@@ -117,8 +116,31 @@ static int handleSysMessage(esp_mqtt_event_handle_t event) {
 	return ret;
 }
 
+int handleConfigMsg(pCtx_t ctx, esp_mqtt_event_handle_t event) {
+	int ret = 0;
+	if (event->topic_len > strlen(getSubMsg())) {
+		const char* pTopic = &event->topic[strlen(getSubMsg()) - 1];
+		//check for control messages
+		int c = strncmp(pTopic, "/config", strlen("/config"));
+		if (c == 0) {
+			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(getSubMsg()) + 1, pTopic);
+
+			cJSON *root = cJSON_Parse(event->data);
+			if (root != NULL) {
+				cJSON *pConfig = cJSON_GetObjectItem(root, "mqtt");
+				if (pConfig != NULL) {
+					setMqttConfig(pConfig);
+				}
+				cJSON_Delete(root);
+				ret = 1;
+			}
+		}
+	}
+	return ret;
+}
+
 /* */
-int md5StrToAr(char* pMD5, uint8_t* md5) {
+static int md5StrToAr(char* pMD5, uint8_t* md5) {
 	int error = 0;
 	for (int i = 0; i < 32; i++) {
 		int temp = 0;
@@ -150,8 +172,7 @@ static void handleFirmwareMsg(cJSON* firmware) {
 	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
 
 	if (cJSON_GetObjectItem(firmware, "update") != NULL) {
-		char* pUpdate = cJSON_GetStringValue(
-				cJSON_GetObjectItem(firmware, "update"));
+		char* pUpdate = cJSON_GetStringValue(cJSON_GetObjectItem(firmware, "update"));
 		if (strcmp(pUpdate, "ota") != 0) {
 			error = 1;
 		}
@@ -166,7 +187,7 @@ static void handleFirmwareMsg(cJSON* firmware) {
 			error = 3;
 		}
 
-		if(!error && md5StrToAr(pMD5, md5_update.md5) !=0) {
+		if (!error && md5StrToAr(pMD5, md5_update.md5) != 0) {
 			error = 4;
 		}
 
@@ -179,13 +200,10 @@ static void handleFirmwareMsg(cJSON* firmware) {
 		if (error) {
 			ESP_LOGE(TAG, "handleFirmwareMsg error %d", error);
 		} else {
-			ESP_LOGV(TAG,
-					"fileSize :%d ->md5: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-					md5_update.len, md5_update.md5[0], md5_update.md5[1],
-					md5_update.md5[2], md5_update.md5[3], md5_update.md5[4],
-					md5_update.md5[5], md5_update.md5[6], md5_update.md5[7],
-					md5_update.md5[8], md5_update.md5[9], md5_update.md5[10],
-					md5_update.md5[11], md5_update.md5[12], md5_update.md5[13],
+			ESP_LOGV(TAG, "fileSize :%d ->md5: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+					md5_update.len, md5_update.md5[0], md5_update.md5[1], md5_update.md5[2], md5_update.md5[3],
+					md5_update.md5[4], md5_update.md5[5], md5_update.md5[6], md5_update.md5[7], md5_update.md5[8],
+					md5_update.md5[9], md5_update.md5[10], md5_update.md5[11], md5_update.md5[12], md5_update.md5[13],
 					md5_update.md5[14], md5_update.md5[15]);
 
 			if (xQueueSend(otaQueue, (void * ) &md5_update,
@@ -198,33 +216,27 @@ static void handleFirmwareMsg(cJSON* firmware) {
 
 void mqtt_task(void *pvParameters) {
 	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
-	const esp_mqtt_client_config_t mqtt_cfg = {
-			.uri = getMqttServer(),
-			.event_handle = mqtt_event_handler,
-			.username = getMqttUser(),
-			.password = getMqttPass(),
-			//.cert_pem = (const char *)iot_eclipse_org_pem_start,
-			// .user_context = (void *)your_context
-			//.buffer_size = 4096 /*not set here, set in config */
+	const esp_mqtt_client_config_t mqtt_cfg = { //
+			.uri = getMqttServer(), //
+			.event_handle = mqtt_event_handler,//
+			.username =	getMqttUser(), //
+			.password = getMqttPass(),//
 	};
 
-	xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, pdFALSE, pdTRUE, 10000/portTICK_PERIOD_MS);
+	xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, pdFALSE, pdTRUE, 10000 / portTICK_PERIOD_MS);
 	client = esp_mqtt_client_init(&mqtt_cfg);
 	esp_mqtt_client_start(client);
 
 	while (1) {
 		// check if we have something to do
-		// queueData_t rxData = { 0 };
-		message_t rxData = {0};
+		message_t rxData = { 0 };
 
-		if ((client != NULL)
-				&& (xQueueReceive(pubQueue, &(rxData), xTicksToWait))) {
+		if ((client != NULL) && (xQueueReceive(pubQueue, &(rxData), xTicksToWait))) {
 
-			ESP_LOGD(TAG, "publish %.*s : %.*s", strlen(rxData.pTopic),
-					rxData.pTopic, strlen(rxData.pData), rxData.pData);
+			ESP_LOGD(TAG, "publish %.*s : %.*s", strlen(rxData.pTopic), rxData.pTopic, strlen(rxData.pData),
+					rxData.pData);
 
-			int msg_id = esp_mqtt_client_publish(client, rxData.pTopic,
-					rxData.pData, strlen(rxData.pData) + 1, 1, 0);
+			int msg_id = esp_mqtt_client_publish(client, rxData.pTopic, rxData.pData, strlen(rxData.pData) + 1, 1, 0);
 
 			ESP_LOGD(TAG, "sent publish successful, msg_id=%d", msg_id);
 			if (rxData.topic_len > 0) {
@@ -257,11 +269,14 @@ void mqtt_user_init(void) {
 	xTaskCreatePinnedToCore(&mqtt_task, "mqtt_task", 2 * 8192, NULL, 5, NULL, 0);
 	xTaskCreatePinnedToCore(&mqtt_ota_task, "mqtt_ota_task", 2 * 8192, NULL, 5, NULL, 0);
 
+	mqtt_user_addHandler(&sysConfigHandler);
+	mqtt_user_addHandler(&mqttConfigHandler);
+	mqtt_user_addHandler(&mqttOtaHandler);
 }
 
-int  mqtt_user_addHandler(messageHandler_t *pHandle) {
+int mqtt_user_addHandler(messageHandler_t *pHandle) {
 	int ret = 0;
-	for (int i=0; i< (sizeof(messageHandle)/sizeof(messageHandle[0]));i++) {
+	for (int i = 0; i < (sizeof(messageHandle) / sizeof(messageHandle[0])); i++) {
 		if (messageHandle[i] == NULL) {
 			messageHandle[i] = pHandle;
 			ret = 1;

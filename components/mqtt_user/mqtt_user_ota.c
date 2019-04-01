@@ -42,19 +42,18 @@ static QueueHandle_t dataQueue;
 
 ota_state_t ota_state = OTA_IDLE;
 SemaphoreHandle_t xSemaphore = NULL;
-messageHandler_t otaHandler = {.pUserctx = NULL, .onMessage = handleOtaMessage};
+messageHandler_t mqttOtaHandler = { .pUserctx = NULL, .onMessage = handleOtaMessage, "ota event" };
 
-static void __attribute__((noreturn)) task_fatal_error()
-{
-    ESP_LOGE(TAG, "Exiting task due to fatal error...");
-    (void)vTaskDelete(NULL);
+static void __attribute__((noreturn)) task_fatal_error() {
+	ESP_LOGE(TAG, "Exiting task due to fatal error...");
+	(void) vTaskDelete(NULL);
 
-    while (1) {
-        ;
-    }
+	while (1) {
+		;
+	}
 }
 
-static void b85DecodeInit(decode_t *src){
+static void b85DecodeInit(decode_t *src) {
 	if (src != NULL) {
 		memset(src->buffer, 0, DECODEBUFSIZE);
 		memset(src->decoded, 0, DECODEBUFSIZE);
@@ -73,7 +72,7 @@ static int b85Decode(const uint8_t *src, size_t len, decode_t *dest) {
 			//copy data to buffer
 			memcpy(&dest->buffer[dest->decodePos], src, len);
 			//decode
-			int ret = decode_85((char*)dest->decoded, (const char*)dest->buffer, decLen / 5 * 4);
+			int ret = decode_85((char*) dest->decoded, (const char*) dest->buffer, decLen / 5 * 4);
 
 			if (ret == 0) {
 				//copy rest to buffer
@@ -96,9 +95,7 @@ static int b85Decode(const uint8_t *src, size_t len, decode_t *dest) {
 int handleOtaMessage(pCtx_t p, esp_mqtt_event_handle_t event) {
 	int ret = 0;
 	if (xSemaphore != NULL) {
-		const char* pTopic =
-				event->topic_len >= strlen(getSubMsg()) ?
-						&event->topic[strlen(getSubMsg()) - 1] : "";
+		const char* pTopic = event->topic_len >= strlen(getSubMsg()) ? &event->topic[strlen(getSubMsg()) - 1] : "";
 
 		if ((ota_state != OTA_IDLE)) {
 			if (((event->topic_len == 0)
@@ -106,7 +103,7 @@ int handleOtaMessage(pCtx_t p, esp_mqtt_event_handle_t event) {
 
 				//block till data was processed by ota task
 				const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;
-				if (xQueueSend(dataQueue, (void * ) &decodeCtx.len,	xTicksToWait) != pdPASS) {
+				if (xQueueSend(dataQueue, (void * ) &decodeCtx.len, xTicksToWait) != pdPASS) {
 					// Failed to post the message, even after 100 ticks.
 					ESP_LOGI(TAG, "dataqueue post failure");
 					task_fatal_error();
@@ -114,11 +111,10 @@ int handleOtaMessage(pCtx_t p, esp_mqtt_event_handle_t event) {
 
 				if ( xSemaphoreTake( xSemaphore, xTicksToWait) == pdTRUE) {
 
-					int len = b85Decode((uint8_t*) event->data, event->data_len,&decodeCtx);
+					int len = b85Decode((uint8_t*) event->data, event->data_len, &decodeCtx);
 					if (len > 0) {
 						mbedtls_md5_update(&ctx, decodeCtx.decoded, len);
-					}
-					LED_TOGGLE();
+					} LED_TOGGLE();
 					ret = 1;
 					xSemaphoreGive(xSemaphore);
 				}
@@ -130,16 +126,16 @@ int handleOtaMessage(pCtx_t p, esp_mqtt_event_handle_t event) {
 
 void mqtt_ota_task(void *pvParameters) {
 	static uint32_t last = 0, temp;
-    esp_err_t err;
-    /* update handle : set by esp_ota_begin(), must be freed via esp_ota_end() */
-    esp_ota_handle_t update_handle = 0 ;
-    const esp_partition_t *update_partition = NULL;
-    const esp_partition_t *configured = esp_ota_get_boot_partition();
-    const esp_partition_t *running = esp_ota_get_running_partition();
+	esp_err_t err;
+	/* update handle : set by esp_ota_begin(), must be freed via esp_ota_end() */
+	esp_ota_handle_t update_handle = 0;
+	const esp_partition_t *update_partition = NULL;
+	const esp_partition_t *configured = esp_ota_get_boot_partition();
+	const esp_partition_t *running = esp_ota_get_running_partition();
 
 	xSemaphore = xSemaphoreCreateBinary();
 
-	if( xSemaphore == NULL ) {
+	if (xSemaphore == NULL) {
 		ESP_LOGE(TAG, "error creating semaphore");
 	} else {
 		xSemaphoreGive(xSemaphore);
@@ -180,31 +176,25 @@ void mqtt_ota_task(void *pvParameters) {
 
 				case OTA_START:
 					if (configured != running) {
-						ESP_LOGW(TAG,
-								"Configured OTA boot partition at offset 0x%08x, but running from offset 0x%08x",
+						ESP_LOGW(TAG, "Configured OTA boot partition at offset 0x%08x, but running from offset 0x%08x",
 								configured->address, running->address);
 						ESP_LOGW(TAG,
 								"(This can happen if either the OTA boot data or preferred boot image become corrupted somehow.)");
 					}
-					ESP_LOGI(TAG,
-							"Running partition type %d subtype %d (offset 0x%08x)",
-							running->type, running->subtype, running->address);
+					ESP_LOGI(TAG, "Running partition type %d subtype %d (offset 0x%08x)", running->type,
+							running->subtype, running->address);
 
 					update_partition = esp_ota_get_next_update_partition(NULL);
 
-					ESP_LOGI(TAG,
-							"Writing to partition subtype %d at offset 0x%x",
-							update_partition->subtype,
+					ESP_LOGI(TAG, "Writing to partition subtype %d at offset 0x%x", update_partition->subtype,
 							update_partition->address);
 
 					assert(update_partition != NULL);
 
-					err = esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN,
-							&update_handle);
+					err = esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &update_handle);
 
 					if (err != ESP_OK) {
-						ESP_LOGE(TAG, "esp_ota_begin failed (%s)",
-								esp_err_to_name(err));
+						ESP_LOGE(TAG, "esp_ota_begin failed (%s)", esp_err_to_name(err));
 						task_fatal_error();
 					}
 
@@ -221,16 +211,13 @@ void mqtt_ota_task(void *pvParameters) {
 					if (xQueueReceive(dataQueue, &(temp), (TickType_t ) 1)) {
 						last = now;
 						if (decodeCtx.len > 0) {
-							err = esp_ota_write(update_handle,
-									(const void *) decodeCtx.decoded,
-									decodeCtx.len);
+							err = esp_ota_write(update_handle, (const void *) decodeCtx.decoded, decodeCtx.len);
 
 							if (err != ESP_OK) {
-								ESP_LOGE(TAG, "esp_ota_write failed (%s)",
-										esp_err_to_name(err));
+								ESP_LOGE(TAG, "esp_ota_write failed (%s)", esp_err_to_name(err));
 								task_fatal_error();
 							} else {
-								ESP_LOGI(TAG, "esp_ota_write %d%%", decodeCtx.sumLen*100/md5Updata.len);
+								ESP_LOGI(TAG, "esp_ota_write %d%%", decodeCtx.sumLen * 100 / md5Updata.len);
 							}
 
 							if (decodeCtx.sumLen == md5Updata.len) {
@@ -251,11 +238,9 @@ void mqtt_ota_task(void *pvParameters) {
 					mbedtls_md5_finish(&ctx, output);
 					ESP_LOGI(TAG,
 							"fileSize :%d ->md5: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-							decodeCtx.sumLen, output[0], output[1], output[2],
-							output[3], output[4], output[5], output[6],
-							output[7], output[8], output[9], output[10],
-							output[11], output[12], output[13], output[14],
-							output[15]);
+							decodeCtx.sumLen, output[0], output[1], output[2], output[3], output[4], output[5],
+							output[6], output[7], output[8], output[9], output[10], output[11], output[12], output[13],
+							output[14], output[15]);
 
 					if (memcmp(md5Updata.md5, output, 16) != 0) {
 						ESP_LOGE(TAG, "md5 sum failed ");
@@ -266,9 +251,7 @@ void mqtt_ota_task(void *pvParameters) {
 						}
 						err = esp_ota_set_boot_partition(update_partition);
 						if (err != ESP_OK) {
-							ESP_LOGE(TAG,
-									"esp_ota_set_boot_partition failed (%s)!",
-									esp_err_to_name(err));
+							ESP_LOGE(TAG, "esp_ota_set_boot_partition failed (%s)!", esp_err_to_name(err));
 							task_fatal_error();
 						}
 						ESP_LOGI(TAG, "Prepare to restart system!");

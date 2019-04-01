@@ -77,7 +77,7 @@ esp_err_t _get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-httpd_uri_t hello = {
+httpd_uri_t get_base = {
     .uri       = "/",
     .method    = HTTP_GET,
     .handler   = _get_handler,
@@ -183,8 +183,6 @@ httpd_uri_t put_config = {
     .uri       = "/config",
     .method    = HTTP_PUT,
     .handler   = _config_handler,
-    /* Let's pass response string in user
-     * context to demonstrate it's usage */
 };
 
 /* An HTTP GET handler */
@@ -239,8 +237,6 @@ httpd_uri_t put_command = {
     .uri       = "/command",
     .method    = HTTP_PUT,
     .handler   = _command_handler,
-    /* Let's pass response string in user
-     * context to demonstrate it's usage */
 };
 
 httpd_handle_t start_webserver(void)
@@ -253,8 +249,8 @@ httpd_handle_t start_webserver(void)
     if (httpd_start(&server, &config) == ESP_OK) {
         // Set URI handlers
         ESP_LOGI(TAG, "Registering URI handlers");
-        httpd_register_uri_handler(server, &hello);
-        httpd_register_uri_handler(server, &post);
+        httpd_register_uri_handler(server, &get_base);
+        httpd_register_uri_handler(server, &put_command);
         httpd_register_uri_handler(server, &put_config);
         return server;
     }
