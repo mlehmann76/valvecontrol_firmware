@@ -35,6 +35,7 @@ typedef struct {
 
 void mqtt_user_init(void);
 int  mqtt_user_addHandler(messageHandler_t *pHandle);
+bool isTopic(esp_mqtt_event_handle_t event, const char const * pCommand);
 
 #ifdef __cplusplus
 }

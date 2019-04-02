@@ -47,22 +47,23 @@ void status_task_setup(void) {
 }
 
 void status_task(void* pvParameters) {
+	EventBits_t bits;
 	while (1) {
 		if ((status_event_group != NULL) && (mqtt_event_group != NULL)) {
 
 			if ((xEventGroupGetBits(mqtt_event_group) & MQTT_CONNECTED_BIT) &&
-					(xEventGroupGetBits(status_event_group) != 0)) {
+					((bits = xEventGroupGetBits(status_event_group)) != 0)) {
 
 				cJSON *pRoot = cJSON_CreateObject();
 				if (pRoot != NULL) {
 					for (size_t i = 0; i < (sizeof(status_func) / sizeof(status_func[0])); i++) {
 						//at least one is set, so send all status
-//						if (xEventGroupClearBits(status_event_group, status_func[i].bit) != 0) {
-							if (status_func[i].pFunc != NULL) {
-								status_func[i].pFunc(pRoot);
-							}
-//						}
+						if (status_func[i].pFunc != NULL) {
+							status_func[i].pFunc(pRoot);
+						}
 					}
+
+					xEventGroupClearBits(status_event_group, bits);
 
 					char *string = cJSON_Print(pRoot);
 					if (string == NULL) {

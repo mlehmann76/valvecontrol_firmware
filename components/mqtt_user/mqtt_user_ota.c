@@ -95,11 +95,9 @@ static int b85Decode(const uint8_t *src, size_t len, decode_t *dest) {
 int handleOtaMessage(pCtx_t p, esp_mqtt_event_handle_t event) {
 	int ret = 0;
 	if (xSemaphore != NULL) {
-		const char* pTopic = event->topic_len >= strlen(getSubMsg()) ? &event->topic[strlen(getSubMsg()) - 1] : "";
 
 		if ((ota_state != OTA_IDLE)) {
-			if (((event->topic_len == 0)
-					|| (strncmp(pTopic, "/ota/$implementation/binary", strlen("/ota/$implementation/binary")) == 0))) {
+			if ((event->topic_len == 0) || (isTopic(event,"/ota/$implementation/binary"))) {
 
 				//block till data was processed by ota task
 				const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;

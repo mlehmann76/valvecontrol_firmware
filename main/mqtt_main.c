@@ -49,7 +49,7 @@ static bool g_wifi_wps_flag = true;
 /* The event group allows multiple bits for each event,
  but we only care about one event - are we connected
  to the AP with an IP? */
-const int CONNECTED_BIT = BIT0;
+const int CONNECTED_BIT = 1u<<0;
 #define TAG "MAIN"
 //static char task_debug_buf[512];
 

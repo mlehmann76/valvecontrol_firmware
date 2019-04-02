@@ -109,22 +109,17 @@ static int checkButton() {
 
 int handleControlMsg(pCtx_t ctx, esp_mqtt_event_handle_t event) {
 	int ret = 0;
-	if (event->topic_len > strlen(getSubMsg())) {
-		const char* pTopic = &event->topic[strlen(getSubMsg()) - 1];
-		//check for control messages
-		int c = strncmp(pTopic, "/control", strlen("/control"));
-		if (c == 0) {
-			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(getSubMsg()) + 1, pTopic);
+	if (isTopic(event,"/control")) {
+		ESP_LOGI(TAG, "%.*s", event->topic_len, event->topic);
 
-			cJSON *root = cJSON_Parse(event->data);
-			if (root != NULL) {
-				cJSON *chan = cJSON_GetObjectItem(root, "channel");
-				if (chan != NULL) {
-					handleChannelControl(chan);
-				}
-				cJSON_Delete(root);
-				ret = 1;
+		cJSON *root = cJSON_Parse(event->data);
+		if (root != NULL) {
+			cJSON *chan = cJSON_GetObjectItem(root, "channel");
+			if (chan != NULL) {
+				handleChannelControl(chan);
 			}
+			cJSON_Delete(root);
+			ret = 1;
 		}
 	}
 	return ret;

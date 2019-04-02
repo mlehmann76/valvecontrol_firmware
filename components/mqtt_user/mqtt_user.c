@@ -99,41 +99,32 @@ static void mqtt_message_handler(esp_mqtt_event_handle_t event) {
 
 int handleSysMessage(pCtx_t ctx, esp_mqtt_event_handle_t event) {
 	int ret = 0;
-	if (event->topic_len > strlen(getSubMsg())) {
-		const char* pTopic = &event->topic[strlen(getSubMsg()) - 1];
-		//check for control messages
-		if (strncmp(pTopic, "/system", strlen("/system")) == 0) {
-			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(getSubMsg()) + 1, pTopic);
-			cJSON *root = cJSON_Parse(event->data);
-			cJSON *firmware = cJSON_GetObjectItem(root, "firmware");
-			if (firmware != NULL) {
-				handleFirmwareMsg(firmware);
-			}
-			cJSON_Delete(root);
-			ret = 1;
+	if (isTopic(event,"/system")) {
+		ESP_LOGI(TAG, "%.*s", event->topic_len, event->topic);
+		cJSON *root = cJSON_Parse(event->data);
+		cJSON *firmware = cJSON_GetObjectItem(root, "firmware");
+		if (firmware != NULL) {
+			handleFirmwareMsg(firmware);
 		}
+		cJSON_Delete(root);
+		ret = 1;
 	}
 	return ret;
 }
 
 int handleConfigMsg(pCtx_t ctx, esp_mqtt_event_handle_t event) {
 	int ret = 0;
-	if (event->topic_len > strlen(getSubMsg())) {
-		const char* pTopic = &event->topic[strlen(getSubMsg()) - 1];
-		//check for control messages
-		int c = strncmp(pTopic, "/config", strlen("/config"));
-		if (c == 0) {
-			ESP_LOGI(TAG, "%.*s", event->topic_len - strlen(getSubMsg()) + 1, pTopic);
+	if (isTopic(event,"/config")) {
+		ESP_LOGI(TAG, "%.*s", event->topic_len, event->topic);
 
-			cJSON *root = cJSON_Parse(event->data);
-			if (root != NULL) {
-				cJSON *pConfig = cJSON_GetObjectItem(root, "mqtt");
-				if (pConfig != NULL) {
-					setMqttConfig(pConfig);
-				}
-				cJSON_Delete(root);
-				ret = 1;
+		cJSON *root = cJSON_Parse(event->data);
+		if (root != NULL) {
+			cJSON *pConfig = cJSON_GetObjectItem(root, "mqtt");
+			if (pConfig != NULL) {
+				setMqttConfig(pConfig);
 			}
+			cJSON_Delete(root);
+			ret = 1;
 		}
 	}
 	return ret;
@@ -286,3 +277,9 @@ int mqtt_user_addHandler(messageHandler_t *pHandle) {
 	return ret;
 }
 
+bool isTopic(esp_mqtt_event_handle_t event, const char const * pCommand) {
+	const char* psTopic =
+			event->topic_len >= strlen(getSubMsg()) ?
+					&event->topic[strlen(getSubMsg()) - 2] : "";
+	return strncmp(psTopic, pCommand, strlen(pCommand)) == 0;
+}
