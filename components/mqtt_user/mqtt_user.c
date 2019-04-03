@@ -37,11 +37,18 @@ EventGroupHandle_t mqtt_event_group;
 static void mqtt_message_handler(esp_mqtt_event_handle_t event);
 static void handleFirmwareMsg(cJSON* firmware);
 
-int handleSysMessage(pCtx_t ctx, esp_mqtt_event_handle_t event);
-int handleConfigMsg(pCtx_t ctx, esp_mqtt_event_handle_t event);
+int handleSysMessage(const char * topic, esp_mqtt_event_handle_t event);
+int handleConfigMsg(const char * topic, esp_mqtt_event_handle_t event);
 
-messageHandler_t mqttConfigHandler = { .pUserctx = NULL, .onMessage = handleConfigMsg, "config event" };
-messageHandler_t sysConfigHandler = { .pUserctx = NULL, .onMessage = handleSysMessage, "sys event" };
+messageHandler_t mqttConfigHandler = { //
+		.topicName = "/config", //
+				.onMessage = handleConfigMsg, //
+				"config event" };
+
+messageHandler_t sysConfigHandler = { //
+		.topicName = "/system", //
+				.onMessage = handleSysMessage, //
+				"sys event" };
 
 static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 	client = event->client;
@@ -88,18 +95,17 @@ static void mqtt_message_handler(esp_mqtt_event_handle_t event) {
 
 	for (int i = 0; i < (sizeof(messageHandle) / sizeof(messageHandle[0])); i++) {
 		if ((messageHandle[i] != NULL) && (messageHandle[i]->onMessage != NULL)) {
-			if (messageHandle[i]->onMessage(messageHandle[i]->pUserctx, event)) {
+			if (messageHandle[i]->onMessage(messageHandle[i]->topicName, event)) {
 				ESP_LOGI(TAG, "%s handled", messageHandle[i]->handlerName);
 				break;
 			}
 		}
 	}
-
 }
 
-int handleSysMessage(pCtx_t ctx, esp_mqtt_event_handle_t event) {
+int handleSysMessage(const char * topic, esp_mqtt_event_handle_t event) {
 	int ret = 0;
-	if (isTopic(event,"/system")) {
+	if (isTopic(event, topic)) {
 		ESP_LOGI(TAG, "%.*s", event->topic_len, event->topic);
 		cJSON *root = cJSON_Parse(event->data);
 		cJSON *firmware = cJSON_GetObjectItem(root, "firmware");
@@ -112,11 +118,10 @@ int handleSysMessage(pCtx_t ctx, esp_mqtt_event_handle_t event) {
 	return ret;
 }
 
-int handleConfigMsg(pCtx_t ctx, esp_mqtt_event_handle_t event) {
+int handleConfigMsg(const char * topic, esp_mqtt_event_handle_t event) {
 	int ret = 0;
-	if (isTopic(event,"/config")) {
+	if (isTopic(event, topic)) {
 		ESP_LOGI(TAG, "%.*s", event->topic_len, event->topic);
-
 		cJSON *root = cJSON_Parse(event->data);
 		if (root != NULL) {
 			cJSON *pConfig = cJSON_GetObjectItem(root, "mqtt");
@@ -209,10 +214,10 @@ void mqtt_task(void *pvParameters) {
 	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
 	const esp_mqtt_client_config_t mqtt_cfg = { //
 			.uri = getMqttServer(), //
-			.event_handle = mqtt_event_handler,//
-			.username =	getMqttUser(), //
-			.password = getMqttPass(),//
-	};
+					.event_handle = mqtt_event_handler, //
+					.username = getMqttUser(), //
+					.password = getMqttPass(), //
+			};
 
 	xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, pdFALSE, pdTRUE, 10000 / portTICK_PERIOD_MS);
 	client = esp_mqtt_client_init(&mqtt_cfg);
@@ -278,8 +283,6 @@ int mqtt_user_addHandler(messageHandler_t *pHandle) {
 }
 
 bool isTopic(esp_mqtt_event_handle_t event, const char const * pCommand) {
-	const char* psTopic =
-			event->topic_len >= strlen(getSubMsg()) ?
-					&event->topic[strlen(getSubMsg()) - 2] : "";
+	const char* psTopic = event->topic_len >= strlen(getSubMsg()) ? &event->topic[strlen(getSubMsg()) - 2] : "";
 	return strncmp(psTopic, pCommand, strlen(pCommand)) == 0;
 }

@@ -26,7 +26,7 @@ typedef struct {
 } queueData_t;
 
 void handleChannelControl(const cJSON* const chan);
-int handleControlMsg(pCtx_t, esp_mqtt_event_handle_t );
+int handleControlMsg(const char *, esp_mqtt_event_handle_t );
 void gpio_task_setup(void);
 void gpio_onConnect(void);
 void addChannelStatus(cJSON *root);

@@ -42,7 +42,11 @@ static QueueHandle_t dataQueue;
 
 ota_state_t ota_state = OTA_IDLE;
 SemaphoreHandle_t xSemaphore = NULL;
-messageHandler_t mqttOtaHandler = { .pUserctx = NULL, .onMessage = handleOtaMessage, "ota event" };
+
+messageHandler_t mqttOtaHandler = { //
+		.topicName = "/ota/$implementation/binary",//
+		.onMessage = handleOtaMessage,//
+		"ota event" };
 
 static void __attribute__((noreturn)) task_fatal_error() {
 	ESP_LOGE(TAG, "Exiting task due to fatal error...");
@@ -92,12 +96,12 @@ static int b85Decode(const uint8_t *src, size_t len, decode_t *dest) {
 	return dest->len;
 }
 
-int handleOtaMessage(pCtx_t p, esp_mqtt_event_handle_t event) {
+int handleOtaMessage(const char * p, esp_mqtt_event_handle_t event) {
 	int ret = 0;
 	if (xSemaphore != NULL) {
 
 		if ((ota_state != OTA_IDLE)) {
-			if ((event->topic_len == 0) || (isTopic(event,"/ota/$implementation/binary"))) {
+			if ((event->topic_len == 0) || (isTopic(event, p))) {
 
 				//block till data was processed by ota task
 				const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;
@@ -112,7 +116,7 @@ int handleOtaMessage(pCtx_t p, esp_mqtt_event_handle_t event) {
 					int len = b85Decode((uint8_t*) event->data, event->data_len, &decodeCtx);
 					if (len > 0) {
 						mbedtls_md5_update(&ctx, decodeCtx.decoded, len);
-					} LED_TOGGLE();
+					}LED_TOGGLE();
 					ret = 1;
 					xSemaphoreGive(xSemaphore);
 				}

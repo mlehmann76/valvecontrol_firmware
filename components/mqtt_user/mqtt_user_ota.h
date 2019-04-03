@@ -35,7 +35,7 @@ typedef struct {
 
 messageHandler_t mqttOtaHandler;
 
-int handleOtaMessage(pCtx_t, esp_mqtt_event_handle_t);
+int handleOtaMessage(const char *, esp_mqtt_event_handle_t);
 void handleOta();
 void mqtt_ota_task(void *pvParameters);
 

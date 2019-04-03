@@ -43,27 +43,16 @@
 #define LED_C_TIME			   1
 #define LED_FREQ			   50
 #endif
-
-messageHandler_t controlHandler = { .pUserctx = NULL, .onMessage = handleControlMsg, "control event" };
-
-//static uint32_t actChan = 0;
-typedef enum {
-	pOFF, pHALF, pON
-} channelMode_t;
-static struct {
-	channelMode_t mode;
-	time_t time;
-} chanMode[NUM_CONTROL] = { 0 };
-
+/**/
 const char* const channel_str[NUM_CONTROL] = { "Channel0", "Channel1", "Channel2", "Channel3" };
-
+/**/
+messageHandler_t controlHandler = {//
+		.topicName = "/control",//
+		.onMessage = handleControlMsg,//
+		"control event" };
+/**/
+static channelSet_t chanMode[NUM_CONTROL] = { 0 };
 static bool isConnected = false;
-
-static void updateStatus(void);
-static void disableChan(uint32_t chan);
-static void enableChan(uint32_t chan);
-static void updateChannel(uint32_t chan);
-
 static ledc_channel_config_t ledc_channel[NUM_CONTROL] = { //
 		{ .channel = LEDC_CHANNEL_0, //
 				.duty = LED_C_OFF, //
@@ -90,26 +79,16 @@ static ledc_channel_config_t ledc_channel[NUM_CONTROL] = { //
 				.hpoint = 0, //
 				.timer_sel = LEDC_TIMER_0 }, }; //
 
-static int checkButton() {
-	static int wps_button_count = 0;
-	if ((gpio_get_level(WPS_BUTTON) == 0)) {
-		wps_button_count++;
-		if (wps_button_count > (WPS_LONG_MS / portTICK_PERIOD_MS)) {
-			xEventGroupSetBits(button_event_group, WPS_LONG_BIT);
-			wps_button_count = 0;
-		}
-	} else {
-		if (wps_button_count > (WPS_SHORT_MS / portTICK_PERIOD_MS)) {
-			xEventGroupSetBits(button_event_group, WPS_SHORT_BIT);
-		}
-		wps_button_count = 0;
-	}
-	return wps_button_count;
-}
-
-int handleControlMsg(pCtx_t ctx, esp_mqtt_event_handle_t event) {
+/**/
+static void updateStatus(void);
+static void disableChan(uint32_t chan);
+static void enableChan(uint32_t chan);
+static void updateChannel(uint32_t chan);
+static int checkButton();
+/**/
+int handleControlMsg(const char * topic, esp_mqtt_event_handle_t event) {
 	int ret = 0;
-	if (isTopic(event,"/control")) {
+	if (isTopic(event, topic)) {
 		ESP_LOGI(TAG, "%.*s", event->topic_len, event->topic);
 
 		cJSON *root = cJSON_Parse(event->data);
@@ -240,9 +219,9 @@ void gpio_task_setup(void) {
 
 	ledc_timer_config_t ledc_timer = { //
 			.duty_resolution = LEDC_TIMER_13_BIT, // resolution of PWM duty
-			.freq_hz = LED_FREQ,                      // frequency of PWM signal
-			.speed_mode = LEDC_LOW_SPEED_MODE,           // timer mode
-			.timer_num = LEDC_TIMER_0            // timer index
+					.freq_hz = LED_FREQ,                      // frequency of PWM signal
+					.speed_mode = LEDC_LOW_SPEED_MODE,           // timer mode
+					.timer_num = LEDC_TIMER_0            // timer index
 			};
 	// Set configuration of timer0 for high speed channels
 
@@ -265,12 +244,6 @@ void gpio_task_setup(void) {
 	}
 
 	xTaskCreate(&gpio_task, "gpio_task", 2048, NULL, 5, NULL);
-}
-
-static void updateStatus(void) {
-	if (status_event_group != NULL) {
-		xEventGroupSetBits(status_event_group, STATUS_EVENT_CONTROL);
-	}
 }
 
 void addChannelStatus(cJSON *root) {
@@ -298,6 +271,12 @@ void addChannelStatus(cJSON *root) {
 	end:
 
 	return;
+}
+
+static void updateStatus(void) {
+	if (status_event_group != NULL) {
+		xEventGroupSetBits(status_event_group, STATUS_EVENT_CONTROL);
+	}
 }
 
 static void enableChan(uint32_t chan) {
@@ -348,3 +327,21 @@ static void updateChannel(uint32_t chan) {
 		ledc_update_duty(ledc_channel[chan].speed_mode, ledc_channel[chan].channel);
 	}
 }
+
+static int checkButton() {
+	static int wps_button_count = 0;
+	if ((gpio_get_level(WPS_BUTTON) == 0)) {
+		wps_button_count++;
+		if (wps_button_count > (WPS_LONG_MS / portTICK_PERIOD_MS)) {
+			xEventGroupSetBits(button_event_group, WPS_LONG_BIT);
+			wps_button_count = 0;
+		}
+	} else {
+		if (wps_button_count > (WPS_SHORT_MS / portTICK_PERIOD_MS)) {
+			xEventGroupSetBits(button_event_group, WPS_SHORT_BIT);
+		}
+		wps_button_count = 0;
+	}
+	return wps_button_count;
+}
+
