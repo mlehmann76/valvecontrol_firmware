@@ -78,8 +78,8 @@ if __name__ == "__main__":
     parser.add_argument('file', help='filename')
     args = parser.parse_args()
 
-    if not args.dev.endswith("/"):
-        args.dev = args.dev + "/"
+    #if not args.dev.endswith("/"):
+    #    args.dev = args.dev + "/"
     dc = deviceControl(args.dev)
     dc.start()
     dc.sendFirmware(args.file)
