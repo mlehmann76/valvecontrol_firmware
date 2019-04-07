@@ -32,11 +32,11 @@
 #define LEDC_MAX			   ((1<<LEDC_RESOLUTION)-1)
 #define LED_C_OFF			   LEDC_MAX
 
-#if defined(CHANOUT_USE_PWM) && (CHANOUT_USE_PWM==y)
+#if CHANOUT_USE_PWM==y
 #define LED_C_HALF			   0
-#define LED_C_ON			   ((LEDC_MAX*CHANOUT_PWM_DUTY)/100)
-#define LED_C_TIME			   1
-#define LED_FREQ			   (CHANOUT_PWM_FREQ)
+#define LED_C_ON			   ((LEDC_MAX*CONFIG_CHANOUT_PWM_DUTY)/100)
+#define LED_C_TIME			   (0.25)
+#define LED_FREQ			   (CONFIG_CHANOUT_PWM_FREQ)
 #else
 #define LED_C_HALF			   0
 #define LED_C_ON			   0
@@ -167,7 +167,7 @@ void gpio_task(void *pvParameters) {
 				time_t now;
 				// test for duty cycle switch
 				time(&now);
-				if ((difftime(now, chanMode[i].time) > LED_C_TIME) && (chanMode[i].mode != pON)) {
+				if ((difftime(now, chanMode[i].time) >= LED_C_TIME) && (chanMode[i].mode != pON)) {
 					chanMode[i].mode = pON;
 					updateChannel(i);
 				}

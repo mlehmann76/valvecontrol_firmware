@@ -59,13 +59,13 @@ config CHANOUT_PWM_FREQ
     int "PWM Freq"
     depends on CHANOUT_USE_PWM
     default 50
-    range 10 100
+    range 10 1000
 
 config CHANOUT_PWM_DUTY
     int "PWM Duty"
     depends on CHANOUT_USE_PWM
     default 50
-    range 25 100
+    range 5 100
    
 
 endmenu
