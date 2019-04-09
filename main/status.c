@@ -20,6 +20,7 @@
 #include "mqtt_user.h"
 
 #include "controlTask.h"
+#include "sht1x.h"
 
 #include "status.h"
 
@@ -38,7 +39,8 @@ typedef struct {
 
 status_func_t status_func[] = { //
 		{ STATUS_EVENT_FIRMWARE, addFirmwareStatus },//
-		{ STATUS_EVENT_CONTROL, addChannelStatus }};
+		{ STATUS_EVENT_CONTROL, addChannelStatus },
+		{ STATUS_EVENT_SENSOR, addSHT1xStatus }};
 
 
 void status_task_setup(void) {

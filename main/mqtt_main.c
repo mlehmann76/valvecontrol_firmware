@@ -27,6 +27,7 @@
 #include "config_user.h"
 #include "controlTask.h"
 #include "status.h"
+#include "sht1x.h"
 
 #if CONFIG_EXAMPLE_WPS_TYPE_PBC
 #define WPS_TEST_MODE WPS_TYPE_PBC
@@ -202,6 +203,7 @@ void app_main() {
 
     status_task_setup();
 	gpio_task_setup();
+	setupSHT1xTask();
 	mqtt_config_init();
 	mqtt_user_init();
 	mqtt_user_addHandler(&controlHandler);
