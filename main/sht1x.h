@@ -15,7 +15,6 @@
 
 #define SHT1X_MEASURE_TIME 320
 
-
 void addSHT1xStatus(cJSON *root);
 void setupSHT1xTask(void);
 
