@@ -42,6 +42,8 @@ typedef struct {
 } channelSet_t;
 
 void mqtt_user_init(void);
+void mqtt_connect(void);
+void mqtt_disconnect(void);
 int  mqtt_user_addHandler(messageHandler_t *pHandle);
 bool isTopic(esp_mqtt_event_handle_t event, const char const * pCommand);
 

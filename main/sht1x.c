@@ -48,13 +48,13 @@ static i2c_port_t i2c_port = I2C_NUM_0;
 static sht1x_data_t sensor_data = { NULL, 0, 0, false };
 
 static esp_err_t i2c_master_driver_initialize() {
-	i2c_config_t conf = {//
-			.mode = I2C_MODE_MASTER,//
-			.sda_io_num = i2c_gpio_sda,//
-			.sda_pullup_en = GPIO_PULLUP_ENABLE,//
-			.scl_io_num = i2c_gpio_scl,//
-			.scl_pullup_en = GPIO_PULLUP_ENABLE,//
-			.master.clk_speed = i2c_frequency };
+	i2c_config_t conf = { //
+			.mode = I2C_MODE_MASTER, //
+					.sda_io_num = i2c_gpio_sda, //
+					.sda_pullup_en = GPIO_PULLUP_ENABLE, //
+					.scl_io_num = i2c_gpio_scl, //
+					.scl_pullup_en = GPIO_PULLUP_ENABLE, //
+					.master.clk_speed = i2c_frequency };
 	return i2c_param_config(i2c_port, &conf);
 }
 
@@ -183,17 +183,24 @@ void sht1x_task(void *pvParameters) {
 }
 
 void setupSHT1xTask(void) {
-	i2c_master_driver_initialize();
+	esp_err_t err;
+	err = i2c_master_driver_initialize();
+	if (err == ESP_OK) {
+		err = i2c_driver_install(i2c_port, I2C_MODE_MASTER, 0, 0, ESP_INTR_FLAG_LOWMED);
 
-	sensor_data.sem = xSemaphoreCreateBinary();
+		if (err == ESP_OK) {
 
-	if (sensor_data.sem == NULL) {
-		ESP_LOGE(TAG, "error creating semaphore");
-	} else {
-		xSemaphoreGive(sensor_data.sem);
+			sensor_data.sem = xSemaphoreCreateBinary();
+
+			if (sensor_data.sem == NULL) {
+				ESP_LOGE(TAG, "error creating semaphore");
+			} else {
+				xSemaphoreGive(sensor_data.sem);
+			}
+
+			setupSHT1x();
+
+			xTaskCreate(&sht1x_task, "sht1x_task", 2048, NULL, 5, NULL);
+		}
 	}
-
-	setupSHT1x();
-
-	xTaskCreate(&sht1x_task, "sht1x_task", 2048, NULL, 5, NULL);
 }

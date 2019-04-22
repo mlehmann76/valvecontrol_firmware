@@ -30,9 +30,11 @@ extern const int CONNECTED_BIT;
 static const char *TAG = "MQTTS";
 static esp_mqtt_client_handle_t client = NULL;
 static messageHandler_t* messageHandle[8] = { 0 };
+static bool isMqttConnected = false;
+static bool isMqttInit = false;
 
 QueueHandle_t pubQueue, otaQueue;
-EventGroupHandle_t mqtt_event_group;
+EventGroupHandle_t mqtt_event_group = NULL;
 
 static void mqtt_message_handler(esp_mqtt_event_handle_t event);
 static void handleFirmwareMsg(cJSON* firmware);
@@ -58,10 +60,13 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 		xEventGroupSetBits(mqtt_event_group, MQTT_CONNECTED_BIT);
 		int msg_id = esp_mqtt_client_subscribe(client, getSubMsg(), 1);
 		ESP_LOGD(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+		isMqttConnected = true;
 		break;
 	case MQTT_EVENT_DISCONNECTED:
 		xEventGroupClearBits(mqtt_event_group, MQTT_CONNECTED_BIT);
 		ESP_LOGD(TAG, "MQTT_EVENT_DISCONNECTED");
+		isMqttConnected = false;
+		isMqttInit = false;
 		break;
 
 	case MQTT_EVENT_SUBSCRIBED:
@@ -212,19 +217,9 @@ static void handleFirmwareMsg(cJSON* firmware) {
 
 void mqtt_task(void *pvParameters) {
 	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
-	const esp_mqtt_client_config_t mqtt_cfg = { //
-			.uri = getMqttServer(), //
-					.event_handle = mqtt_event_handler, //
-					.username = getMqttUser(), //
-					.password = getMqttPass(), //
-			};
-
-	xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, pdFALSE, pdTRUE, 10000 / portTICK_PERIOD_MS);
-	client = esp_mqtt_client_init(&mqtt_cfg);
-	esp_mqtt_client_start(client);
 
 	while (1) {
-		// check if we have something to do
+
 		message_t rxData = { 0 };
 
 		if ((client != NULL) && (xQueueReceive(pubQueue, &(rxData), xTicksToWait))) {
@@ -242,6 +237,7 @@ void mqtt_task(void *pvParameters) {
 				free(rxData.pData);
 			}
 		}
+
 		vTaskDelay(10 / portTICK_PERIOD_MS);
 		taskYIELD();
 	}
@@ -262,12 +258,31 @@ void mqtt_user_init(void) {
 		ESP_LOGI(TAG, "otaQueue init failure");
 	}
 
+	const esp_mqtt_client_config_t mqtt_cfg = { //
+			.uri = getMqttServer(), //
+					.event_handle = mqtt_event_handler, //
+					.username = getMqttUser(), //
+					.password = getMqttPass(), //
+			};
+
+	client = esp_mqtt_client_init(&mqtt_cfg);
+
 	xTaskCreatePinnedToCore(&mqtt_task, "mqtt_task", 2 * 8192, NULL, 5, NULL, 0);
 	xTaskCreatePinnedToCore(&mqtt_ota_task, "mqtt_ota_task", 2 * 8192, NULL, 5, NULL, 0);
 
 	mqtt_user_addHandler(&sysConfigHandler);
 	mqtt_user_addHandler(&mqttConfigHandler);
 	mqtt_user_addHandler(&mqttOtaHandler);
+}
+
+void mqtt_connect(void) {
+	if (client != NULL)
+		esp_mqtt_client_start(client);
+}
+
+void mqtt_disconnect(void) {
+	if (client != NULL)
+		esp_mqtt_client_stop(client);
 }
 
 int mqtt_user_addHandler(messageHandler_t *pHandle) {
