@@ -224,12 +224,15 @@ void mqtt_task(void *pvParameters) {
 
 		if ((client != NULL) && (xQueueReceive(pubQueue, &(rxData), xTicksToWait))) {
 
-			ESP_LOGD(TAG, "publish %.*s : %.*s", strlen(rxData.pTopic), rxData.pTopic, strlen(rxData.pData),
+			if (isMqttConnected) {
+				ESP_LOGD(TAG, "publish %.*s : %.*s", strlen(rxData.pTopic), rxData.pTopic, strlen(rxData.pData),
 					rxData.pData);
 
-			int msg_id = esp_mqtt_client_publish(client, rxData.pTopic, rxData.pData, strlen(rxData.pData) + 1, 1, 0);
+				int msg_id = esp_mqtt_client_publish(client, rxData.pTopic, rxData.pData, strlen(rxData.pData) + 1, 1, 0);
 
-			ESP_LOGD(TAG, "sent publish successful, msg_id=%d", msg_id);
+				ESP_LOGD(TAG, "sent publish successful, msg_id=%d", msg_id);
+			}
+
 			if (rxData.topic_len > 0) {
 				free(rxData.pTopic);
 			}
