@@ -8,7 +8,7 @@
 #ifndef MAIN_SNTP_H_
 #define MAIN_SNTP_H_
 
-void setup_sntp(const char* const pTz);
+void setup_sntp(void);
 esp_err_t update_time(void);
 
 

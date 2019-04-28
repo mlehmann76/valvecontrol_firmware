@@ -20,8 +20,11 @@
 #include "lwip/err.h"
 #include "lwip/apps/sntp.h"
 #include "sdkconfig.h"
+#include "jsonconfig.h"
 
 static const char *TAG = "sntp";
+char* server = NULL;
+char* timeZone = NULL;
 
 esp_err_t update_time(void) {
 	time_t now;
@@ -45,10 +48,14 @@ esp_err_t update_time(void) {
 
 void setup_sntp(const char* const pTz) {
 	ESP_LOGI(TAG, "Initializing SNTP");
+	//FIXME free memory before reallocate
+	readConfigStr("sntp", "server", &server);
+	readConfigStr("sntp", "zone", &timeZone);
+	ESP_LOGI(TAG, "sntp server (%s) (%s)", server, timeZone);
 	sntp_setoperatingmode(SNTP_OPMODE_POLL);
-	sntp_setservername(0, "pool.ntp.org");
+	sntp_setservername(0, server);
 	//sntp_set_time_sync_notification_cb(time_sync_notification_cb);
 	sntp_init();
-	setenv("TZ", pTz, 1);
+	setenv("TZ", timeZone, 1);
 	tzset();
 }

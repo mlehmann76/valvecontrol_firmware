@@ -59,10 +59,6 @@ const int CONNECTED_BIT = 1u<<0;
 		EventGroupHandle_t wifi_event_group,
 button_event_group;
 
-void activateWPS(const esp_wps_config_t* config) {
-
-}
-
 #pragma GCC diagnostic pop
 static esp_err_t event_handler(void *ctx, system_event_t *event) {
 	httpd_handle_t *server = (httpd_handle_t *) ctx;
@@ -72,7 +68,9 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 		switch (esp_wifi_connect()) {
 		case ESP_OK:
 			ESP_LOGI(TAG, "connected successfully");
-			xEventGroupSetBits(status_event_group, STATUS_EVENT_FIRMWARE);
+			if (status_event_group != NULL) {
+				xEventGroupSetBits(status_event_group, STATUS_EVENT_FIRMWARE);
+			}
 			break;
 
 		case ESP_ERR_WIFI_NOT_INIT:
@@ -245,10 +243,11 @@ void app_main() {
 		ret = nvs_flash_init();
 	}
 	ESP_ERROR_CHECK(ret);
+
 	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
 	xTaskCreate(wifi_init_sta, "wifi init task", 4096, &server, 10, NULL);
 
-	setup_sntp("CET-1CEST,M3.5.0,M10.5.0/3");
+	setup_sntp();
 	status_task_setup();
 	gpio_task_setup();
 	setupSHT1xTask();
@@ -258,6 +257,7 @@ void app_main() {
 
 	ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
 
+	size_t heapFree = esp_get_free_heap_size();
 	while (1) {
 
 #if 0
@@ -284,6 +284,10 @@ void app_main() {
 			vTaskDelay(500 / portTICK_PERIOD_MS);
 		}
 #else
+		if (esp_get_free_heap_size() != heapFree) {
+			heapFree = esp_get_free_heap_size();
+			ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
+		}
 		vTaskDelay(500 / portTICK_PERIOD_MS);
 #endif
 	}

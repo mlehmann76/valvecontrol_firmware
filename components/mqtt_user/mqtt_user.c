@@ -286,7 +286,7 @@ void mqtt_connect(void) {
 }
 
 void mqtt_disconnect(void) {
-	if (client != NULL)
+	if (client != NULL && isMqttConnected)
 		esp_mqtt_client_stop(client);
 }
 

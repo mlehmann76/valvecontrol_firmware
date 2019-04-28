@@ -7,7 +7,7 @@
 # please read the ESP-IDF documents if you need to do this.
 #
 
-COMPONENT_ADD_INCLUDEDIRS := . ../components/mqtt_user
+COMPONENT_ADD_INCLUDEDIRS := . ../components/mqtt_user ../components/jsonconfig
 COMPONENT_SRCDIRS := $(COMPONENT_ADD_INCLUDEDIRS)
 
-COMPONENT_EMBED_TXTFILES := raspberrypi.pem
+COMPONENT_EMBED_TXTFILES := config.json
