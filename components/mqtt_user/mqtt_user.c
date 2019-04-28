@@ -68,7 +68,6 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 		isMqttConnected = false;
 		isMqttInit = false;
 		break;
-
 	case MQTT_EVENT_SUBSCRIBED:
 		ESP_LOGD(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
 		break;
@@ -84,6 +83,9 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 		break;
 	case MQTT_EVENT_ERROR:
 		ESP_LOGE(TAG, "MQTT_EVENT_ERROR");
+		break;
+	case MQTT_EVENT_BEFORE_CONNECT:
+		ESP_LOGE(TAG, "MQTT_EVENT_BEFORE_CONNECT");
 		break;
 	}
 	return ESP_OK;

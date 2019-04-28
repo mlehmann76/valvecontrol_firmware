@@ -28,6 +28,7 @@
 #include "controlTask.h"
 #include "status.h"
 #include "sht1x.h"
+#include "sntp.h"
 
 #if CONFIG_EXAMPLE_WPS_TYPE_PBC
 #define WPS_TEST_MODE WPS_TYPE_PBC
@@ -244,11 +245,10 @@ void app_main() {
 		ret = nvs_flash_init();
 	}
 	ESP_ERROR_CHECK(ret);
-
-	//initialise_wifi(&server);
 	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
 	xTaskCreate(wifi_init_sta, "wifi init task", 4096, &server, 10, NULL);
 
+	setup_sntp("CET-1CEST,M3.5.0,M10.5.0/3");
 	status_task_setup();
 	gpio_task_setup();
 	setupSHT1xTask();
@@ -258,11 +258,14 @@ void app_main() {
 
 	ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
 
-	time_t now, last;
-	time(&last);
-	time(&now);
-
 	while (1) {
+
+#if 0
+		time_t now;
+		struct tm timeinfo;
+		char strftime_buf[64];
+		time(&now);
+		localtime_r(&now, &timeinfo);
 		//if (xEventGroupWaitBits(button_event_group, WPS_SHORT_BIT, true, true,10)) {
 		/*
 		 time(&now);
@@ -272,6 +275,16 @@ void app_main() {
 		 last = now;
 		 }
 		 */
-		vTaskDelay(100 / portTICK_PERIOD_MS);
+		if (timeinfo.tm_year > (2016 - 1900)) {
+			localtime_r(&now, &timeinfo);
+			strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+			ESP_LOGI(TAG, "The current date/time is: %s", strftime_buf);
+			vTaskDelay(5000 / portTICK_PERIOD_MS);
+		} else {
+			vTaskDelay(500 / portTICK_PERIOD_MS);
+		}
+#else
+		vTaskDelay(500 / portTICK_PERIOD_MS);
+#endif
 	}
 }

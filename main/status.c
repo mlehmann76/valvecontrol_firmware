@@ -29,6 +29,7 @@
 EventGroupHandle_t status_event_group;
 
 void addFirmwareStatus(cJSON *root);
+void addTimeStamp(cJSON *root);
 
 typedef void (*pStatusFunc)(cJSON *root);
 
@@ -58,6 +59,9 @@ void status_task(void* pvParameters) {
 
 				cJSON *pRoot = cJSON_CreateObject();
 				if (pRoot != NULL) {
+					//
+					addTimeStamp(pRoot);
+					//
 					for (size_t i = 0; i < (sizeof(status_func) / sizeof(status_func[0])); i++) {
 						//at least one is set, so send all status
 						if (status_func[i].pFunc != NULL) {
@@ -117,3 +121,35 @@ void addFirmwareStatus(cJSON *root) {
 	return;
 }
 
+void addTimeStamp(cJSON *root) {
+	if (root == NULL) {
+		goto end;
+	}
+
+	time_t now;
+	struct tm timeinfo;
+	time(&now);
+	localtime_r(&now, &timeinfo);
+	char strftime_buf[64];
+	localtime_r(&now, &timeinfo);
+
+
+	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "datetime");
+	if (pcjsonfirm == NULL) {
+		goto end;
+	}
+
+	strftime(strftime_buf, sizeof(strftime_buf), "%F", &timeinfo);
+	if (cJSON_AddStringToObject(pcjsonfirm, "date", strftime_buf) == NULL) {
+		goto end;
+	}
+
+	strftime(strftime_buf, sizeof(strftime_buf), "%T", &timeinfo);
+	if (cJSON_AddStringToObject(pcjsonfirm, "time", strftime_buf) == NULL) {
+		goto end;
+	}
+
+	end:
+
+	return;
+}
