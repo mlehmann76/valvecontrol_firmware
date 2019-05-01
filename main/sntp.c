@@ -46,7 +46,7 @@ esp_err_t update_time(void) {
 	return ESP_OK;
 }
 
-void setup_sntp(const char* const pTz) {
+void sntp_support(void) {
 	ESP_LOGI(TAG, "Initializing SNTP");
 	//FIXME free memory before reallocate
 	readConfigStr("sntp", "server", &server);

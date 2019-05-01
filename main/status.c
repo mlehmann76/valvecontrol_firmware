@@ -13,6 +13,8 @@
 
 #include "sdkconfig.h"
 #include "esp_log.h"
+#include "esp_image_format.h"
+#include "esp_ota_ops.h"
 #include "cJSON.h"
 
 #include "mqtt_config.h"
@@ -83,6 +85,7 @@ void status_task(void* pvParameters) {
 					if ( xQueueSendToBack(pubQueue, &message, 10) != pdPASS) {
 						// Failed to post the message, even after 10 ticks.
 						ESP_LOGI(TAG, "pubqueue post failure");
+						free(string);
 					}
 
 					end:
@@ -107,14 +110,22 @@ void addFirmwareStatus(cJSON *root) {
 	if (pcjsonfirm == NULL) {
 		goto end;
 	}
-
-	if (cJSON_AddStringToObject(pcjsonfirm, "date", __DATE__) == NULL) {
+	if (cJSON_AddStringToObject(pcjsonfirm, "name", esp_ota_get_app_description()->project_name) == NULL) {
 		goto end;
 	}
 
-	if (cJSON_AddStringToObject(pcjsonfirm, "time", __TIME__) == NULL) {
+	if (cJSON_AddStringToObject(pcjsonfirm, "version", esp_ota_get_app_description()->version) == NULL) {
 		goto end;
 	}
+
+	if (cJSON_AddStringToObject(pcjsonfirm, "date", esp_ota_get_app_description()->date) == NULL) {
+		goto end;
+	}
+
+	if (cJSON_AddStringToObject(pcjsonfirm, "time", esp_ota_get_app_description()->time) == NULL) {
+		goto end;
+	}
+
 
 	end:
 

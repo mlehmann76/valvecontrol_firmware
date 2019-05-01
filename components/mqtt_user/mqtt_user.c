@@ -173,8 +173,9 @@ static void handleFirmwareMsg(cJSON* firmware) {
 	md5_update_t md5_update;
 	char* pMD5 = NULL;
 	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
+	cJSON* pfirmware = cJSON_GetObjectItem(firmware, "update");
 
-	if (cJSON_GetObjectItem(firmware, "update") != NULL) {
+	if (pfirmware != NULL) {
 		char* pUpdate = cJSON_GetStringValue(cJSON_GetObjectItem(firmware, "update"));
 		if (strcmp(pUpdate, "ota") != 0) {
 			error = 1;

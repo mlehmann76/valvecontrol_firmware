@@ -55,9 +55,8 @@ const int CONNECTED_BIT = 1u<<0;
 #define TAG "MAIN"
 //static char task_debug_buf[512];
 
-		/* FreeRTOS event group to signal when we are connected & ready to make a request */
-		EventGroupHandle_t wifi_event_group,
-button_event_group;
+/* FreeRTOS event group to signal when we are connected & ready to make a request */
+EventGroupHandle_t wifi_event_group, button_event_group;
 
 #pragma GCC diagnostic pop
 static esp_err_t event_handler(void *ctx, system_event_t *event) {
@@ -247,7 +246,7 @@ void app_main() {
 	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
 	xTaskCreate(wifi_init_sta, "wifi init task", 4096, &server, 10, NULL);
 
-	setup_sntp();
+	sntp_support();
 	status_task_setup();
 	gpio_task_setup();
 	setupSHT1xTask();

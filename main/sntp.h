@@ -8,7 +8,7 @@
 #ifndef MAIN_SNTP_H_
 #define MAIN_SNTP_H_
 
-void setup_sntp(void);
+void sntp_support(void);
 esp_err_t update_time(void);
 
 
