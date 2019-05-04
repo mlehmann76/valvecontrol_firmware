@@ -29,6 +29,7 @@
 #include "status.h"
 #include "sht1x.h"
 #include "sntp.h"
+#include "jsonconfig.h"
 
 #if CONFIG_EXAMPLE_WPS_TYPE_PBC
 #define WPS_TEST_MODE WPS_TYPE_PBC
@@ -67,9 +68,6 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 		switch (esp_wifi_connect()) {
 		case ESP_OK:
 			ESP_LOGI(TAG, "connected successfully");
-			if (status_event_group != NULL) {
-				xEventGroupSetBits(status_event_group, STATUS_EVENT_FIRMWARE);
-			}
 			break;
 
 		case ESP_ERR_WIFI_NOT_INIT:
@@ -95,7 +93,12 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 		}
 		break;
 	case SYSTEM_EVENT_STA_GOT_IP:
+		ESP_LOGI(TAG, "sta got ip successfully");
 		xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
+		if (status_event_group != NULL) {
+			xEventGroupSetBits(status_event_group, STATUS_EVENT_FIRMWARE);
+		}
+
 		/* Start the web server */
 		if (*server == NULL) {
 			*server = start_webserver();
@@ -246,6 +249,7 @@ void app_main() {
 	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
 	xTaskCreate(wifi_init_sta, "wifi init task", 4096, &server, 10, NULL);
 
+	configInit();
 	sntp_support();
 	status_task_setup();
 	gpio_task_setup();

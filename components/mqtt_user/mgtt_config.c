@@ -56,6 +56,7 @@ const char* getMqttPass() {
 	return mqtt_pass;
 }
 
+/*
 esp_err_t setMqttConfig(cJSON* config) {
 	char* pHost = cJSON_GetStringValue(cJSON_GetObjectItem(config, "host"));
 	cJSON* pPort = cJSON_GetObjectItem(config, "port");
@@ -80,6 +81,7 @@ esp_err_t setMqttConfig(cJSON* config) {
 
 	return ESP_OK;
 }
+*/
 
 void mqtt_config_init() {
 	// Initialize NVS

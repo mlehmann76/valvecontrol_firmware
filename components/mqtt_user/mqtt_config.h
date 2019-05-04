@@ -29,7 +29,7 @@ const char* getPubMsg();
 const char* getMqttServer();
 const char* getMqttUser();
 const char* getMqttPass();
-esp_err_t setMqttConfig(cJSON* config);
+//esp_err_t setMqttConfig(cJSON* config);
 
 void mqtt_config_init();
 

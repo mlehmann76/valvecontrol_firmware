@@ -51,10 +51,9 @@ messageHandler_t mqttOtaHandler = { //
 static void __attribute__((noreturn)) task_fatal_error() {
 	ESP_LOGE(TAG, "Exiting task due to fatal error...");
 	(void) vTaskDelete(NULL);
-
-	while (1) {
-		;
-	}
+	ESP_LOGE(TAG, "restart in 5...");
+	vTaskDelay(5000 / portTICK_PERIOD_MS);
+	esp_restart();
 }
 
 static void b85DecodeInit(decode_t *src) {

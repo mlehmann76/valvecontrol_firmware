@@ -22,6 +22,7 @@
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
 #include "mqtt_config.h"
+#include "jsonconfig.h"
 
 //extern const uint8_t iot_eclipse_org_pem_start[] asm("_binary_raspberrypi_pem_start");
 //extern const uint8_t iot_eclipse_org_pem_end[]   asm("_binary_iot_eclipse_org_pem_end");
@@ -129,15 +130,8 @@ int handleConfigMsg(const char * topic, esp_mqtt_event_handle_t event) {
 	int ret = 0;
 	if (isTopic(event, topic)) {
 		ESP_LOGI(TAG, "%.*s", event->topic_len, event->topic);
-		cJSON *root = cJSON_Parse(event->data);
-		if (root != NULL) {
-			cJSON *pConfig = cJSON_GetObjectItem(root, "mqtt");
-			if (pConfig != NULL) {
-				setMqttConfig(pConfig);
-			}
-			cJSON_Delete(root);
-			ret = 1;
-		}
+		updateConfig(event->data);
+		ret = 1;
 	}
 	return ret;
 }

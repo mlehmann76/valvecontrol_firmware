@@ -31,6 +31,7 @@
 #include "http_config_server.h"
 
 #include "controlTask.h"
+#include "jsonconfig.h"
 
 #define TAG "HTTP"
 
@@ -164,14 +165,7 @@ esp_err_t _config_handler(httpd_req_t *req) {
 	}
 
 	/* read mqtt config */
-	cJSON *root = cJSON_Parse(buf);
-	cJSON *mqtt_config = cJSON_GetObjectItem(root, "mqtt");
-
-	if (mqtt_config != NULL) {
-		setMqttConfig(mqtt_config);
-	}
-
-	cJSON_Delete(root);
+	updateConfig(buf);
 
 	httpd_resp_set_type(req, HTTPD_TYPE_JSON);
 	httpd_resp_send(req, buf, 0);

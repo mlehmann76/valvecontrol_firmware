@@ -12,5 +12,6 @@
 
 esp_err_t configInit(void);
 esp_err_t readConfigStr(const char* section, const char* name, char **dest);
+void updateConfig(const char *pjsonConfig);
 
 #endif /* COMPONENTS_JSONCONFIG_JSONCONFIG_H_ */
