@@ -110,6 +110,15 @@ void addFirmwareStatus(cJSON *root) {
 	if (pcjsonfirm == NULL) {
 		goto end;
 	}
+#if (1)
+	if (cJSON_AddStringToObject(pcjsonfirm, "date", __DATE__) == NULL) {
+		goto end;
+	}
+
+	if (cJSON_AddStringToObject(pcjsonfirm, "time", __TIME__) == NULL) {
+		goto end;
+	}
+#else
 	if (cJSON_AddStringToObject(pcjsonfirm, "name", esp_ota_get_app_description()->project_name) == NULL) {
 		goto end;
 	}
@@ -125,7 +134,7 @@ void addFirmwareStatus(cJSON *root) {
 	if (cJSON_AddStringToObject(pcjsonfirm, "time", esp_ota_get_app_description()->time) == NULL) {
 		goto end;
 	}
-
+#endif
 
 	end:
 
