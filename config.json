@@ -1,9 +1,0 @@
-{
-  "mqtt": {
-    "host": "raspberrypi",
-    "port": 1883,
-    "device": "esp32_test/",
-    "user": "user",
-    "pass": "pass"
-  }
-}

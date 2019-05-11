@@ -13,6 +13,8 @@
 
 #include "sdkconfig.h"
 #include "esp_log.h"
+#include "esp_image_format.h"
+#include "esp_ota_ops.h"
 #include "cJSON.h"
 
 #include "mqtt_config.h"
@@ -29,6 +31,7 @@
 EventGroupHandle_t status_event_group;
 
 void addFirmwareStatus(cJSON *root);
+void addTimeStamp(cJSON *root);
 
 typedef void (*pStatusFunc)(cJSON *root);
 
@@ -58,6 +61,9 @@ void status_task(void* pvParameters) {
 
 				cJSON *pRoot = cJSON_CreateObject();
 				if (pRoot != NULL) {
+					//
+					addTimeStamp(pRoot);
+					//
 					for (size_t i = 0; i < (sizeof(status_func) / sizeof(status_func[0])); i++) {
 						//at least one is set, so send all status
 						if (status_func[i].pFunc != NULL) {
@@ -79,6 +85,7 @@ void status_task(void* pvParameters) {
 					if ( xQueueSendToBack(pubQueue, &message, 10) != pdPASS) {
 						// Failed to post the message, even after 10 ticks.
 						ESP_LOGI(TAG, "pubqueue post failure");
+						free(string);
 					}
 
 					end:
@@ -103,7 +110,7 @@ void addFirmwareStatus(cJSON *root) {
 	if (pcjsonfirm == NULL) {
 		goto end;
 	}
-
+#if (1)
 	if (cJSON_AddStringToObject(pcjsonfirm, "date", __DATE__) == NULL) {
 		goto end;
 	}
@@ -111,9 +118,58 @@ void addFirmwareStatus(cJSON *root) {
 	if (cJSON_AddStringToObject(pcjsonfirm, "time", __TIME__) == NULL) {
 		goto end;
 	}
+#else
+	if (cJSON_AddStringToObject(pcjsonfirm, "name", esp_ota_get_app_description()->project_name) == NULL) {
+		goto end;
+	}
+
+	if (cJSON_AddStringToObject(pcjsonfirm, "version", esp_ota_get_app_description()->version) == NULL) {
+		goto end;
+	}
+
+	if (cJSON_AddStringToObject(pcjsonfirm, "date", esp_ota_get_app_description()->date) == NULL) {
+		goto end;
+	}
+
+	if (cJSON_AddStringToObject(pcjsonfirm, "time", esp_ota_get_app_description()->time) == NULL) {
+		goto end;
+	}
+#endif
 
 	end:
 
 	return;
 }
 
+void addTimeStamp(cJSON *root) {
+	if (root == NULL) {
+		goto end;
+	}
+
+	time_t now;
+	struct tm timeinfo;
+	time(&now);
+	localtime_r(&now, &timeinfo);
+	char strftime_buf[64];
+	localtime_r(&now, &timeinfo);
+
+
+	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "datetime");
+	if (pcjsonfirm == NULL) {
+		goto end;
+	}
+
+	strftime(strftime_buf, sizeof(strftime_buf), "%F", &timeinfo);
+	if (cJSON_AddStringToObject(pcjsonfirm, "date", strftime_buf) == NULL) {
+		goto end;
+	}
+
+	strftime(strftime_buf, sizeof(strftime_buf), "%T", &timeinfo);
+	if (cJSON_AddStringToObject(pcjsonfirm, "time", strftime_buf) == NULL) {
+		goto end;
+	}
+
+	end:
+
+	return;
+}

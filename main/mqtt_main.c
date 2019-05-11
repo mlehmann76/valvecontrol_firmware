@@ -28,6 +28,8 @@
 #include "controlTask.h"
 #include "status.h"
 #include "sht1x.h"
+#include "sntp.h"
+#include "jsonconfig.h"
 
 #if CONFIG_EXAMPLE_WPS_TYPE_PBC
 #define WPS_TEST_MODE WPS_TYPE_PBC
@@ -45,7 +47,7 @@
 static esp_wps_config_t config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
 static bool enableWPS = false;
 static bool g_wifi_reconnect_flag = true;
-static bool g_wifi_wps_flag = true;
+static bool g_wifi_wps_flag = false;
 
 /* The event group allows multiple bits for each event,
  but we only care about one event - are we connected
@@ -57,13 +59,6 @@ const int CONNECTED_BIT = 1u<<0;
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 EventGroupHandle_t wifi_event_group, button_event_group;
 
-void activateWPS(const esp_wps_config_t* config) {
-	ESP_LOGI(TAG, "start wps...");
-	ESP_ERROR_CHECK(esp_wifi_wps_enable(config));
-	ESP_ERROR_CHECK(esp_wifi_wps_start(0));
-	g_wifi_wps_flag = true;
-}
-
 #pragma GCC diagnostic pop
 static esp_err_t event_handler(void *ctx, system_event_t *event) {
 	httpd_handle_t *server = (httpd_handle_t *) ctx;
@@ -73,7 +68,6 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 		switch (esp_wifi_connect()) {
 		case ESP_OK:
 			ESP_LOGI(TAG, "connected successfully");
-			xEventGroupSetBits(status_event_group, STATUS_EVENT_FIRMWARE);
 			break;
 
 		case ESP_ERR_WIFI_NOT_INIT:
@@ -85,8 +79,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 			break;
 
 		case ESP_ERR_WIFI_CONN:
-			ESP_LOGE(TAG,
-					"WiFi internal error, station or soft-AP control block wrong");
+			ESP_LOGE(TAG, "WiFi internal error, station or soft-AP control block wrong");
 			break;
 
 		case ESP_ERR_WIFI_SSID:
@@ -100,48 +93,58 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 		}
 		break;
 	case SYSTEM_EVENT_STA_GOT_IP:
+		ESP_LOGI(TAG, "sta got ip successfully");
 		xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
-        /* Start the web server */
-        if (*server == NULL) {
-            *server = start_webserver();
-        }
+		if (status_event_group != NULL) {
+			xEventGroupSetBits(status_event_group, STATUS_EVENT_FIRMWARE);
+		}
+
+		/* Start the web server */
+		if (*server == NULL) {
+			*server = start_webserver();
+		}
+		mqtt_connect();
 		break;
 	case SYSTEM_EVENT_STA_DISCONNECTED:
 		/* This is a workaround as ESP32 WiFi libs don't currently
 		 auto-reassociate. */
 		esp_wifi_connect();
 		xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
-        /* Stop the web server */
-        if (*server) {
-            stop_webserver(*server);
-            *server = NULL;
-        }
+		/* Stop the web server */
+		if (*server) {
+			stop_webserver(*server);
+			*server = NULL;
+		}
+		mqtt_disconnect();
 		break;
 	case SYSTEM_EVENT_STA_WPS_ER_SUCCESS:
 		/*point: the function esp_wifi_wps_start() only get ssid & password
 		 * so call the function esp_wifi_connect() here
 		 * */
 		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_SUCCESS");
-		ESP_ERROR_CHECK(esp_wifi_wps_disable());
-		ESP_ERROR_CHECK(esp_wifi_connect());
+		ESP_ERROR_CHECK(esp_wifi_wps_disable())		;
+		ESP_ERROR_CHECK(esp_wifi_connect())		;
+		g_wifi_wps_flag = false;
 		break;
 	case SYSTEM_EVENT_STA_WPS_ER_FAILED:
 		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_FAILED");
-		ESP_ERROR_CHECK(esp_wifi_wps_disable());
-		ESP_ERROR_CHECK(esp_wifi_wps_enable(&config));
-		ESP_ERROR_CHECK(esp_wifi_wps_start(0));
+		ESP_ERROR_CHECK(esp_wifi_wps_disable())		;
+		ESP_ERROR_CHECK(esp_wifi_wps_enable(&config))		;
+		ESP_ERROR_CHECK(esp_wifi_wps_start(0))		;
+		g_wifi_wps_flag = false;
 		break;
 	case SYSTEM_EVENT_STA_WPS_ER_TIMEOUT:
 		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_TIMEOUT");
-		ESP_ERROR_CHECK(esp_wifi_wps_disable());
-		ESP_ERROR_CHECK(esp_wifi_wps_enable(&config));
-		ESP_ERROR_CHECK(esp_wifi_wps_start(0));
+		ESP_ERROR_CHECK(esp_wifi_wps_disable())		;
+		ESP_ERROR_CHECK(esp_wifi_wps_enable(&config))		;
+		ESP_ERROR_CHECK(esp_wifi_wps_start(0))		;
+		g_wifi_wps_flag = false;
 		break;
 	case SYSTEM_EVENT_STA_WPS_ER_PIN:
 		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_PIN");
 		/*show the PIN code here*/
 		ESP_LOGI(TAG, "WPS_PIN = "PINSTR,
-				PIN2STR(event->event_info.sta_er_pin.pin_code))	;
+				PIN2STR(event->event_info.sta_er_pin.pin_code));
 		break;
 	default:
 		break;
@@ -149,45 +152,93 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 	return ESP_OK;
 }
 
-void wifi_init_sta(void *param)
-{
-    wifi_event_group = xEventGroupCreate();
+void wifi_init_sta(void *param) {
+	enum state_t {w_disconnected, w_connected, w_wps_enable, w_wps} w_state = w_disconnected;
+	int timeout = 0;
 
-    tcpip_adapter_init();
-    ESP_ERROR_CHECK(esp_event_loop_init(event_handler, param) );
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+	wifi_event_group = xEventGroupCreate();
 
-    while(1) {
-    	if (!(xEventGroupGetBits(wifi_event_group) & CONNECTED_BIT)) {
-    		g_wifi_reconnect_flag = true;
+	tcpip_adapter_init();
+	ESP_ERROR_CHECK(esp_event_loop_init(event_handler, param));
+	wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT()	;
+
+
+	while (1) {
+		bool isConnected = (xEventGroupGetBits(wifi_event_group) & CONNECTED_BIT) != 0;
+
+		switch(w_state) {
+		case w_disconnected:
 			ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-			ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
+			ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 			ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
+			ESP_ERROR_CHECK(esp_wifi_start());
+			g_wifi_reconnect_flag = true;
+			if (!enableWPS) {
+				timeout = 30;
+				w_state = w_connected;
+			} else {
+				timeout = 5;
+				w_state = w_wps_enable;
+			}
+			break;
 
-			ESP_ERROR_CHECK(esp_wifi_start() );
+		case w_connected:
+			if (!isConnected) {
+				if (timeout == 0) {
+					g_wifi_reconnect_flag = false;
+					ESP_LOGI(TAG, "wifi_init_sta stop sta");
+					ESP_ERROR_CHECK(esp_wifi_stop());
+					ESP_LOGI(TAG, "wifi_init_sta deinit sta");
+					ESP_ERROR_CHECK(esp_wifi_deinit());
+					w_state = w_disconnected;
+				} else {
+					vTaskDelay(1000 / portTICK_PERIOD_MS);
+					timeout--;
+				}
+			}
+			break;
 
-			vTaskDelay(5000/portTICK_PERIOD_MS);
-    	}
-    	if (!(xEventGroupGetBits(wifi_event_group) & CONNECTED_BIT)) {
+		case w_wps_enable:
+			if (!isConnected) {
+				if (timeout == 0) {
+					ESP_LOGI(TAG, "start wps...");
+					ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_wps_enable(&config));
+					ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_wps_start(0));
+					g_wifi_wps_flag = true;
+					enableWPS = false;
+					timeout = 60;
+					w_state = w_wps;
+				} else {
+					vTaskDelay(1000 / portTICK_PERIOD_MS);
+					timeout--;
+				}
+			}
+			break;
 
-    		g_wifi_reconnect_flag = false;
+		case w_wps:
+			if (isConnected) {
+				w_state = w_connected;
+			}else {
+				vTaskDelay(1000 / portTICK_PERIOD_MS);
+				timeout--;
+				if (timeout == 0) {
+					w_state = w_disconnected;
+				}
+			}
+			break;
+		}
 
-			ESP_LOGI(TAG, "wifi_init_sta stop sta");
-			ESP_ERROR_CHECK(esp_wifi_stop() );
-			ESP_LOGI(TAG, "wifi_init_sta deinit sta");
-			ESP_ERROR_CHECK(esp_wifi_deinit() );
-    	}
-		vTaskDelay(100/portTICK_PERIOD_MS);
-    }
+		vTaskDelay(100 / portTICK_PERIOD_MS);
+	}
 }
 
 void app_main() {
 
-    static httpd_handle_t server = NULL;
-    button_event_group = xEventGroupCreate();
-	mqtt_event_group = xEventGroupCreate();
+	esp_log_level_set("phy_init", ESP_LOG_ERROR);
 
+	static httpd_handle_t server = NULL;
+	button_event_group = xEventGroupCreate();
+	mqtt_event_group = xEventGroupCreate();
 
 	/* Initialize NVS — it is used to store PHY calibration data */
 	esp_err_t ret = nvs_flash_init();
@@ -197,11 +248,12 @@ void app_main() {
 	}
 	ESP_ERROR_CHECK(ret);
 
-	//initialise_wifi(&server);
-    ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-    xTaskCreate(wifi_init_sta, "wifi init task", 4096, &server, 10, NULL);
+	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
+	xTaskCreate(wifi_init_sta, "wifi init task", 4096, &server, 10, NULL);
 
-    status_task_setup();
+	configInit();
+	sntp_support();
+	status_task_setup();
 	gpio_task_setup();
 	setupSHT1xTask();
 	mqtt_config_init();
@@ -210,24 +262,38 @@ void app_main() {
 
 	ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
 
-	time_t now, last;
-	time(&last);
-	time(&now);
-
+	size_t heapFree = esp_get_free_heap_size();
 	while (1) {
-		//if (xEventGroupWaitBits(button_event_group, WPS_SHORT_BIT, true, true,10)) {
-		if (enableWPS) {
-			activateWPS(&config);
-			enableWPS = false;
-		}
-		/*
+
+#if 0
+		time_t now;
+		struct tm timeinfo;
+		char strftime_buf[64];
 		time(&now);
-		if (difftime(now,last) >=2 ) {
-			vTaskGetRunTimeStats(task_debug_buf);
-			ESP_LOGI(TAG, "%s", task_debug_buf);
-			last = now;
+		localtime_r(&now, &timeinfo);
+		//if (xEventGroupWaitBits(button_event_group, WPS_SHORT_BIT, true, true,10)) {
+		/*
+		 time(&now);
+		 if (difftime(now,last) >=2 ) {
+		 vTaskGetRunTimeStats(task_debug_buf);
+		 ESP_LOGI(TAG, "%s", task_debug_buf);
+		 last = now;
+		 }
+		 */
+		if (timeinfo.tm_year > (2016 - 1900)) {
+			localtime_r(&now, &timeinfo);
+			strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+			ESP_LOGI(TAG, "The current date/time is: %s", strftime_buf);
+			vTaskDelay(5000 / portTICK_PERIOD_MS);
+		} else {
+			vTaskDelay(500 / portTICK_PERIOD_MS);
 		}
-		*/
-		vTaskDelay(100/portTICK_PERIOD_MS);
+#else
+		if (esp_get_free_heap_size() != heapFree) {
+			heapFree = esp_get_free_heap_size();
+			ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
+		}
+		vTaskDelay(500 / portTICK_PERIOD_MS);
+#endif
 	}
 }

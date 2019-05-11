@@ -22,6 +22,7 @@
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
 #include "mqtt_config.h"
+#include "jsonconfig.h"
 
 //extern const uint8_t iot_eclipse_org_pem_start[] asm("_binary_raspberrypi_pem_start");
 //extern const uint8_t iot_eclipse_org_pem_end[]   asm("_binary_iot_eclipse_org_pem_end");
@@ -30,9 +31,11 @@ extern const int CONNECTED_BIT;
 static const char *TAG = "MQTTS";
 static esp_mqtt_client_handle_t client = NULL;
 static messageHandler_t* messageHandle[8] = { 0 };
+static bool isMqttConnected = false;
+static bool isMqttInit = false;
 
 QueueHandle_t pubQueue, otaQueue;
-EventGroupHandle_t mqtt_event_group;
+EventGroupHandle_t mqtt_event_group = NULL;
 
 static void mqtt_message_handler(esp_mqtt_event_handle_t event);
 static void handleFirmwareMsg(cJSON* firmware);
@@ -58,12 +61,14 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 		xEventGroupSetBits(mqtt_event_group, MQTT_CONNECTED_BIT);
 		int msg_id = esp_mqtt_client_subscribe(client, getSubMsg(), 1);
 		ESP_LOGD(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+		isMqttConnected = true;
 		break;
 	case MQTT_EVENT_DISCONNECTED:
 		xEventGroupClearBits(mqtt_event_group, MQTT_CONNECTED_BIT);
 		ESP_LOGD(TAG, "MQTT_EVENT_DISCONNECTED");
+		isMqttConnected = false;
+		isMqttInit = false;
 		break;
-
 	case MQTT_EVENT_SUBSCRIBED:
 		ESP_LOGD(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
 		break;
@@ -79,6 +84,9 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 		break;
 	case MQTT_EVENT_ERROR:
 		ESP_LOGE(TAG, "MQTT_EVENT_ERROR");
+		break;
+	case MQTT_EVENT_BEFORE_CONNECT:
+		ESP_LOGE(TAG, "MQTT_EVENT_BEFORE_CONNECT");
 		break;
 	}
 	return ESP_OK;
@@ -122,15 +130,8 @@ int handleConfigMsg(const char * topic, esp_mqtt_event_handle_t event) {
 	int ret = 0;
 	if (isTopic(event, topic)) {
 		ESP_LOGI(TAG, "%.*s", event->topic_len, event->topic);
-		cJSON *root = cJSON_Parse(event->data);
-		if (root != NULL) {
-			cJSON *pConfig = cJSON_GetObjectItem(root, "mqtt");
-			if (pConfig != NULL) {
-				setMqttConfig(pConfig);
-			}
-			cJSON_Delete(root);
-			ret = 1;
-		}
+		updateConfig(event->data);
+		ret = 1;
 	}
 	return ret;
 }
@@ -166,8 +167,9 @@ static void handleFirmwareMsg(cJSON* firmware) {
 	md5_update_t md5_update;
 	char* pMD5 = NULL;
 	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
+	cJSON* pfirmware = cJSON_GetObjectItem(firmware, "update");
 
-	if (cJSON_GetObjectItem(firmware, "update") != NULL) {
+	if (pfirmware != NULL) {
 		char* pUpdate = cJSON_GetStringValue(cJSON_GetObjectItem(firmware, "update"));
 		if (strcmp(pUpdate, "ota") != 0) {
 			error = 1;
@@ -212,29 +214,22 @@ static void handleFirmwareMsg(cJSON* firmware) {
 
 void mqtt_task(void *pvParameters) {
 	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
-	const esp_mqtt_client_config_t mqtt_cfg = { //
-			.uri = getMqttServer(), //
-					.event_handle = mqtt_event_handler, //
-					.username = getMqttUser(), //
-					.password = getMqttPass(), //
-			};
-
-	xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, pdFALSE, pdTRUE, 10000 / portTICK_PERIOD_MS);
-	client = esp_mqtt_client_init(&mqtt_cfg);
-	esp_mqtt_client_start(client);
 
 	while (1) {
-		// check if we have something to do
+
 		message_t rxData = { 0 };
 
 		if ((client != NULL) && (xQueueReceive(pubQueue, &(rxData), xTicksToWait))) {
 
-			ESP_LOGD(TAG, "publish %.*s : %.*s", strlen(rxData.pTopic), rxData.pTopic, strlen(rxData.pData),
+			if (isMqttConnected) {
+				ESP_LOGD(TAG, "publish %.*s : %.*s", strlen(rxData.pTopic), rxData.pTopic, strlen(rxData.pData),
 					rxData.pData);
 
-			int msg_id = esp_mqtt_client_publish(client, rxData.pTopic, rxData.pData, strlen(rxData.pData) + 1, 1, 0);
+				int msg_id = esp_mqtt_client_publish(client, rxData.pTopic, rxData.pData, strlen(rxData.pData) + 1, 1, 0);
 
-			ESP_LOGD(TAG, "sent publish successful, msg_id=%d", msg_id);
+				ESP_LOGD(TAG, "sent publish successful, msg_id=%d", msg_id);
+			}
+
 			if (rxData.topic_len > 0) {
 				free(rxData.pTopic);
 			}
@@ -242,6 +237,7 @@ void mqtt_task(void *pvParameters) {
 				free(rxData.pData);
 			}
 		}
+
 		vTaskDelay(10 / portTICK_PERIOD_MS);
 		taskYIELD();
 	}
@@ -262,12 +258,31 @@ void mqtt_user_init(void) {
 		ESP_LOGI(TAG, "otaQueue init failure");
 	}
 
+	const esp_mqtt_client_config_t mqtt_cfg = { //
+			.uri = getMqttServer(), //
+					.event_handle = mqtt_event_handler, //
+					.username = getMqttUser(), //
+					.password = getMqttPass(), //
+			};
+
+	client = esp_mqtt_client_init(&mqtt_cfg);
+
 	xTaskCreatePinnedToCore(&mqtt_task, "mqtt_task", 2 * 8192, NULL, 5, NULL, 0);
 	xTaskCreatePinnedToCore(&mqtt_ota_task, "mqtt_ota_task", 2 * 8192, NULL, 5, NULL, 0);
 
 	mqtt_user_addHandler(&sysConfigHandler);
 	mqtt_user_addHandler(&mqttConfigHandler);
 	mqtt_user_addHandler(&mqttOtaHandler);
+}
+
+void mqtt_connect(void) {
+	if (client != NULL)
+		esp_mqtt_client_start(client);
+}
+
+void mqtt_disconnect(void) {
+	if (client != NULL && isMqttConnected)
+		esp_mqtt_client_stop(client);
 }
 
 int mqtt_user_addHandler(messageHandler_t *pHandle) {
