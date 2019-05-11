@@ -6,6 +6,7 @@
  */
 
 #include <stdio.h>
+#include <time.h>
 
 #include "sdkconfig.h"
 
@@ -29,8 +30,8 @@
 #define READ_BIT I2C_MASTER_READ    /*!< I2C master read */
 #define ACK_CHECK_EN 0x1            /*!< I2C master will check ack from slave*/
 #define ACK_CHECK_DIS 0x0           /*!< I2C master will not check ack from slave */
-#define ACK_VAL 0x0                 /*!< I2C ack value */
-#define NACK_VAL 0x1                /*!< I2C nack value */
+#define ACK_VAL 0x1                 /*!< I2C ack value */
+#define NACK_VAL 0x0                /*!< I2C nack value */
 
 typedef struct {
 	SemaphoreHandle_t sem;
@@ -40,55 +41,160 @@ typedef struct {
 } sht1x_data_t;
 
 static const char *TAG = "I2C";
+static const int _us = 20;
 
 static gpio_num_t i2c_gpio_sda = 21;
 static gpio_num_t i2c_gpio_scl = 22;
-static uint32_t i2c_frequency = 100000;
-static i2c_port_t i2c_port = I2C_NUM_0;
+//static uint32_t i2c_frequency = 100000;
+//static i2c_port_t i2c_port = I2C_NUM_0;
 static sht1x_data_t sensor_data = { NULL, 0, 0, false };
-
-static esp_err_t i2c_master_driver_initialize() {
-	i2c_config_t conf = { //
-			.mode = I2C_MODE_MASTER, //
-					.sda_io_num = i2c_gpio_sda, //
-					.sda_pullup_en = GPIO_PULLUP_ENABLE, //
-					.scl_io_num = i2c_gpio_scl, //
-					.scl_pullup_en = GPIO_PULLUP_ENABLE, //
-					.master.clk_speed = i2c_frequency };
-	return i2c_param_config(i2c_port, &conf);
-}
+static void _sht1x_start(gpio_num_t i2c_gpio_sda, gpio_num_t i2c_gpio_scl) ;
 
 static esp_err_t setupSHT1x(void) {
 	return ESP_OK;
 }
 
+static void delay_usec(int64_t usec) {
+	int64_t end = esp_timer_get_time() + usec;
+	while (esp_timer_get_time() < end) {	};
+//	for (int i=0;i<usec*100;i++) {;}
+}
+
+static void inline _sda_(gpio_num_t sda, int lvl) {
+	if (lvl) {
+		gpio_set_level(sda, 1);
+		//gpio_set_direction(sda, GPIO_MODE_INPUT);
+	} else {
+		gpio_set_level(sda, 0);
+		//gpio_set_direction(sda, GPIO_MODE_OUTPUT);
+	}
+}
+
+static void inline _scl_(gpio_num_t scl, int lvl) {
+	if (lvl) {
+		gpio_set_level(scl, 1);
+		 delay_usec(_us);
+		//gpio_set_direction(scl, GPIO_MODE_INPUT);
+	} else {
+		gpio_set_level(scl, 0);
+		 delay_usec(_us);
+		//gpio_set_direction(scl, GPIO_MODE_OUTPUT);
+	}
+}
+
+
+static void _sht1x_connectionreset(gpio_num_t i2c_gpio_sda, gpio_num_t i2c_gpio_scl) {
+	_sda_(i2c_gpio_sda,1);
+	_scl_(i2c_gpio_scl, 0);
+	//reset
+	for (int i = 0; i < 9; i++) {
+		_scl_(i2c_gpio_scl, 1);
+		_scl_(i2c_gpio_scl, 0);
+	}
+	_sht1x_start(i2c_gpio_sda, i2c_gpio_scl);
+}
+
+static void _sht1x_start(gpio_num_t i2c_gpio_sda, gpio_num_t i2c_gpio_scl) {
+	//start pattern
+	_sda_(i2c_gpio_sda, 1);
+	_scl_(i2c_gpio_scl, 0);
+	_scl_(i2c_gpio_scl, 1);
+	_sda_(i2c_gpio_sda, 0); delay_usec(_us);
+	_scl_(i2c_gpio_scl, 0);
+
+	_scl_(i2c_gpio_scl, 1);
+	_sda_(i2c_gpio_sda, 1); delay_usec(_us);
+	_scl_(i2c_gpio_scl, 0);
+}
+
+static uint32_t _sht1x_read(gpio_num_t i2c_gpio_sda, gpio_num_t i2c_gpio_scl, uint32_t numBits, int ack) {
+	uint32_t ret = 0;
+	_sda_(i2c_gpio_sda,1);
+	for (size_t i = 0; i < numBits; ++i) {
+		_scl_(i2c_gpio_scl, 1);
+		ret = ret * 2 + gpio_get_level(i2c_gpio_sda);
+		_scl_(i2c_gpio_scl, 0);
+	}
+
+	_sda_(i2c_gpio_sda, ack == 0 ? 1 : 0);
+	_scl_(i2c_gpio_scl, 1);
+	_scl_(i2c_gpio_scl, 0);
+	_sda_(i2c_gpio_sda, 1);
+
+	ESP_LOGI(TAG, "read i2c %d", ret);
+	return (ret);
+}
+
+static int _sht1x_write(gpio_num_t i2c_gpio_sda, gpio_num_t i2c_gpio_scl, uint32_t data) {
+	int ack;
+	for (size_t i = 0; i < 8; ++i) {
+		_sda_(i2c_gpio_sda, (data & (1 << (7 - i))) ? 1 : 0);
+		_scl_(i2c_gpio_scl, 1);
+		_scl_(i2c_gpio_scl, 0);
+	}
+	_sda_(i2c_gpio_sda,1);
+	_scl_(i2c_gpio_scl, 1);
+	ack = gpio_get_level(i2c_gpio_sda);
+	_scl_(i2c_gpio_scl, 0);
+	return ack;
+}
+
+static void _sht_skip_crc(gpio_num_t i2c_gpio_sda, gpio_num_t i2c_gpio_scl) {
+	// Skip acknowledge to end trans (no CRC)
+	_sda_(i2c_gpio_sda,1);
+	_scl_(i2c_gpio_scl, 1);
+	_scl_(i2c_gpio_scl, 0);
+}
+
+static void _sht1x_reset(gpio_num_t i2c_gpio_sda, gpio_num_t i2c_gpio_scl) {
+	_sht1x_connectionreset(i2c_gpio_sda, i2c_gpio_scl);
+	_sht1x_write(i2c_gpio_sda, i2c_gpio_scl, SHT1X_RESET);
+}
+
 static esp_err_t readSHT1xReg16(uint8_t reg, uint16_t *pData) {
-	i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-	i2c_master_start(cmd);
 
-	i2c_master_write_byte(cmd, reg, ACK_CHECK_EN);
-	esp_err_t ret = i2c_master_cmd_begin(i2c_port, cmd, 1000 / portTICK_RATE_MS);
-	if (ret != ESP_OK) {
-		ESP_LOGI(TAG, "error on reading i2c : %s", esp_err_to_name(ret));
+	esp_err_t ret = ESP_OK;
+	int ack = 0;
+	_sht1x_start(i2c_gpio_sda, i2c_gpio_scl);
+	ack += _sht1x_write(i2c_gpio_sda, i2c_gpio_scl, reg);
+
+	if (ack != 0) {
+		ESP_LOGI(TAG, "error on ack i2c 1");
+		ret = ESP_ERR_TIMEOUT;
 	}
 
-	vTaskDelay(SHT1X_MEASURE_TIME / portTICK_PERIOD_MS);
+	time_t start,now;
+	time(&now);
+	time(&start);
 
-	i2c_master_read(cmd, (uint8_t*) pData, sizeof(*pData), ACK_VAL);
-	i2c_master_stop(cmd);
-	ret = i2c_master_cmd_begin(i2c_port, cmd, 1000 / portTICK_RATE_MS);
-	i2c_cmd_link_delete(cmd);
-
-	if (ret != ESP_OK) {
-		ESP_LOGI(TAG, "error on reading i2c : %s", esp_err_to_name(ret));
+	while (1) {
+		time(&now);
+		if (gpio_get_level(i2c_gpio_sda) == 0) {
+			break;
+		}
+		if (difftime(now, start) >= 1) {
+			ESP_LOGI(TAG, "timeout on waiting i2c ");
+			ret = ESP_ERR_TIMEOUT;
+			break;
+		}
 	}
 
+	uint16_t val = _sht1x_read(i2c_gpio_sda, i2c_gpio_scl, 8, ACK_VAL);
+	val *= 256;
+
+	val |= _sht1x_read(i2c_gpio_sda, i2c_gpio_scl, 8, ACK_VAL);
+	uint8_t c = _sht1x_read(i2c_gpio_sda, i2c_gpio_scl, 8, NACK_VAL);
+
+	*pData = val;
+
+	_scl_(i2c_gpio_scl, 1);
+	_sda_(i2c_gpio_sda,1);
 	return ret;
 }
 
 static float readSHT1xTemp(void) {
 	static const float d1 = -40.1;
-	static const float d2 = 0.04; //12bit
+	static const float d2 = 0.01; //12bit
 
 	uint16_t temp = 0;
 	if (readSHT1xReg16(SHT1X_MEASURE_TEMP, &temp) != ESP_OK) {
@@ -98,13 +204,15 @@ static float readSHT1xTemp(void) {
 		sensor_data.hasError = false;
 	}
 
+	temp &= 0x3FFF;
+
 	return (d1 + d2 * temp);
 }
 
 static float readSHT1xHum(void) {
-	static const float c1 = -2.0468;
-	static const float c2 = 0.5872;
-	static const float c3 = -4.0845E-4;
+	static const float c1 = -4.0;
+	static const float c2 = +0.0405;
+	static const float c3 = -0.0000028;
 
 	uint16_t temp = 0;
 	if (readSHT1xReg16(SHT1X_MEASURE_HUM, &temp) != ESP_OK) {
@@ -113,6 +221,8 @@ static float readSHT1xHum(void) {
 	} else {
 		sensor_data.hasError = false;
 	}
+
+	temp &= 0x0FFF;
 
 	return (c1 + c2 * temp + c3 * temp * temp);
 }
@@ -159,12 +269,14 @@ void addSHT1xStatus(cJSON *root) {
 }
 
 void sht1x_task(void *pvParameters) {
-
 	while (1) {
 		if (1) {
 			//block till data was processed by ota task
 			const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;
 			if ((sensor_data.sem != NULL) && xSemaphoreTake( sensor_data.sem, xTicksToWait) == pdTRUE) {
+
+				_sht1x_reset(i2c_gpio_sda, i2c_gpio_scl);
+				vTaskDelay(20 / portTICK_PERIOD_MS);
 
 				sensor_data.temp = readSHT1xTemp();
 				sensor_data.hum = readSHT1xHum();
@@ -183,10 +295,20 @@ void sht1x_task(void *pvParameters) {
 }
 
 void setupSHT1xTask(void) {
-	esp_err_t err;
-	err = i2c_master_driver_initialize();
+	esp_err_t err = ESP_OK;
+	//err = i2c_master_driver_initialize();
+	gpio_config_t io_conf;
+	io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
+	io_conf.mode = GPIO_MODE_INPUT_OUTPUT_OD;
+	io_conf.pin_bit_mask = (1 << i2c_gpio_sda) | (1 << i2c_gpio_scl);
+	io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+	io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
+	gpio_config(&io_conf);
+	gpio_set_level(i2c_gpio_scl, 1);
+	gpio_set_level(i2c_gpio_sda, 1);
+
 	if (err == ESP_OK) {
-		err = i2c_driver_install(i2c_port, I2C_MODE_MASTER, 0, 0, ESP_INTR_FLAG_LOWMED);
+		//err = i2c_driver_install(i2c_port, I2C_MODE_MASTER, 0, 0, 0);
 
 		if (err == ESP_OK) {
 

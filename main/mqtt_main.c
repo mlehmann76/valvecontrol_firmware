@@ -234,6 +234,8 @@ void wifi_init_sta(void *param) {
 
 void app_main() {
 
+	esp_log_level_set("phy_init", ESP_LOG_ERROR);
+
 	static httpd_handle_t server = NULL;
 	button_event_group = xEventGroupCreate();
 	mqtt_event_group = xEventGroupCreate();
