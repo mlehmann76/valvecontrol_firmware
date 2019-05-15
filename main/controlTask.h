@@ -8,14 +8,10 @@
 #ifndef MAIN_GPIOTASK_H_
 #define MAIN_GPIOTASK_H_
 
-
-#define WPS_SHORT_BIT	(1<<0)
-#define WPS_LONG_BIT (1<<1)
 #define WPS_SHORT_MS	(100)
 #define WPS_LONG_MS (500)
 
 QueueHandle_t subQueue,pubQueue;
-EventGroupHandle_t button_event_group;
 messageHandler_t controlHandler;
 
 typedef enum {mStatus, mOn, mOff} gpio_task_mode_t;

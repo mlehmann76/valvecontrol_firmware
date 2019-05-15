@@ -152,12 +152,12 @@ void gpio_task(void *pvParameters) {
 
 	while (1) {
 
-		if (!isConnected && (xEventGroupGetBits(mqtt_event_group) & MQTT_CONNECTED_BIT)) {
+		if (!isConnected && (xEventGroupGetBits(main_event_group) & MQTT_CONNECTED_BIT)) {
 			isConnected = true;
 			updateStatus();
 		}
 
-		if (!(xEventGroupGetBits(mqtt_event_group) & MQTT_CONNECTED_BIT)) {
+		if (!(xEventGroupGetBits(main_event_group) & MQTT_CONNECTED_BIT)) {
 			isConnected = false;
 		}
 
@@ -333,12 +333,12 @@ static int checkButton() {
 	if ((gpio_get_level(WPS_BUTTON) == 0)) {
 		wps_button_count++;
 		if (wps_button_count > (WPS_LONG_MS / portTICK_PERIOD_MS)) {
-			xEventGroupSetBits(button_event_group, WPS_LONG_BIT);
+			xEventGroupSetBits(main_event_group, WPS_LONG_BIT);
 			wps_button_count = 0;
 		}
 	} else {
 		if (wps_button_count > (WPS_SHORT_MS / portTICK_PERIOD_MS)) {
-			xEventGroupSetBits(button_event_group, WPS_SHORT_BIT);
+			xEventGroupSetBits(main_event_group, WPS_SHORT_BIT);
 		}
 		wps_button_count = 0;
 	}

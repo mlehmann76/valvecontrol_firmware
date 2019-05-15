@@ -50,11 +50,11 @@ static bool enableWPS = false;
 /* The event group allows multiple bits for each event,
  but we only care about one event - are we connected
  to the AP with an IP? */
-const int CONNECTED_BIT = 1u<<0;
+
 #define TAG "MAIN"
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
-EventGroupHandle_t wifi_event_group, button_event_group;
+EventGroupHandle_t main_event_group;
 
 #pragma GCC diagnostic pop
 static esp_err_t event_handler(void *ctx, system_event_t *event) {
@@ -91,7 +91,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 		break;
 	case SYSTEM_EVENT_STA_GOT_IP:
 		ESP_LOGI(TAG, "sta got ip successfully");
-		xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
+		xEventGroupSetBits(main_event_group, CONNECTED_BIT);
 		if (status_event_group != NULL) {
 			xEventGroupSetBits(status_event_group, STATUS_EVENT_FIRMWARE);
 		}
@@ -106,7 +106,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 		/* This is a workaround as ESP32 WiFi libs don't currently
 		 auto-reassociate. */
 		esp_wifi_connect();
-		xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
+		xEventGroupClearBits(main_event_group, CONNECTED_BIT);
 		/* Stop the web server */
 		if (*server) {
 			stop_webserver(*server);
@@ -150,7 +150,7 @@ void wifi_init_sta(void *param) {
 	enum state_t {w_disconnected, w_connected, w_wps_enable, w_wps} w_state = w_disconnected;
 	int timeout = 0;
 
-	wifi_event_group = xEventGroupCreate();
+	main_event_group = xEventGroupCreate();
 
 	tcpip_adapter_init();
 	ESP_ERROR_CHECK(esp_event_loop_init(event_handler, param));
@@ -158,7 +158,7 @@ void wifi_init_sta(void *param) {
 
 
 	while (1) {
-		bool isConnected = (xEventGroupGetBits(wifi_event_group) & CONNECTED_BIT) != 0;
+		bool isConnected = (xEventGroupGetBits(main_event_group) & CONNECTED_BIT) != 0;
 
 		switch(w_state) {
 		case w_disconnected:
@@ -232,8 +232,6 @@ void app_main() {
 	esp_log_level_set("phy_init", ESP_LOG_ERROR);
 
 	static httpd_handle_t server = NULL;
-	button_event_group = xEventGroupCreate();
-	mqtt_event_group = xEventGroupCreate();
 
 	/* Initialize NVS — it is used to store PHY calibration data */
 	esp_err_t ret = nvs_flash_init();

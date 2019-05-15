@@ -12,10 +12,7 @@
 extern "C" {
 #endif
 
-EventGroupHandle_t wifi_event_group;
-EventGroupHandle_t mqtt_event_group;
-
-#define MQTT_CONNECTED_BIT (1u<<0)
+EventGroupHandle_t main_event_group;
 
 typedef int (*pOnMessageFunc)(const char *, esp_mqtt_event_handle_t);
 

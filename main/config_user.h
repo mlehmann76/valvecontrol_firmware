@@ -28,6 +28,12 @@ extern "C" {
 
 #define AUTO_OFF_SEC	(35U*60U)
 
+#define CONNECTED_BIT (1u<<0)
+#define MQTT_CONNECTED_BIT (1u<<1)
+#define MQTT_OTA_BIT (1u<<2)
+#define WPS_SHORT_BIT	(1<<3)
+#define WPS_LONG_BIT (1<<4)
+
 #ifdef __cplusplus
 }
 #endif

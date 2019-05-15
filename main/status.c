@@ -25,6 +25,7 @@
 #include "controlTask.h"
 #include "sht1x.h"
 
+#include "config_user.h"
 #include "status.h"
 
 #define TAG "status"
@@ -55,10 +56,11 @@ void status_task_setup(void) {
 void status_task(void* pvParameters) {
 	EventBits_t bits;
 	while (1) {
-		if ((status_event_group != NULL) && (mqtt_event_group != NULL)) {
+		if ((status_event_group != NULL) && (main_event_group != NULL)) {
 
-			if ((xEventGroupGetBits(mqtt_event_group) & MQTT_CONNECTED_BIT) &&
-					((bits = xEventGroupGetBits(status_event_group)) != 0)) {
+			if (((xEventGroupGetBits(main_event_group) & (CONNECTED_BIT | MQTT_CONNECTED_BIT | MQTT_OTA_BIT))
+					== (CONNECTED_BIT | MQTT_CONNECTED_BIT))
+					&& ((bits = xEventGroupGetBits(status_event_group)) != 0)) {
 
 				cJSON *pRoot = cJSON_CreateObject();
 				if (pRoot != NULL) {

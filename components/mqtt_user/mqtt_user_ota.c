@@ -115,7 +115,8 @@ int handleOtaMessage(const char * p, esp_mqtt_event_handle_t event) {
 					int len = b85Decode((uint8_t*) event->data, event->data_len, &decodeCtx);
 					if (len > 0) {
 						mbedtls_md5_update(&ctx, decodeCtx.decoded, len);
-					}LED_TOGGLE();
+					}
+					LED_TOGGLE();
 					ret = 1;
 					xSemaphoreGive(xSemaphore);
 				}
@@ -160,6 +161,7 @@ void mqtt_ota_task(void *pvParameters) {
 			if (xQueueReceive(otaQueue, &(rxData), xTicksToWait)) {
 				md5Updata = rxData;
 				ota_state = OTA_START;
+				xEventGroupSetBits(main_event_group, MQTT_OTA_BIT);
 			}
 		}
 		if (xSemaphore != NULL) {

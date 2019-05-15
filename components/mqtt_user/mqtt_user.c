@@ -23,6 +23,7 @@
 #include "mqtt_user_ota.h"
 #include "mqtt_config.h"
 #include "jsonconfig.h"
+#include "config_user.h"
 
 static const char *TAG = "MQTTS";
 static esp_mqtt_client_handle_t client = NULL;
@@ -31,7 +32,6 @@ static bool isMqttConnected = false;
 static bool isMqttInit = false;
 
 QueueHandle_t pubQueue, otaQueue;
-EventGroupHandle_t mqtt_event_group = NULL;
 
 static void mqtt_message_handler(esp_mqtt_event_handle_t event);
 static void handleFirmwareMsg(cJSON* firmware);
@@ -54,13 +54,13 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 	switch (event->event_id) {
 	case MQTT_EVENT_CONNECTED:
 		ESP_LOGD(TAG, "MQTT_EVENT_CONNECTED");
-		xEventGroupSetBits(mqtt_event_group, MQTT_CONNECTED_BIT);
+		xEventGroupSetBits(main_event_group, MQTT_CONNECTED_BIT);
 		int msg_id = esp_mqtt_client_subscribe(client, getSubMsg(), 1);
 		ESP_LOGD(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 		isMqttConnected = true;
 		break;
 	case MQTT_EVENT_DISCONNECTED:
-		xEventGroupClearBits(mqtt_event_group, MQTT_CONNECTED_BIT);
+		xEventGroupClearBits(main_event_group, MQTT_CONNECTED_BIT);
 		ESP_LOGD(TAG, "MQTT_EVENT_DISCONNECTED");
 		isMqttConnected = false;
 		isMqttInit = false;
