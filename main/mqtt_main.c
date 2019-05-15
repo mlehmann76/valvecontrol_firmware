@@ -36,7 +36,7 @@
 #elif CONFIG_EXAMPLE_WPS_TYPE_PIN
 #define WPS_TEST_MODE WPS_TYPE_PIN
 #else
-#define WPS_TEST_MODE WPS_TYPE_DISABLE
+#define WPS_TEST_MODE WPS_TYPE_PBC
 #endif /*CONFIG_EXAMPLE_WPS_TYPE_PBC*/
 
 #ifndef PIN2STR
@@ -46,15 +46,12 @@
 
 static esp_wps_config_t config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
 static bool enableWPS = false;
-static bool g_wifi_reconnect_flag = true;
-static bool g_wifi_wps_flag = false;
 
 /* The event group allows multiple bits for each event,
  but we only care about one event - are we connected
  to the AP with an IP? */
 const int CONNECTED_BIT = 1u<<0;
 #define TAG "MAIN"
-//static char task_debug_buf[512];
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 EventGroupHandle_t wifi_event_group, button_event_group;
@@ -124,21 +121,18 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_SUCCESS");
 		ESP_ERROR_CHECK(esp_wifi_wps_disable())		;
 		ESP_ERROR_CHECK(esp_wifi_connect())		;
-		g_wifi_wps_flag = false;
 		break;
 	case SYSTEM_EVENT_STA_WPS_ER_FAILED:
 		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_FAILED");
 		ESP_ERROR_CHECK(esp_wifi_wps_disable())		;
 		ESP_ERROR_CHECK(esp_wifi_wps_enable(&config))		;
 		ESP_ERROR_CHECK(esp_wifi_wps_start(0))		;
-		g_wifi_wps_flag = false;
 		break;
 	case SYSTEM_EVENT_STA_WPS_ER_TIMEOUT:
 		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_TIMEOUT");
 		ESP_ERROR_CHECK(esp_wifi_wps_disable())		;
 		ESP_ERROR_CHECK(esp_wifi_wps_enable(&config))		;
 		ESP_ERROR_CHECK(esp_wifi_wps_start(0))		;
-		g_wifi_wps_flag = false;
 		break;
 	case SYSTEM_EVENT_STA_WPS_ER_PIN:
 		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_PIN");
@@ -172,7 +166,7 @@ void wifi_init_sta(void *param) {
 			ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 			ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
 			ESP_ERROR_CHECK(esp_wifi_start());
-			g_wifi_reconnect_flag = true;
+
 			if (!enableWPS) {
 				timeout = 30;
 				w_state = w_connected;
@@ -185,7 +179,7 @@ void wifi_init_sta(void *param) {
 		case w_connected:
 			if (!isConnected) {
 				if (timeout == 0) {
-					g_wifi_reconnect_flag = false;
+
 					ESP_LOGI(TAG, "wifi_init_sta stop sta");
 					ESP_ERROR_CHECK(esp_wifi_stop());
 					ESP_LOGI(TAG, "wifi_init_sta deinit sta");
@@ -195,6 +189,8 @@ void wifi_init_sta(void *param) {
 					vTaskDelay(1000 / portTICK_PERIOD_MS);
 					timeout--;
 				}
+			} else {
+				timeout = 30;
 			}
 			break;
 
@@ -204,7 +200,6 @@ void wifi_init_sta(void *param) {
 					ESP_LOGI(TAG, "start wps...");
 					ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_wps_enable(&config));
 					ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_wps_start(0));
-					g_wifi_wps_flag = true;
 					enableWPS = false;
 					timeout = 60;
 					w_state = w_wps;

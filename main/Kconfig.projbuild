@@ -1,38 +1,3 @@
-menu "WiFi Configuration"
-
-config WIFI_SSID
-    string "WiFi SSID"
-	default "myssid"
-	help
-		SSID (network name) for the example to connect to.
-
-config WIFI_PASSWORD
-    string "WiFi Password"
-	default "myssid"
-	help
-		WiFi password (WPA or WPA2) for the example to use.
-
-		Can be left blank if the network has no security set.
-endmenu
-
-menu "WPS mode Configuration"
-
-choice EXAMPLE_WPS_TYPE
-    prompt "WPS mode"
-    default EXAMPLE_WPS_TYPE_PBC
-    help
-	WPS type for the esp32 to use.
-
-config EXAMPLE_WPS_TYPE_PBC
-    bool "PBC"
-config EXAMPLE_WPS_TYPE_PIN
-    bool "PIN"
-config EXAMPLE_WPS_TYPE_DISABLE
-    bool "disable"
-endchoice
-
-endmenu
-
 menu "OutPut Configuration"
 
 config CHANOUTPUT1
@@ -51,9 +16,6 @@ config CHANOUTPUT4
 config CHANOUT_USE_PWM
     bool "Use Pwm on Outputs"
     default n
-
-#menu "PWM Output Config"
-#    visible if CHANOUT_USE_PWM
 
 config CHANOUT_PWM_FREQ
     int "PWM Freq"

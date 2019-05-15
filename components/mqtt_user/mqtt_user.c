@@ -24,10 +24,6 @@
 #include "mqtt_config.h"
 #include "jsonconfig.h"
 
-//extern const uint8_t iot_eclipse_org_pem_start[] asm("_binary_raspberrypi_pem_start");
-//extern const uint8_t iot_eclipse_org_pem_end[]   asm("_binary_iot_eclipse_org_pem_end");
-extern const int CONNECTED_BIT;
-
 static const char *TAG = "MQTTS";
 static esp_mqtt_client_handle_t client = NULL;
 static messageHandler_t* messageHandle[8] = { 0 };
