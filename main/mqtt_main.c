@@ -256,11 +256,12 @@ void app_main() {
 	ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
 
 	size_t heapFree = esp_get_free_heap_size();
+	time_t now;
+	struct tm timeinfo;
+
 	while (1) {
 
 #if 0
-		time_t now;
-		struct tm timeinfo;
 		char strftime_buf[64];
 		time(&now);
 		localtime_r(&now, &timeinfo);
@@ -282,6 +283,22 @@ void app_main() {
 			vTaskDelay(500 / portTICK_PERIOD_MS);
 		}
 #else
+		time(&now);
+		localtime_r(&now, &timeinfo);
+		if (timeinfo.tm_year > (2016 - 1900)) {
+			//reboot @0:0:0 if received sntp
+			if ((timeinfo.tm_hour == 0) && (timeinfo.tm_min == 0)) {
+				if ((timeinfo.tm_sec == 0) || (timeinfo.tm_sec == 1)) {
+					esp_restart();
+				}
+			}
+		} else { // reboot after 1h when not received sntp
+			if ((timeinfo.tm_hour == 1) && (timeinfo.tm_min == 0)) {
+				if ((timeinfo.tm_sec == 0) || (timeinfo.tm_sec == 1)) {
+					esp_restart();
+				}
+			}
+		}
 		if (esp_get_free_heap_size() != heapFree) {
 			heapFree = esp_get_free_heap_size();
 			ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
