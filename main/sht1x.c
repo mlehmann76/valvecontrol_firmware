@@ -186,10 +186,12 @@ static void readSHT1xHum(sht1x_handle_t* pHandle) {
 
 	float rth = (c1 + c2 * sorh + c3 * sorh * sorh);
 
+	/* disabled for testing
 	// temperature compensation
 	if (!pHandle->hasError) {
 		rth = (pHandle->temp - 25) * (0.01 + 0.00008 * sorh) + rth;
 	}
+	*/
 	pHandle->hum = rth;
 }
 
@@ -282,22 +284,18 @@ void setupSHT1xTask(void) {
 	gpio_set_level(sht1x_handle.i2c_gpio_sda, 1);
 
 	if (err == ESP_OK) {
-		//err = i2c_driver_install(i2c_port, I2C_MODE_MASTER, 0, 0, 0);
 
-		if (err == ESP_OK) {
+		sht1x_handle.sem = xSemaphoreCreateBinary();
 
-			sht1x_handle.sem = xSemaphoreCreateBinary();
-
-			if (sht1x_handle.sem == NULL) {
-				ESP_LOGE(TAG, "error creating semaphore");
-			} else {
-				xSemaphoreGive(sht1x_handle.sem);
-			}
-
-			setupSHT1x();
-			psht1x_handle = &sht1x_handle;
-
-			xTaskCreate(&sht1x_task, "sht1x_task", 2048, &sht1x_handle, 5, NULL);
+		if (sht1x_handle.sem == NULL) {
+			ESP_LOGE(TAG, "error creating semaphore");
+		} else {
+			xSemaphoreGive(sht1x_handle.sem);
 		}
+
+		setupSHT1x();
+		psht1x_handle = &sht1x_handle;
+
+		xTaskCreate(&sht1x_task, "sht1x_task", 2048, &sht1x_handle, 5, NULL);
 	}
 }

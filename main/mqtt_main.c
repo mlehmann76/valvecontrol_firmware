@@ -46,6 +46,7 @@
 
 static esp_wps_config_t config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
 static bool enableWPS = false;
+static time_t lastMqttSeen;
 
 /* The event group allows multiple bits for each event,
  but we only care about one event - are we connected
@@ -93,7 +94,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 		ESP_LOGI(TAG, "sta got ip successfully");
 		xEventGroupSetBits(main_event_group, CONNECTED_BIT);
 		if (status_event_group != NULL) {
-			xEventGroupSetBits(status_event_group, STATUS_EVENT_FIRMWARE);
+			xEventGroupSetBits(status_event_group, STATUS_EVENT_FIRMWARE | STATUS_EVENT_HARDWARE);
 		}
 
 		/* Start the web server */
@@ -159,6 +160,7 @@ void wifi_init_sta(void *param) {
 
 	while (1) {
 		bool isConnected = (xEventGroupGetBits(main_event_group) & CONNECTED_BIT) != 0;
+		bool isMQTTConnected = (xEventGroupGetBits(main_event_group) & MQTT_CONNECTED_BIT) != 0;
 
 		switch(w_state) {
 		case w_disconnected:
@@ -191,6 +193,9 @@ void wifi_init_sta(void *param) {
 				}
 			} else {
 				timeout = 30;
+				if (isMQTTConnected) {
+					time(&lastMqttSeen);
+				}
 			}
 			break;
 
@@ -258,6 +263,7 @@ void app_main() {
 	size_t heapFree = esp_get_free_heap_size();
 	time_t now;
 	struct tm timeinfo;
+	time(&lastMqttSeen);
 
 	while (1) {
 
@@ -292,11 +298,9 @@ void app_main() {
 					esp_restart();
 				}
 			}
-		} else { // reboot after 1h when not received sntp
-			if ((timeinfo.tm_hour == 1) && (timeinfo.tm_min == 0)) {
-				if ((timeinfo.tm_sec == 0) || (timeinfo.tm_sec == 1)) {
-					esp_restart();
-				}
+		} else { // reboot after 1h when not connected to mqtt server
+			if (difftime(now, lastMqttSeen) > 3600) {
+				esp_restart();
 			}
 		}
 		if (esp_get_free_heap_size() != heapFree) {

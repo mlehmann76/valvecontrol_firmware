@@ -12,7 +12,8 @@ EventGroupHandle_t status_event_group;
 
 #define STATUS_EVENT_CONTROL (1u<<0)
 #define STATUS_EVENT_FIRMWARE (1u<<1)
-#define STATUS_EVENT_SENSOR (1u<<2)
+#define STATUS_EVENT_HARDWARE (1u << 2)
+#define STATUS_EVENT_SENSOR (1u<<3)
 #define STATUS_EVENT_ALL (0xFFFFFFFF)
 
 void status_task_setup(void);

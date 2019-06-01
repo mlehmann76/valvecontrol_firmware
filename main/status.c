@@ -33,6 +33,7 @@
 EventGroupHandle_t status_event_group;
 
 void addFirmwareStatus(cJSON *root);
+void addHardwareStatus(cJSON *root);
 void addTimeStamp(cJSON *root);
 
 typedef void (*pStatusFunc)(cJSON *root);
@@ -44,6 +45,7 @@ typedef struct {
 
 status_func_t status_func[] = { //
 		{ STATUS_EVENT_FIRMWARE, addFirmwareStatus },//
+		{ STATUS_EVENT_HARDWARE, addHardwareStatus },//
 		{ STATUS_EVENT_CONTROL, addChannelStatus },
 		{ STATUS_EVENT_SENSOR, addSHT1xStatus }};
 
@@ -69,7 +71,7 @@ void status_task(void* pvParameters) {
 					//
 					for (size_t i = 0; i < (sizeof(status_func) / sizeof(status_func[0])); i++) {
 						//at least one is set, so send all status
-						if (status_func[i].pFunc != NULL) {
+						if (status_func[i].pFunc != NULL && (bits & status_func[i].bit)) {
 							status_func[i].pFunc(pRoot);
 						}
 					}
@@ -124,6 +126,9 @@ void addFirmwareStatus(cJSON *root) {
 	if (cJSON_AddStringToObject(pcjsonfirm, "version", PROJECT_GIT) == NULL) {
 		goto end;
 	}
+	if (cJSON_AddStringToObject(pcjsonfirm, "idf", esp_get_idf_version()) == NULL) {
+		goto end;
+	}
 
 #else
 	if (cJSON_AddStringToObject(pcjsonfirm, "name", esp_ota_get_app_description()->project_name) == NULL) {
@@ -142,6 +147,31 @@ void addFirmwareStatus(cJSON *root) {
 		goto end;
 	}
 #endif
+
+	end:
+
+	return;
+}
+
+void addHardwareStatus(cJSON *root) {
+	if (root == NULL) {
+		goto end;
+	}
+
+	esp_chip_info_t chip_info;
+	esp_chip_info(&chip_info);
+
+	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "hardware");
+	if (pcjsonfirm == NULL) {
+		goto end;
+	}
+	if (cJSON_AddNumberToObject(pcjsonfirm, "cores", chip_info.cores) == NULL) {
+		goto end;
+	}
+
+	if (cJSON_AddNumberToObject(pcjsonfirm, "rev", chip_info.revision) == NULL) {
+		goto end;
+	}
 
 	end:
 
