@@ -84,6 +84,8 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 	case MQTT_EVENT_BEFORE_CONNECT:
 		ESP_LOGE(TAG, "MQTT_EVENT_BEFORE_CONNECT");
 		break;
+	case MQTT_EVENT_ANY:
+		ESP_LOGE(TAG, "MQTT_EVENT_ANY");
 	}
 	return ESP_OK;
 }
@@ -293,7 +295,7 @@ int mqtt_user_addHandler(messageHandler_t *pHandle) {
 	return ret;
 }
 
-bool isTopic(esp_mqtt_event_handle_t event, const char const * pCommand) {
+bool isTopic(esp_mqtt_event_handle_t event, const char * pCommand) {
 	const char* psTopic = event->topic_len >= strlen(getSubMsg()) ? &event->topic[strlen(getSubMsg()) - 2] : "";
 	return strncmp(psTopic, pCommand, strlen(pCommand)) == 0;
 }

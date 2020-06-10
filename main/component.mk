@@ -12,6 +12,7 @@ COMPONENT_ADD_INCLUDEDIRS := . ../components/mqtt_user ../components/jsonconfig
 COMPONENT_SRCDIRS := $(COMPONENT_ADD_INCLUDEDIRS)
 CPPFLAGS += -DPROJECT_GIT='"'$(GIT_BRANCH)'"'
 COMPONENT_EMBED_TXTFILES := config.json
-
+COMPONENT_EMBED_TXTFILES += ../certs/prvtkey.pem
+COMPONENT_EMBED_TXTFILES += ../certs/cacert.pem
 	
 	

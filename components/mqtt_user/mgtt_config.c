@@ -56,49 +56,7 @@ const char* getMqttPass() {
 	return mqtt_pass;
 }
 
-/*
-esp_err_t setMqttConfig(cJSON* config) {
-	char* pHost = cJSON_GetStringValue(cJSON_GetObjectItem(config, "host"));
-	cJSON* pPort = cJSON_GetObjectItem(config, "port");
-
-	if ((pHost != NULL) && (pPort != NULL) && cJSON_IsNumber(pPort)) {
-		ESP_LOGI(TAG, "config found host %s:%d", pHost, pPort->valueint);
-	}
-
-	char* pUser = cJSON_GetStringValue(cJSON_GetObjectItem(config, "user"));
-	char* pPass  = cJSON_GetStringValue(cJSON_GetObjectItem(config, "pass"));
-	if ((pUser != NULL) && (pPass != NULL)) {
-		ESP_LOGI(TAG, "user/pass found %s:%s", pUser, pPass);
-		//FIXME writeStr(&my_handle, "mqtt_user", pUser);
-		//FIXME writeStr(&my_handle, "mqtt_pass", pPass);
-	}
-
-	char* pDev   = cJSON_GetStringValue(cJSON_GetObjectItem(config, "device"));
-	if ((pDev != NULL)) {
-		ESP_LOGI(TAG, "device found %s", pDev);
-		//FIXME writeStr(&my_handle, "mqtt_device", pDev);
-	}
-
-	return ESP_OK;
-}
-*/
-
 void mqtt_config_init() {
-	// Initialize NVS
-//	esp_err_t err = nvs_flash_init();
-//	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-//		// NVS partition was truncated and needs to be erased
-//		// Retry nvs_flash_init
-//		ESP_ERROR_CHECK(nvs_flash_erase());
-//		err = nvs_flash_init();
-//	}
-//
-//	ESP_ERROR_CHECK(err);
-//
-//	err = nvs_open("storage", NVS_READWRITE, &my_handle);
-//	if (err != ESP_OK) {
-//		ESP_LOGE(TAG, "nvs_open storage failed (%s)", esp_err_to_name(err));
-//	}
 
 	size_t required_size = 0;
 	/* read mqtt device name */
