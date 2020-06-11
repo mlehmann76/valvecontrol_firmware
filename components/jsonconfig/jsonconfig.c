@@ -16,7 +16,9 @@
 #include "nvs.h"
 
 #include "cJSON.h"
-const char *TAG = "config";
+#include "cJSON_Utils.h"
+
+const char *TAG = "JSON";
 static nvs_handle my_handle;
 char *nvs_json_config = NULL;
 
@@ -52,61 +54,57 @@ esp_err_t configInit(void) {
 	return ret;
 }
 
-void debugJson(const char* TAG, cJSON* root) {
+void debugJson(const cJSON* root) {
 	/* */
 	char* out = NULL;
 	out = cJSON_Print(root);
-	ESP_LOGV(TAG, "new config \n%s", out);
+	ESP_LOGD(TAG, "new config \n%s", out);
 	free(out);
+}
+
+const char* getConfigJson(void) {
+	cJSON *to_merge = NULL, *patch = NULL;
+
+	to_merge = cJSON_Parse(config_json_start);
+	patch = cJSON_Parse(nvs_json_config);
+	to_merge = cJSONUtils_MergePatch(to_merge, patch);
+
+	char* out = NULL;
+	out = cJSON_Print(to_merge);
+
+	cJSON_Delete(to_merge);
+	cJSON_Delete(patch);
+
+	return out;
 }
 
 /*
  *
  */
 void updateConfig(const char *pjsonConfig) {
-	cJSON *root = NULL, *pUpdate = NULL, *pUpdateItem = NULL;
+	cJSON *pUpdate = NULL, *merged = NULL;
 
 	// read recent config
 	if (nvs_json_config != NULL) {
-		root = cJSON_Parse(nvs_json_config);
+		merged = cJSON_Parse(nvs_json_config);
 	}
 
-	if (root == NULL) {
-		root = cJSON_Parse(config_json_start);
+	if (merged == NULL) {
+		merged = cJSON_Parse(config_json_start);
 	}
 
 	pUpdate = cJSON_Parse(pjsonConfig);
-	if (root != NULL) {
-		if (pUpdate != NULL) {
-			// check for updated items
-			cJSON_ArrayForEach(pUpdateItem, pUpdate)
-			{
-				// replace item
-				if (pUpdateItem->string != NULL) {
-					cJSON *dup = cJSON_Duplicate(pUpdateItem, true);
-					ESP_LOGI(TAG, "testing (%s)", dup->string);
-					if (cJSON_HasObjectItem(root, dup->string)) {
-						//string gets lost in ReplaceItemInObject
-						char s[128];
-						strncpy(s, dup->string, sizeof(s));
-						debugJson(TAG, dup);
-						ESP_LOGI(TAG, "replacing (%s)", s);
-						cJSON_ReplaceItemInObject(root, s, dup);
-						debugJson(TAG, root);
-					}
-				}
-			}
-		} else {
-			ESP_LOGE(TAG, "error parsing update (%s)", pjsonConfig);
-		}
 
+	if (merged != NULL) {
+		// check for updated items
+		merged = cJSONUtils_MergePatch(merged, pUpdate);
 	} else {
 		ESP_LOGE(TAG, "error parsing nvs and default");
 	}
 
 	// write config
 	char* out = NULL;
-	out = cJSON_Print(root);
+	out = cJSON_Print(merged);
 	ESP_LOGI(TAG, "writing \n%s", out);
 	esp_err_t err = writeStr(&my_handle, "config_json", out);
 	free(out);
@@ -116,13 +114,8 @@ void updateConfig(const char *pjsonConfig) {
 	}
 
 	//clean up
-	if (root != NULL) {
-		cJSON_Delete(root);
-	}
-
-	if(pUpdate != NULL) {
-		cJSON_Delete(pUpdate);
-	}
+	cJSON_Delete(pUpdate);
+	cJSON_Delete(merged);
 }
 
 static char* readJsonConfigStr(const cJSON *pRoot, const char *cfg, const char* section, const char* name) {

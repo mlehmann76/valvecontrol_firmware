@@ -165,9 +165,13 @@ esp_err_t _get_handler(httpd_req_t *req)
         free(buf);
     }
 
-    httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
 
-    _send_file(req, "/spiffs/index.html");
+    httpd_resp_set_type(req, HTTPD_TYPE_JSON);
+
+    //_send_file(req, "/spiffs/index.html");
+    const char* out = getConfigJson();
+    httpd_resp_send(req, out, strlen(out));
+    free(out);
 
     return ESP_OK;
 }

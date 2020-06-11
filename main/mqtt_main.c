@@ -311,6 +311,7 @@ void app_main() {
 	esp_log_level_set("phy_init", ESP_LOG_ERROR);
 	esp_log_level_set("MQTT_CLIENT", ESP_LOG_ERROR);
 	esp_log_level_set("HTTP", ESP_LOG_VERBOSE);
+	esp_log_level_set("JSON", ESP_LOG_VERBOSE);
 
 	static httpd_handle_t server = NULL;
 
