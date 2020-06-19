@@ -30,7 +30,7 @@
 
 #include "esp_https_server.h"
 #include "controlTask.h"
-#include "jsonconfig.h"
+#include "config.h"
 
 #include "http_handler.h"
 #include "http_server.h"

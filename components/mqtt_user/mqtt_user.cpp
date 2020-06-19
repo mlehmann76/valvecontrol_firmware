@@ -22,7 +22,6 @@
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
 #include "config.h"
-#include "jsonconfig.h"
 #include "config_user.h"
 
 static const char *TAG = "MQTTS";
@@ -129,7 +128,7 @@ int handleConfigMsg(const char * topic, esp_mqtt_event_handle_t event) {
 	int ret = 0;
 	if (isTopic(event, topic)) {
 		ESP_LOGI(TAG, "%.*s", event->topic_len, event->topic);
-		updateConfig(event->data);
+		//FIXME updateConfig(event->data);
 		ret = 1;
 	}
 	return ret;

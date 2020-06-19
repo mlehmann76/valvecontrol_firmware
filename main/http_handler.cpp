@@ -23,16 +23,18 @@
 #include "nvs_flash.h"
 #include "esp_task_wdt.h"
 #include "cJSON.h"
-#include "../esp-idf/components/wpa_supplicant/src/utils/base64.h"
 
-#include "mqtt_config.h"
+extern "C" {
+#include "../esp-idf/components/wpa_supplicant/src/utils/base64.h"
+}
+
+#include "config.h"
 #include "mqtt_client.h"
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
 
 #include "esp_https_server.h"
 #include "controlTask.h"
-#include "jsonconfig.h"
 
 #include "http_handler.h"
 #include "http_server.h"
@@ -155,7 +157,7 @@ esp_err_t _send_file(httpd_req_t *req, const char *fname) {
 esp_err_t _fileHandler(httpd_req_t *req) {
 	esp_err_t ret = ESP_OK;
 	size_t maxSize = HTTPD_MAX_URI_LEN + strlen("/spiffs/") + 1;
-	char *pBuf = malloc(maxSize);
+	char *pBuf = (char*)malloc(maxSize);
 	if (pBuf != NULL) {
 		snprintf(pBuf, maxSize, "/spiffs/%s", req->uri);
 		ret = _send_file(req, pBuf);
@@ -191,13 +193,13 @@ esp_err_t _get_handler(httpd_req_t *req)
 
     buf_len = httpd_req_get_hdr_value_len(req, "Authorization") + 1;
     if (buf_len > 1) {
-    	buf = malloc(buf_len);
+    	buf = (char*)malloc(buf_len);
 		/* Copy null terminated value string into buffer */
 		if (httpd_req_get_hdr_value_str(req, AUTHORIZATION_HEADER, buf, buf_len) == ESP_OK) {
 			char *pUser;
 			char *pPass;
-			readConfigStr("system", "user", &pUser);
-			readConfigStr("system", "password", &pPass);
+			sys.readConfigStr("system", "user", &pUser);
+			sys.readConfigStr("system", "password", &pPass);
 			if(authenticate(buf, buf_len, pUser, pPass) == ESP_OK) {
 
 			} else {
@@ -231,9 +233,9 @@ esp_err_t _get_handler(httpd_req_t *req)
     } else {
 		httpd_resp_set_type(req, HTTPD_TYPE_JSON);
 
-		const char *out = getConfigJson();
-		httpd_resp_send(req, out, strlen(out));
-		free(out);
+		//char *out = sys.getConfigJson();
+		//httpd_resp_send(req, out, strlen(out));
+		//free(out);
 	}
 
     return ret;
@@ -244,7 +246,7 @@ esp_err_t _get_handler(httpd_req_t *req)
 esp_err_t _config_handler(httpd_req_t *req) {
 	ESP_LOGI(TAG, "/config handler read content length %d", req->content_len);
 
-	char* buf = malloc(req->content_len + 1);
+	char* buf = (char*)malloc(req->content_len + 1);
 	size_t off = 0;
 	int ret;
 
@@ -272,9 +274,9 @@ esp_err_t _config_handler(httpd_req_t *req) {
 		ESP_LOGI(TAG, "/config handler read %s", buf);
 	}
 
-	/* read mqtt config */
+	/* read mqtt config FIXME
 	updateConfig(buf);
-
+*/
 	httpd_resp_set_type(req, HTTPD_TYPE_JSON);
 	httpd_resp_send(req, buf, 0);
 	free(buf);
@@ -286,7 +288,7 @@ esp_err_t _config_handler(httpd_req_t *req) {
 esp_err_t _command_handler(httpd_req_t *req) {
 	ESP_LOGI(TAG, "/command handler read content length %d", req->content_len);
 
-	char* buf = malloc(req->content_len + 1);
+	char* buf = (char*)malloc(req->content_len + 1);
 	size_t off = 0;
 	int ret;
 

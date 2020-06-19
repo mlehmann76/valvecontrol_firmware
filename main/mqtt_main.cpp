@@ -28,7 +28,7 @@
 #include "status.h"
 #include "sht1x.h"
 #include "sntp.h"
-#include "jsonconfig.h"
+#include "config.h"
 
 
 #if CONFIG_EXAMPLE_WPS_TYPE_PBC
@@ -333,13 +333,15 @@ void app_main() {
 	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
 	xTaskCreate(wifi_init_sta, "wifi init task", 4096, &server, 10, NULL);
 
-	configInit();
+	sys.init();
+	mqtt.init();
+
 	spiffsInit();
 	sntp_support();
 	status_task_setup();
 	gpio_task_setup();
 	setupSHT1xTask();
-	mqtt.init();
+
 	mqtt_user_init();
 	mqtt_user_addHandler(&controlHandler);
 
