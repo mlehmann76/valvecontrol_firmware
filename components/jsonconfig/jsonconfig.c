@@ -20,14 +20,16 @@
 
 const char *TAG = "JSON";
 static nvs_handle my_handle;
-char *nvs_json_config = NULL;
 
 extern const char config_json_start[] asm("_binary_config_json_start");
 
 static esp_err_t readStr(nvs_handle *pHandle, const char *pName, char **dest);
 static esp_err_t writeStr(nvs_handle *pHandle, const char *pName, const char *str);
 
+static cJSON *pConfig = NULL;
+
 esp_err_t configInit(void) {
+	char *nvs_json_config;
 	esp_err_t ret = ESP_OK;
 
 	esp_err_t err = nvs_flash_init();
@@ -49,8 +51,15 @@ esp_err_t configInit(void) {
 	err = readStr(&my_handle, "config_json", &nvs_json_config);
 	if (ESP_OK != err) {
 		ESP_LOGE(TAG, "config_json read failed (%s)", esp_err_to_name(err));
+		pConfig = cJSON_Parse(config_json_start);
+	} else {
+		cJSON *pConfig = cJSON_Parse(config_json_start), *patch = NULL;
+		patch = cJSON_Parse(nvs_json_config);
+		pConfig = cJSONUtils_MergePatch(pConfig, patch);
+		cJSON_Delete(patch);
 	}
 	//
+
 	return ret;
 }
 
@@ -63,21 +72,21 @@ void debugJson(const cJSON* root) {
 }
 
 const char* getConfigJson(void) {
-	cJSON *to_merge = NULL, *patch = NULL;
-
-	to_merge = cJSON_Parse(config_json_start);
-	patch = cJSON_Parse(nvs_json_config);
-	to_merge = cJSONUtils_MergePatch(to_merge, patch);
-
-	char* out = NULL;
-	out = cJSON_Print(to_merge);
-
-	cJSON_Delete(to_merge);
-	cJSON_Delete(patch);
-
-	return out;
+	return pConfig;
 }
 
+const cJSON *getArrayItem(const char *arrayName, const char *itemName) {
+	cJSON *ret = NULL, *element = NULL;
+	if (pConfig != NULL) {
+		cJSON *pArray = cJSON_GetObjectItem(pConfig, arrayName);
+		if (pArray != NULL) {
+			cJSON_ArrayForEach(pArray, element) {
+
+			}
+		}
+	}
+	return ret;
+}
 /*
  *
  */
@@ -85,13 +94,13 @@ void updateConfig(const char *pjsonConfig) {
 	cJSON *pUpdate = NULL, *merged = NULL;
 
 	// read recent config
-	if (nvs_json_config != NULL) {
-		merged = cJSON_Parse(nvs_json_config);
-	}
-
-	if (merged == NULL) {
-		merged = cJSON_Parse(config_json_start);
-	}
+//	if (nvs_json_config != NULL) {
+//		merged = cJSON_Parse(nvs_json_config);
+//	}
+//
+//	if (merged == NULL) {
+//		merged = cJSON_Parse(config_json_start);
+//	}
 
 	pUpdate = cJSON_Parse(pjsonConfig);
 
@@ -100,6 +109,7 @@ void updateConfig(const char *pjsonConfig) {
 		merged = cJSONUtils_MergePatch(merged, pUpdate);
 	} else {
 		ESP_LOGE(TAG, "error parsing nvs and default");
+		return;
 	}
 
 	// write config
@@ -140,16 +150,16 @@ static char* readJsonConfigStr(const cJSON *pRoot, const char *cfg, const char* 
 esp_err_t readConfigStr(const char* section, const char* name, char **dest) {
 	char* ret = NULL;
 
-	if (nvs_json_config != NULL) {
-		cJSON *root = cJSON_Parse(nvs_json_config);
-		ret = readJsonConfigStr(root, "nvs", section, name);
-		cJSON_Delete(root);
-	}
+//	if (nvs_json_config != NULL) {
+//		cJSON *root = cJSON_Parse(nvs_json_config);
+//		ret = readJsonConfigStr(root, "nvs", section, name);
+//		cJSON_Delete(root);
+//	}
 
 	if (ret == NULL) {
-		cJSON *root = cJSON_Parse(config_json_start);
-		ret = readJsonConfigStr(root, "default", section, name);
-		cJSON_Delete(root);
+		//cJSON *root = cJSON_Parse(config_json_start);
+		ret = readJsonConfigStr(pConfig, "default", section, name);
+		//cJSON_Delete(root);
 	}
 
 	*dest = ret;

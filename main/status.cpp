@@ -18,7 +18,7 @@
 #include "esp_ota_ops.h"
 #include "cJSON.h"
 
-#include "mqtt_config.h"
+#include "config.h"
 #include "mqtt_client.h"
 #include "mqtt_user.h"
 
@@ -81,10 +81,10 @@ void status_task(void* pvParameters) {
 					char *string = cJSON_Print(pRoot);
 					if (string == NULL) {
 						ESP_LOGI(TAG, "Failed to print channel.");
-						goto end;
+						return;
 					}
 
-					message_t message = { .pTopic = (char*) getPubMsg(), .topic_len = 0, .pData = string, .data_len =
+					message_t message = { .pTopic = (char*) mqtt.getPubMsg(), .pData = string, .topic_len = 0, .data_len =
 							strlen(string) };
 
 					if ( xQueueSendToBack(pubQueue, &message, 10) != pdPASS) {
@@ -93,7 +93,6 @@ void status_task(void* pvParameters) {
 						free(string);
 					}
 
-					end:
 
 					cJSON_Delete(pRoot);
 					/* reduce frequency by waiting some time*/
@@ -108,54 +107,52 @@ void status_task(void* pvParameters) {
 
 void addFirmwareStatus(cJSON *root) {
 	if (root == NULL) {
-		goto end;
+		return;
 	}
 
 	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "firmware");
 	if (pcjsonfirm == NULL) {
-		goto end;
+		return;
 	}
 #if (1)
 	if (cJSON_AddStringToObject(pcjsonfirm, "date", __DATE__) == NULL) {
-		goto end;
+		return;
 	}
 
 	if (cJSON_AddStringToObject(pcjsonfirm, "time", __TIME__) == NULL) {
-		goto end;
+		return;
 	}
 	if (cJSON_AddStringToObject(pcjsonfirm, "version", PROJECT_GIT) == NULL) {
-		goto end;
+		return;
 	}
 	if (cJSON_AddStringToObject(pcjsonfirm, "idf", esp_get_idf_version()) == NULL) {
-		goto end;
+		return;
 	}
 
 #else
 	if (cJSON_AddStringToObject(pcjsonfirm, "name", esp_ota_get_app_description()->project_name) == NULL) {
-		goto end;
+		return;
 	}
 
 	if (cJSON_AddStringToObject(pcjsonfirm, "version", esp_ota_get_app_description()->version) == NULL) {
-		goto end;
+		return;
 	}
 
 	if (cJSON_AddStringToObject(pcjsonfirm, "date", esp_ota_get_app_description()->date) == NULL) {
-		goto end;
+		return;
 	}
 
 	if (cJSON_AddStringToObject(pcjsonfirm, "time", esp_ota_get_app_description()->time) == NULL) {
-		goto end;
+		return;
 	}
 #endif
-
-	end:
 
 	return;
 }
 
 void addHardwareStatus(cJSON *root) {
 	if (root == NULL) {
-		goto end;
+		return;
 	}
 
 	esp_chip_info_t chip_info;
@@ -163,24 +160,22 @@ void addHardwareStatus(cJSON *root) {
 
 	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "hardware");
 	if (pcjsonfirm == NULL) {
-		goto end;
+		return;
 	}
 	if (cJSON_AddNumberToObject(pcjsonfirm, "cores", chip_info.cores) == NULL) {
-		goto end;
+		return;
 	}
 
 	if (cJSON_AddNumberToObject(pcjsonfirm, "rev", chip_info.revision) == NULL) {
-		goto end;
+		return;
 	}
-
-	end:
 
 	return;
 }
 
 void addTimeStamp(cJSON *root) {
 	if (root == NULL) {
-		goto end;
+		return;
 	}
 
 	time_t now;
@@ -193,20 +188,18 @@ void addTimeStamp(cJSON *root) {
 
 	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "datetime");
 	if (pcjsonfirm == NULL) {
-		goto end;
+		return;
 	}
 
 	strftime(strftime_buf, sizeof(strftime_buf), "%F", &timeinfo);
 	if (cJSON_AddStringToObject(pcjsonfirm, "date", strftime_buf) == NULL) {
-		goto end;
+		return;
 	}
 
 	strftime(strftime_buf, sizeof(strftime_buf), "%T", &timeinfo);
 	if (cJSON_AddStringToObject(pcjsonfirm, "time", strftime_buf) == NULL) {
-		goto end;
+		return;
 	}
-
-	end:
 
 	return;
 }

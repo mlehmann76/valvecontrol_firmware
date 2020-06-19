@@ -45,6 +45,7 @@
 #endif
 /**/
 const char* const channel_str[NUM_CONTROL] = { "Channel0", "Channel1", "Channel2", "Channel3" };
+QueueHandle_t subQueue;
 /**/
 messageHandler_t controlHandler = {//
 		.topicName = "/control",//

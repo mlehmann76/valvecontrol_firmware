@@ -1,10 +1,9 @@
 /*
- * mgtt_config.c
+ * config.cpp
  *
- *  Created on: 27.10.2018
+ *  Created on: 19.06.2020
  *      Author: marco
  */
-
 #include <string.h>
 #include <stdlib.h>
 
@@ -19,44 +18,24 @@
 #include "mqtt_config.h"
 
 #include "jsonconfig.h"
+#include "config.h"
 
-static const char *TAG = "MQTT_CNF";
+static const char *TAG = "CONFIG";
 
-static char def_mqtt_device[64] = { 0 }; //TODO
-static char *mqtt_server = (char*)MQTT_SERVER;
-static char *mqtt_sub_msg = NULL;
-static char *mqtt_pub_msg = NULL;
-static char *mqtt_device_name = NULL;
-static char *mqtt_user = (char*)MQTT_USER;
-static char *mqtt_pass = (char*)MQTT_PASS;
+namespace Config {
 
+configBase::configBase() {
+	// TODO Auto-generated constructor stub
 
-
-const char* getSubMsg() {
-	return mqtt_sub_msg;
 }
 
-const char* getPubMsg() {
-	return mqtt_pub_msg;
+configBase::~configBase() {
+	// TODO Auto-generated destructor stub
 }
 
-const char* getDevName() {
-	return mqtt_device_name;
-}
+const char MqttConfig::MQTT_PUB_MESSAGE_FORMAT[] = "%s%02X%02X%02X%02X%02X%02X%s";
 
-const char* getMqttServer() {
-	return mqtt_server;
-}
-
-const char* getMqttUser() {
-	return mqtt_user;
-}
-
-const char* getMqttPass() {
-	return mqtt_pass;
-}
-
-void mqtt_config_init() {
+void MqttConfig::init() {
 
 	size_t required_size = 0;
 	/* read mqtt device name */
@@ -73,8 +52,8 @@ void mqtt_config_init() {
 		required_size = strlen(def_mqtt_device);//TODO strlen is risky here
 	}
 
-	mqtt_sub_msg = malloc(required_size+sizeof("#")+1);
-	mqtt_pub_msg = malloc(required_size+sizeof("state/")+1);
+	mqtt_sub_msg = (char*)malloc(required_size+sizeof("#")+1);
+	mqtt_pub_msg = (char*)malloc(required_size+sizeof("state/")+1);
 
 	if ((mqtt_sub_msg != NULL)&&(mqtt_pub_msg!=NULL)) {
 		snprintf(mqtt_sub_msg, required_size+sizeof("#")+1, "%s#", mqtt_device_name);
@@ -93,3 +72,7 @@ void mqtt_config_init() {
 	ESP_LOGI(TAG, "sub: (%s) pub (%s)", getSubMsg(),getPubMsg());
 }
 
+} /* namespace Config */
+
+//Globals
+Config::MqttConfig mqtt;

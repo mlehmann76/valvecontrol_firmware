@@ -21,7 +21,7 @@
 #include "mqtt_client.h"
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
-#include "mqtt_config.h"
+#include "config.h"
 #include "jsonconfig.h"
 #include "config_user.h"
 
@@ -51,11 +51,12 @@ messageHandler_t sysConfigHandler = { //
 
 static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 	client = event->client;
+	int msg_id;
 	switch (event->event_id) {
 	case MQTT_EVENT_CONNECTED:
 		ESP_LOGD(TAG, "MQTT_EVENT_CONNECTED");
 		xEventGroupSetBits(main_event_group, MQTT_CONNECTED_BIT);
-		int msg_id = esp_mqtt_client_subscribe(client, getSubMsg(), 1);
+		msg_id = esp_mqtt_client_subscribe(client, mqtt.getSubMsg(), 1);
 		ESP_LOGD(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 		isMqttConnected = true;
 		break;
@@ -215,7 +216,7 @@ void mqtt_task(void *pvParameters) {
 
 	while (1) {
 
-		message_t rxData = { 0 };
+		message_t rxData;
 
 		if ((client != NULL) && (xQueueReceive(pubQueue, &(rxData), xTicksToWait))) {
 
@@ -256,12 +257,11 @@ void mqtt_user_init(void) {
 		ESP_LOGI(TAG, "otaQueue init failure");
 	}
 
-	const esp_mqtt_client_config_t mqtt_cfg = { //
-			.uri = getMqttServer(), //
-					.event_handle = mqtt_event_handler, //
-					.username = getMqttUser(), //
-					.password = getMqttPass(), //
-			};
+	esp_mqtt_client_config_t mqtt_cfg;
+	mqtt_cfg.uri = mqtt.getMqttServer();
+	mqtt_cfg.event_handle = mqtt_event_handler;
+	mqtt_cfg.username = mqtt.getMqttUser();
+	mqtt_cfg.password = mqtt.getMqttPass();
 
 	client = esp_mqtt_client_init(&mqtt_cfg);
 
@@ -296,6 +296,6 @@ int mqtt_user_addHandler(messageHandler_t *pHandle) {
 }
 
 bool isTopic(esp_mqtt_event_handle_t event, const char * pCommand) {
-	const char* psTopic = event->topic_len >= strlen(getSubMsg()) ? &event->topic[strlen(getSubMsg()) - 2] : "";
+	const char* psTopic = event->topic_len >= strlen(mqtt.getSubMsg()) ? &event->topic[strlen(mqtt.getSubMsg()) - 2] : "";
 	return strncmp(psTopic, pCommand, strlen(pCommand)) == 0;
 }

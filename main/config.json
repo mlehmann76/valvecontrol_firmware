@@ -11,5 +11,33 @@
     "system": {
     	"user" : "admin",
     	"password" : "admin"
-    }
+    },
+    "sensors": [
+    	{ 
+    		"name" : "sht1x",
+    		"enabled" : false
+    	}
+    },
+    "channels": [
+    	{ 
+    		"name" : "channel1",
+    		"enabled" : true,
+    		"maxTime" : 1800
+    	},
+    	{ 
+    		"name" : "channel2",
+    		"enabled" : true,
+    		"maxTime" : 1800
+    	},
+    	{ 
+    		"name" : "channel3",
+    		"enabled" : true,
+    		"maxTime" : 1800
+    	},
+    	{ 
+    		"name" : "channel4",
+    		"enabled" : true,
+    		"maxTime" : 1800
+    	}
+    ] 
 }

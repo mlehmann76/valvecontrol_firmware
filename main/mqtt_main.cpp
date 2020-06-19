@@ -17,14 +17,14 @@
 #include "esp_http_server.h"
 #include "cJSON.h"
 
-#include "mqtt_config.h"
+#include "config.h"
 #include "mqtt_client.h"
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
 
-#include "http_config_server.h"
 #include "config_user.h"
 #include "controlTask.h"
+#include "http_server.h"
 #include "status.h"
 #include "sht1x.h"
 #include "sntp.h"
@@ -54,6 +54,13 @@ static time_t lastMqttSeen;
 
 #define TAG "MAIN"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+void app_main();
+#ifdef __cplusplus
+}
+#endif
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 EventGroupHandle_t main_event_group;
 httpd_handle_t server_handle;
@@ -141,7 +148,7 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
 	case WIFI_EVENT_STA_WPS_ER_PIN: /**< ESP32 station wps pin code in enrollee mode */
 		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_PIN");
 		/*show the PIN code here*/
-		ESP_LOGI(TAG, "WPS_PIN = "PINSTR, PIN2STR(((wifi_event_sta_wps_er_pin_t*)event_data)->pin_code));
+		ESP_LOGI(TAG, "WPS_PIN = " PINSTR, PIN2STR(((wifi_event_sta_wps_er_pin_t*)event_data)->pin_code));
 		break;
 	case WIFI_EVENT_STA_WPS_ER_PBC_OVERLAP: /**< ESP32 station wps overlap in enrollee mode */
 
@@ -306,8 +313,8 @@ void spiffsInit(void) {
 	}
 }
 
-void app_main() {
 
+void app_main() {
 	esp_log_level_set("phy_init", ESP_LOG_ERROR);
 	esp_log_level_set("MQTT_CLIENT", ESP_LOG_ERROR);
 	esp_log_level_set("HTTP", ESP_LOG_VERBOSE);
@@ -332,7 +339,7 @@ void app_main() {
 	status_task_setup();
 	gpio_task_setup();
 	setupSHT1xTask();
-	mqtt_config_init();
+	mqtt.init();
 	mqtt_user_init();
 	mqtt_user_addHandler(&controlHandler);
 
@@ -389,3 +396,5 @@ void app_main() {
 #endif
 	}
 }
+
+

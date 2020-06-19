@@ -1,9 +1,10 @@
 /*
- * http_server.c
+ * http_handler.c
  *
- *  Created on: 29.10.2018
+ *  Created on: 15.06.2020
  *      Author: marco
  */
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -30,13 +31,17 @@
 #include "mqtt_user_ota.h"
 
 #include "esp_https_server.h"
-#include "http_config_server.h"
-
 #include "controlTask.h"
 #include "jsonconfig.h"
 
-#define TAG "HTTP"
+#include "http_handler.h"
+#include "http_server.h"
 
+#define TAG "HTTP"
+/***
+ *
+ */
+static const char* fileEndings[] = {".html",".css",".js"};
 #define max(a,b) \
    ({ __typeof__ (a) _a = (a); \
        __typeof__ (b) _b = (b); \
@@ -47,18 +52,14 @@ static const char WWW_Authenticate[] = "WWW-Authenticate";
 const static char BASIC[] = "Basic";
 const static char basicRealm[] = "Basic realm=\"";
 const static char digestRealm[] = "Digest realm=\"";
-//const static char http_index_hml[] =
-//		"<!DOCTYPE html>"
-//		"<html>"
-//		"<body>"
-//		"</body>"
-//		"</html>";
+
 /**
  *
  */
 static char nonce[33];
 static char opaque[33];
 static char pbrealm[256];
+
 /**
  *
  */
@@ -72,6 +73,32 @@ static int _pos(const char* s, size_t s_len, const char p) {
 	}
 	return ret;
 }
+
+static void _getRandomHexString(char *buf, size_t len) {
+  for(int i = 0; i < 4; i++) {
+    snprintf (buf + (i*8), len, "%08x", esp_random());
+    len-=8;
+  }
+}
+
+void requestAuth(httpd_req_t *r, HTTPAuthMethod mode, const char *realm, const char *failMsg) {
+	if (realm == NULL) {
+		realm = "Login Required";
+	}
+	if (mode == BASIC_AUTH) {
+		snprintf(pbrealm,sizeof(pbrealm),"%s%s\"",basicRealm,realm);
+	} else {
+		_getRandomHexString(nonce, sizeof(nonce));
+		_getRandomHexString(opaque, sizeof(opaque));
+		snprintf(pbrealm,sizeof(pbrealm),"%s%s\", qop=\"auth\", nonce=\"%s\", opaque=\"%s\"",
+				digestRealm,realm,nonce,opaque);
+	}
+	httpd_resp_set_hdr(r, WWW_Authenticate, pbrealm);
+	httpd_resp_set_status(r, "401 Unauthorized");
+	// End response
+	httpd_resp_send_chunk(r, NULL, 0);
+}
+
 
 static esp_err_t authenticate(char *buf, size_t buf_len, const char* pUser, const char* pPass) {
 	char mode[32];
@@ -122,12 +149,45 @@ esp_err_t _send_file(httpd_req_t *req, const char *fname) {
     fclose(f);
     return ESP_OK;
 }
-
-/* An HTTP GET handler */
+/**
+ *
+ */
+esp_err_t _fileHandler(httpd_req_t *req) {
+	esp_err_t ret = ESP_OK;
+	size_t maxSize = HTTPD_MAX_URI_LEN + strlen("/spiffs/") + 1;
+	char *pBuf = malloc(maxSize);
+	if (pBuf != NULL) {
+		snprintf(pBuf, maxSize, "/spiffs/%s", req->uri);
+		ret = _send_file(req, pBuf);
+		free(pBuf);
+	} else {
+		ret = ESP_FAIL;
+	}
+	return ret;
+}
+/**
+ *
+ */
+static bool _isFile(const char *filename,size_t namelen) {
+	bool ret = false;
+	for (size_t si=0;si<(sizeof(fileEndings)/sizeof(*fileEndings));si++) {
+		size_t endLen= strnlen(fileEndings[si],HTTPD_MAX_URI_LEN);
+		ESP_LOGI(TAG, "isFile %s / %s", &filename[namelen-endLen], fileEndings[si]);
+		if (0 == strcasecmp(&filename[namelen-endLen], fileEndings[si])) {
+			ret = true;
+			break;
+		}
+	}
+	return ret;
+}
+/**
+ * An HTTP GET handler
+ */
 esp_err_t _get_handler(httpd_req_t *req)
 {
     char*  buf;
     size_t buf_len;
+    esp_err_t ret = ESP_OK;
 
     buf_len = httpd_req_get_hdr_value_len(req, "Authorization") + 1;
     if (buf_len > 1) {
@@ -154,81 +214,31 @@ esp_err_t _get_handler(httpd_req_t *req)
     }
 
     /* Get header value string length and allocate memory for length + 1,
-     * extra byte for null termination */
+     * extra byte for null termination
     buf_len = httpd_req_get_hdr_value_len(req, "Host") + 1;
     if (buf_len > 1) {
         buf = malloc(buf_len);
-        /* Copy null terminated value string into buffer */
+        // Copy null terminated value string into buffer
         if (httpd_req_get_hdr_value_str(req, "Host", buf, buf_len) == ESP_OK) {
             ESP_LOGI(TAG, "Found header => Host: %s", buf);
         }
         free(buf);
     }
+	*/
 
+    if (_isFile(req->uri, strnlen(req->uri,HTTPD_MAX_URI_LEN))) {
+    	ret = _fileHandler(req);
+    } else {
+		httpd_resp_set_type(req, HTTPD_TYPE_JSON);
 
-    httpd_resp_set_type(req, HTTPD_TYPE_JSON);
+		const char *out = getConfigJson();
+		httpd_resp_send(req, out, strlen(out));
+		free(out);
+	}
 
-    //_send_file(req, "/spiffs/index.html");
-    const char* out = getConfigJson();
-    httpd_resp_send(req, out, strlen(out));
-    free(out);
-
-    return ESP_OK;
+    return ret;
 }
 
-httpd_uri_t get_base = {
-    .uri       = "/",
-    .method    = HTTP_GET,
-    .handler   = _get_handler,
-    /* Let's pass response string in user
-     * context to demonstrate it's usage */
-};
-
-/* An HTTP POST handler */
-esp_err_t _post_handler(httpd_req_t *req) {
-	ESP_LOGI(TAG, "/echo handler read content length %d", req->content_len);
-
-	char* buf = malloc(req->content_len + 1);
-	size_t off = 0;
-	int ret;
-
-	if (!buf) {
-		httpd_resp_set_status(req, HTTPD_500);
-		return ESP_FAIL;
-	}
-
-	while (off < req->content_len) {
-		/* Read data received in the request */
-		ret = httpd_req_recv(req, buf + off, req->content_len - off);
-		if (ret <= 0) {
-			{
-				httpd_resp_set_status(req, HTTPD_500);
-			}
-			free(buf);
-			return ESP_FAIL;
-		}
-		off += ret;
-		ESP_LOGI(TAG, "/echo handler recv length %d", ret);
-	}
-	buf[off] = '\0';
-
-	if (req->content_len < 128) {
-		ESP_LOGI(TAG, "/echo handler read %s", buf);
-	}
-
-	httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
-	httpd_resp_send(req, buf, 0);
-	free(buf);
-	return ESP_OK;
-}
-
-httpd_uri_t post = {
-    .uri       = "/echo",
-    .method    = HTTP_POST,
-    .handler   = _post_handler,
-    /* Let's pass response string in user
-     * context to demonstrate it's usage */
-};
 
 /* An HTTP POST handler */
 esp_err_t _config_handler(httpd_req_t *req) {
@@ -271,11 +281,6 @@ esp_err_t _config_handler(httpd_req_t *req) {
 	return ESP_OK;
 }
 
-httpd_uri_t put_config = {
-    .uri       = "/config",
-    .method    = HTTP_PUT,
-    .handler   = _config_handler,
-};
 
 /* An HTTP GET handler */
 esp_err_t _command_handler(httpd_req_t *req) {
@@ -322,75 +327,6 @@ esp_err_t _command_handler(httpd_req_t *req) {
 	free(buf);
 	return ESP_OK;
 }
-
-httpd_uri_t put_command = {
-    .uri       = "/command",
-    .method    = HTTP_PUT,
-    .handler   = _command_handler,
-};
-
-static void _getRandomHexString(char *buf, size_t len) {
-  for(int i = 0; i < 4; i++) {
-    snprintf (buf + (i*8), len, "%08x", esp_random());
-    len-=8;
-  }
-}
-
-void requestAuth(httpd_req_t *r, HTTPAuthMethod mode, const char *realm, const char *failMsg) {
-	if (realm == NULL) {
-		realm = "Login Required";
-	}
-	if (mode == BASIC_AUTH) {
-		snprintf(pbrealm,sizeof(pbrealm),"%s%s\"",basicRealm,realm);
-	} else {
-		_getRandomHexString(nonce, sizeof(nonce));
-		_getRandomHexString(opaque, sizeof(opaque));
-		snprintf(pbrealm,sizeof(pbrealm),"%s%s\", qop=\"auth\", nonce=\"%s\", opaque=\"%s\"",
-				digestRealm,realm,nonce,opaque);
-	}
-	httpd_resp_set_hdr(r, WWW_Authenticate, pbrealm);
-	httpd_resp_set_status(r, "401 Unauthorized");
-	// End response
-	httpd_resp_send_chunk(r, NULL, 0);
-}
-
-httpd_handle_t start_webserver(void)
-{
-    httpd_handle_t server = NULL;
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    httpd_ssl_config_t sslconfig = HTTPD_SSL_CONFIG_DEFAULT();
-
-    extern const unsigned char cacert_pem_start[] asm("_binary_cacert_pem_start");
-    extern const unsigned char cacert_pem_end[]   asm("_binary_cacert_pem_end");
-    sslconfig.cacert_pem = cacert_pem_start;
-    sslconfig.cacert_len = cacert_pem_end - cacert_pem_start;
-
-    extern const unsigned char prvtkey_pem_start[] asm("_binary_prvtkey_pem_start");
-    extern const unsigned char prvtkey_pem_end[]   asm("_binary_prvtkey_pem_end");
-    sslconfig.prvtkey_pem = prvtkey_pem_start;
-    sslconfig.prvtkey_len = prvtkey_pem_end - prvtkey_pem_start;
-
-    // Start the httpd server
-    ESP_LOGI(TAG, "Starting server on port: '%d'", config.server_port);
-    if (httpd_start(&server, &config) == ESP_OK) {
-        // Set URI handlers
-        ESP_LOGI(TAG, "Registering URI handlers");
-        httpd_register_uri_handler(server, &get_base);
-        httpd_register_uri_handler(server, &put_command);
-        httpd_register_uri_handler(server, &put_config);
-        return server;
-    }
-
-    ESP_LOGI(TAG, "Error starting server!");
-    return NULL;
-}
-
-void stop_webserver(httpd_handle_t server)
-{
-    // Stop the httpd server
-	httpd_stop(server);
-}
-
 
 
 

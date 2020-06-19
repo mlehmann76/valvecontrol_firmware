@@ -8,9 +8,15 @@
 #ifndef MAIN_SNTP_H_
 #define MAIN_SNTP_H_
 
-void sntp_support(void);
-esp_err_t update_time(void);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+extern void sntp_support(void);
+extern esp_err_t update_time(void);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* MAIN_SNTP_H_ */

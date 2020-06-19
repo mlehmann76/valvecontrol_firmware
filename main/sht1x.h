@@ -8,6 +8,10 @@
 #ifndef MAIN_SHT1X_H_
 #define MAIN_SHT1X_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "hal/gpio_types.h"
 
 #define SHT1X_MEASURE_TEMP 0x03
@@ -38,5 +42,9 @@ typedef struct {
 
 void addSHT1xStatus(cJSON *root);
 void setupSHT1xTask(void);
+bool isSHT1xEnabled(void);
 
+#ifdef __cplusplus
+}
+#endif
 #endif /* MAIN_SHT1X_H_ */

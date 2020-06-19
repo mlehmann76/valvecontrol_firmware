@@ -5,8 +5,8 @@
  *      Author: marco
  */
 
-#ifndef MAIN_HTTP_CONFIG_SERVER_H_
-#define MAIN_HTTP_CONFIG_SERVER_H_
+#ifndef MAIN_HTTP_SERVER_H_
+#define MAIN_HTTP_SERVER_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,4 +25,4 @@ void requestAuth(httpd_req_t *r, HTTPAuthMethod mode, const char *realm, const c
 }
 #endif
 
-#endif /* MAIN_HTTP_CONFIG_SERVER_H_ */
+#endif /* MAIN_HTTP_SERVER_H_ */

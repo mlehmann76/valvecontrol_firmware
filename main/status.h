@@ -8,7 +8,11 @@
 #ifndef MAIN_STATUS_H_
 #define MAIN_STATUS_H_
 
-EventGroupHandle_t status_event_group;
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern EventGroupHandle_t status_event_group;
 
 #define STATUS_EVENT_CONTROL (1u<<0)
 #define STATUS_EVENT_FIRMWARE (1u<<1)
@@ -19,6 +23,8 @@ EventGroupHandle_t status_event_group;
 void status_task_setup(void);
 void status_task(void *pvParameters);
 
-
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* MAIN_STATUS_H_ */

@@ -8,11 +8,15 @@
 #ifndef MAIN_GPIOTASK_H_
 #define MAIN_GPIOTASK_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define WPS_SHORT_MS	(100)
 #define WPS_LONG_MS (500)
 
-QueueHandle_t subQueue,pubQueue;
-messageHandler_t controlHandler;
+extern QueueHandle_t pubQueue;
+extern messageHandler_t controlHandler;
 
 typedef enum {mStatus, mOn, mOff} gpio_task_mode_t;
 
@@ -23,9 +27,11 @@ typedef struct {
 
 void handleChannelControl(const cJSON* const chan);
 int handleControlMsg(const char *, esp_mqtt_event_handle_t );
-void gpio_task_setup(void);
+extern void gpio_task_setup(void);
 void gpio_onConnect(void);
 void addChannelStatus(cJSON *root);
 
-
+#ifdef __cplusplus
+}
+#endif
 #endif /* MAIN_GPIOTASK_H_ */

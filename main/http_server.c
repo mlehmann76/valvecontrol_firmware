@@ -1,0 +1,105 @@
+/*
+ * http_server.c
+ *
+ *  Created on: 29.10.2018
+ *      Author: marco
+ */
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+#include "sdkconfig.h"
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/event_groups.h"
+#include "freertos/queue.h"
+#include "esp_system.h"
+#include "esp_wifi.h"
+#include "esp_event.h"
+#include "esp_log.h"
+#include "esp_wps.h"
+#include "nvs_flash.h"
+#include "esp_task_wdt.h"
+#include "cJSON.h"
+
+#include "mqtt_config.h"
+#include "mqtt_client.h"
+#include "mqtt_user.h"
+#include "mqtt_user_ota.h"
+
+#include "esp_https_server.h"
+#include "controlTask.h"
+#include "jsonconfig.h"
+
+#include "http_handler.h"
+#include "http_server.h"
+
+#define TAG "HTTP"
+
+
+
+httpd_uri_t get_base = {
+    .uri       = "/",
+    .method    = HTTP_GET,
+    .handler   = _get_handler,
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
+};
+
+
+httpd_uri_t put_config = {
+    .uri       = "/config",
+    .method    = HTTP_PUT,
+    .handler   = _config_handler,
+};
+
+
+httpd_uri_t put_command = {
+    .uri       = "/command",
+    .method    = HTTP_PUT,
+    .handler   = _command_handler,
+};
+
+
+
+httpd_handle_t start_webserver(void)
+{
+    httpd_handle_t server = NULL;
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    httpd_ssl_config_t sslconfig = HTTPD_SSL_CONFIG_DEFAULT();
+
+    extern const unsigned char cacert_pem_start[] asm("_binary_cacert_pem_start");
+    extern const unsigned char cacert_pem_end[]   asm("_binary_cacert_pem_end");
+    sslconfig.cacert_pem = cacert_pem_start;
+    sslconfig.cacert_len = cacert_pem_end - cacert_pem_start;
+
+    extern const unsigned char prvtkey_pem_start[] asm("_binary_prvtkey_pem_start");
+    extern const unsigned char prvtkey_pem_end[]   asm("_binary_prvtkey_pem_end");
+    sslconfig.prvtkey_pem = prvtkey_pem_start;
+    sslconfig.prvtkey_len = prvtkey_pem_end - prvtkey_pem_start;
+
+    // Start the httpd server
+    ESP_LOGI(TAG, "Starting server on port: '%d'", config.server_port);
+    if (httpd_start(&server, &config) == ESP_OK) {
+        // Set URI handlers
+        ESP_LOGI(TAG, "Registering URI handlers");
+        httpd_register_uri_handler(server, &get_base);
+        httpd_register_uri_handler(server, &put_command);
+        httpd_register_uri_handler(server, &put_config);
+        return server;
+    }
+
+    ESP_LOGI(TAG, "Error starting server!");
+    return NULL;
+}
+
+void stop_webserver(httpd_handle_t server)
+{
+    // Stop the httpd server
+	httpd_stop(server);
+}
+
+
+
+

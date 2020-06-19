@@ -33,7 +33,7 @@ typedef struct {
 	size_t len;
 } md5_update_t;
 
-messageHandler_t mqttOtaHandler;
+extern messageHandler_t mqttOtaHandler;
 
 int handleOtaMessage(const char *, esp_mqtt_event_handle_t);
 void handleOta();

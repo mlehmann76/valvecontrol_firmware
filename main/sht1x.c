@@ -283,7 +283,7 @@ void setupSHT1xTask(void) {
 	gpio_set_level(sht1x_handle.i2c_gpio_scl, 1);
 	gpio_set_level(sht1x_handle.i2c_gpio_sda, 1);
 
-	if (err == ESP_OK) {
+	if (isSHT1xEnabled()) {
 
 		sht1x_handle.sem = xSemaphoreCreateBinary();
 
@@ -298,4 +298,8 @@ void setupSHT1xTask(void) {
 
 		xTaskCreate(&sht1x_task, "sht1x_task", 2048, &sht1x_handle, 5, NULL);
 	}
+}
+
+bool isSHT1xEnabled(void) {
+	return false;
 }
