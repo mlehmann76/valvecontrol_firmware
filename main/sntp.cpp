@@ -49,13 +49,15 @@ esp_err_t update_time(void) {
 void sntp_support(void) {
 	ESP_LOGI(TAG, "Initializing SNTP");
 	//FIXME free memory before reallocate
-	sys.readConfigStr("sntp", "server", &server);
-	sys.readConfigStr("sntp", "zone", &timeZone);
-	ESP_LOGI(TAG, "sntp server (%s) (%s)", server, timeZone);
-	sntp_setoperatingmode(SNTP_OPMODE_POLL);
-	sntp_setservername(0, server);
-	//sntp_set_time_sync_notification_cb(time_sync_notification_cb);
-	sntp_init();
-	setenv("TZ", timeZone, 1);
-	tzset();
+	server = const_cast<char*>(sys.getTimeServer());
+	timeZone = const_cast<char*>(sys.getTimeZone());
+	if (server && timeZone) {
+		ESP_LOGI(TAG, "sntp server (%s) (%s)", server, timeZone);
+		sntp_setoperatingmode(SNTP_OPMODE_POLL);
+		sntp_setservername(0, server);
+		//sntp_set_time_sync_notification_cb(time_sync_notification_cb);
+		sntp_init();
+		setenv("TZ", timeZone, 1);
+		tzset();
+	}
 }

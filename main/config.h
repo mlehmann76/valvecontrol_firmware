@@ -14,38 +14,60 @@
 namespace Config {
 
 class configBase {
-	nvs_handle_t my_handle;
-	cJSON *pConfig;
-protected:
+private:
 	static bool m_isInitialized;
+	static cJSON *pConfig;
+	esp_err_t readStr(nvs_handle *pHandle, const char *pName, char **dest);
+	esp_err_t writeStr(nvs_handle *pHandle, const char *pName, const char *str);
+	char* readJsonConfigStr(const cJSON *pRoot, const char *cfg, const char *section, const char *name) ;
 public:
-	configBase() ;
+	configBase();
 	virtual esp_err_t init();
 	virtual ~configBase();
 	virtual char* stringify() = 0;
-	virtual void parse(const char*) = 0;
-	esp_err_t readConfigStr(const char* section, const char* name, char **dest);
-protected:
-	esp_err_t readStr(nvs_handle *pHandle, const char *pName, char **dest);
-	esp_err_t writeStr(nvs_handle *pHandle, const char *pName, const char *str);
-	char* readJsonConfigStr(const cJSON *pRoot, const char *cfg, const char* section, const char* name);
-};
-
-
-class SysConfig: public configBase {
-public:
-	virtual esp_err_t init();
-	virtual char* stringify();
 	virtual void parse(const char*);
+	esp_err_t readConfig(const char *section, const char *name, char **dest) ;
+	char* readString(const char *section, const char *name);
+	const cJSON* getRoot() const {
+		return pConfig;
+	}
+	bool isInitialized() const {
+		return m_isInitialized;
+	}
+	void merge(const cJSON*);
+	void debug();
+protected:
+	nvs_handle_t my_handle;
+	char *m_string;
 };
 
-class MqttConfig: public configBase {
+class SysConfig: protected configBase {
+public:
+	virtual esp_err_t init() {
+		return ESP_OK;
+	}
+	virtual char* stringify();
+	const char* getUser() {
+		return readString("system", "user");
+	}
+	const char* getPass() {
+		return readString("system", "pass");
+	}
+	const char* getTimeZone() {
+		return readString("sntp", "zone");
+	}
+	const char* getTimeServer() {
+		return readString("sntp", "server");
+	}
+private:
+};
+
+class MqttConfig: protected configBase {
 	static const char MQTT_PUB_MESSAGE_FORMAT[];
 
 public:
 	virtual esp_err_t init();
 	virtual char* stringify();
-	virtual void parse(const char*);
 
 	const char* getSubMsg() {
 		return mqtt_sub_msg;
@@ -60,27 +82,24 @@ public:
 	}
 
 	const char* getMqttServer() {
-		return mqtt_server;
+		return readString("mqtt", "server");
 	}
 
 	const char* getMqttUser() {
-		return mqtt_user;
+		return readString("mqtt", "user");
 	}
 
 	const char* getMqttPass() {
-		return mqtt_pass;
+		return readString("mqtt", "pass");
 	}
+
 private:
 	char def_mqtt_device[64] = { 0 }; //TODO
-	char *mqtt_server = (char*)"mqtt://raspberrypi.fritz.box";
 	char *mqtt_sub_msg = NULL;
 	char *mqtt_pub_msg = NULL;
 	char *mqtt_device_name = NULL;
-	char *mqtt_user = (char*)"sensor1";
-	char *mqtt_pass = (char*)"sensor1";
-	char *MQTT_DEVICE = (char*)"esp32/";
+	char *MQTT_DEVICE = (char*) "esp32/";
 };
-
 
 } /* namespace Config */
 

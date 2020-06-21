@@ -21,17 +21,16 @@
 
 static const char *TAG = "CONFIG";
 
-char *nvs_json_config = NULL;
-
 extern const char config_json_start[] asm("_binary_config_json_start");
-
 
 namespace Config {
 
 bool configBase::m_isInitialized = false;
+cJSON *configBase::pConfig = NULL;
 const char MqttConfig::MQTT_PUB_MESSAGE_FORMAT[] = "%s%02X%02X%02X%02X%02X%02X%s";
 
-configBase::configBase() {
+configBase::configBase() :
+		my_handle(0), m_string(NULL) {
 	m_isInitialized = false;
 }
 
@@ -68,82 +67,17 @@ esp_err_t configBase::init() {
 		cJSON_Delete(patch);
 	}
 	//
+	m_isInitialized = true;
 
 	return ret;
 }
 
-configBase::~configBase() {
-	// TODO Auto-generated destructor stub
-}
-
-
-esp_err_t MqttConfig::init() {
-
-	if (!m_isInitialized) {
-		configBase::init();
-	}
-	size_t required_size = 0;
-	/* read mqtt device name */
-
-	if (ESP_OK == readConfigStr("mqtt", "device", &mqtt_device_name)) {
-		required_size = strlen(mqtt_device_name);//TODO strlen is risky here
-	}else{
-		/* set default device name */
-		uint8_t mac[6] = { 0 };
-		esp_efuse_mac_get_default(mac);
-		snprintf(def_mqtt_device, sizeof(def_mqtt_device), MQTT_PUB_MESSAGE_FORMAT,
-				MQTT_DEVICE, mac[0], mac[1],mac[2], mac[3],mac[4], mac[5],"/");
-		mqtt_device_name = def_mqtt_device;
-		required_size = strlen(def_mqtt_device);//TODO strlen is risky here
-	}
-
-	mqtt_sub_msg = (char*)malloc(required_size+sizeof("#")+1);
-	mqtt_pub_msg = (char*)malloc(required_size+sizeof("state/")+1);
-
-	if ((mqtt_sub_msg != NULL)&&(mqtt_pub_msg!=NULL)) {
-		snprintf(mqtt_sub_msg, required_size+sizeof("#")+1, "%s#", mqtt_device_name);
-		snprintf(mqtt_pub_msg, required_size+sizeof("state/")+1, "%sstate/", mqtt_device_name);
-	}
-
-	/* read mqtt server name */
-	ESP_ERROR_CHECK(readConfigStr("mqtt", "server", &mqtt_server));
-
-	/* read mqtt user name */
-	ESP_ERROR_CHECK(readConfigStr("mqtt", "user", &mqtt_user));
-
-	/* read mqtt user pass */
-	ESP_ERROR_CHECK(readConfigStr("mqtt", "pass", &mqtt_pass));
-
-	ESP_LOGI(TAG, "sub: (%s) pub (%s)", getSubMsg(), getPubMsg());
-
-	return ESP_OK;
-}
-
-esp_err_t configBase::readConfigStr(const char *section, const char *name, char **dest) {
-	char* ret = NULL;
-
-	//	if (nvs_json_config != NULL) {
-	//		cJSON *root = cJSON_Parse(nvs_json_config);
-	//		ret = readJsonConfigStr(root, "nvs", section, name);
-	//		cJSON_Delete(root);
-	//	}
-
-		if (ret == NULL) {
-			//cJSON *root = cJSON_Parse(config_json_start);
-			ret = readJsonConfigStr(pConfig, "default", section, name);
-			//cJSON_Delete(root);
-		}
-
-		*dest = ret;
-		return ret != NULL ? ESP_OK : !ESP_OK;
-}
-
 esp_err_t configBase::readStr(nvs_handle *pHandle, const char *pName, char **dest) {
 	size_t required_size;
-	char * temp;
+	char *temp;
 	esp_err_t err = nvs_get_str(*pHandle, pName, NULL, &required_size);
 	if (err == ESP_OK) {
-		temp = (char*)malloc(required_size);
+		temp = (char*) malloc(required_size);
 		if (temp != NULL) {
 			nvs_get_str(*pHandle, pName, temp, &required_size);
 			*dest = temp;
@@ -158,14 +92,32 @@ esp_err_t configBase::writeStr(nvs_handle *pHandle, const char *pName, const cha
 	return nvs_set_str(*pHandle, pName, str);
 }
 
-char* configBase::readJsonConfigStr(const cJSON *pRoot, const char *cfg, const char* section, const char* name) {
-	char* ret = NULL;
-	cJSON* pSection = cJSON_GetObjectItem(pRoot, section);
+esp_err_t configBase::readConfig(const char *section, const char *name, char **dest) {
+	char *ret = NULL;
+	if (!m_isInitialized) {
+		init();
+	}
+	ret = readJsonConfigStr(pConfig, "default", section, name);
+
+	*dest = ret;
+	return ret != NULL ? ESP_OK : !ESP_OK;
+}
+
+char* configBase::readString(const char *section, const char *name){
+	char *ret;
+	readConfig(section, name, &ret);
+	return ret;
+}
+
+char* configBase::readJsonConfigStr(const cJSON *pRoot, const char *cfg, const char *section, const char *name) {
+	char *ret = NULL;
+
+	cJSON *pSection = cJSON_GetObjectItem(pRoot, section);
 	if (pSection != NULL) {
-		cJSON* pName = cJSON_GetObjectItem(pSection, name);
+		cJSON *pName = cJSON_GetObjectItem(pSection, name);
 
 		if (cJSON_IsString(pName) && (pName->valuestring != NULL)) {
-			ret = (char*)malloc(strlen(pName->valuestring));
+			ret = (char*) malloc(strlen(pName->valuestring));
 			strcpy(ret, pName->valuestring);
 			ESP_LOGI(TAG, "section (%s), name (%s) in (%s) found (%s)", section, name, cfg, ret);
 		} else {
@@ -176,23 +128,87 @@ char* configBase::readJsonConfigStr(const cJSON *pRoot, const char *cfg, const c
 	}
 	return ret;
 }
-char* MqttConfig::stringify() {
-	return NULL;
+
+void configBase::parse(const char* value) {
+	cJSON *patch = cJSON_Parse(value);
+
+	if (patch != NULL) {
+		merge(patch);
+		cJSON_Delete(patch);
+	}
 }
 
-void MqttConfig::parse(const char*) {
+void configBase::merge(const cJSON* patch) {
+	pConfig = cJSONUtils_MergePatch(pConfig, patch);
 }
 
-esp_err_t SysConfig::init() {
+void configBase::debug() {
+	char *out = cJSON_Print(pConfig);
+	ESP_LOGI(TAG, "debug: (%8X) %s ", (uint32_t)pConfig, out != NULL ? out : "error");
+	free(out);
+}
+
+configBase::~configBase() {
+	// TODO Auto-generated destructor stub
+}
+
+esp_err_t MqttConfig::init() {
+
+	if (!isInitialized()) {
+		configBase::init();
+	}
+	size_t required_size = 0;
+	/* read mqtt device name */
+
+	if (ESP_OK == readConfig("mqtt", "device", &mqtt_device_name)) {
+		required_size = strlen(mqtt_device_name);		//TODO strlen is risky here
+	} else {
+		/* set default device name */
+		uint8_t mac[6] = { 0 };
+		esp_efuse_mac_get_default(mac);
+		snprintf(def_mqtt_device, sizeof(def_mqtt_device), MQTT_PUB_MESSAGE_FORMAT, MQTT_DEVICE, mac[0], mac[1], mac[2],
+				mac[3], mac[4], mac[5], "/");
+		mqtt_device_name = def_mqtt_device;
+		required_size = strlen(def_mqtt_device);
+	}
+
+	mqtt_sub_msg = (char*) malloc(required_size + sizeof("#") + 1);
+	mqtt_pub_msg = (char*) malloc(required_size + sizeof("state/") + 1);
+
+	if ((mqtt_sub_msg != NULL) && (mqtt_pub_msg != NULL)) {
+		snprintf(mqtt_sub_msg, required_size + sizeof("#") + 1, "%s#", mqtt_device_name);
+		snprintf(mqtt_pub_msg, required_size + sizeof("state/") + 1, "%sstate/", mqtt_device_name);
+	}
+
+	ESP_LOGI(TAG, "sub: (%s) pub (%s)", getSubMsg(), getPubMsg());
+
 	return ESP_OK;
 }
 
-char* SysConfig::stringify() {
-	return NULL;
+char* MqttConfig::stringify() {
+	if (m_string != NULL) {
+		free(m_string);
+		m_string = NULL;
+	}
+
+	cJSON *mqtt = cJSON_GetObjectItem(getRoot(), "mqtt");
+	m_string = cJSON_PrintUnformatted(mqtt);
+
+	return m_string;
 }
 
-void SysConfig::parse(const char*) {
+char* SysConfig::stringify() {
+	if (m_string != NULL) {
+		free(m_string);
+		m_string = NULL;
+	}
+
+	cJSON *mqtt = cJSON_GetObjectItem(getRoot(), "system");
+	m_string = cJSON_PrintUnformatted(mqtt);
+
+	return m_string;
 }
+
 
 } /* namespace Config */
 

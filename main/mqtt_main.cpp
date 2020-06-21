@@ -333,10 +333,11 @@ void app_main() {
 	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
 	xTaskCreate(wifi_init_sta, "wifi init task", 4096, &server, 10, NULL);
 
+	spiffsInit();
+
 	sys.init();
 	mqtt.init();
 
-	spiffsInit();
 	sntp_support();
 	status_task_setup();
 	gpio_task_setup();

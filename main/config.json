@@ -16,8 +16,8 @@
     	{ 
     		"name" : "sht1x",
     		"enabled" : false
-    	}
-    },
+    	} 
+    ],
     "channels": [
     	{ 
     		"name" : "channel1",

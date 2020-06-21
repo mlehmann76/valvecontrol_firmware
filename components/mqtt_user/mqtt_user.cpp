@@ -257,6 +257,7 @@ void mqtt_user_init(void) {
 	}
 
 	esp_mqtt_client_config_t mqtt_cfg;
+	memset(&mqtt_cfg,0,sizeof(mqtt_cfg));
 	mqtt_cfg.uri = mqtt.getMqttServer();
 	mqtt_cfg.event_handle = mqtt_event_handler;
 	mqtt_cfg.username = mqtt.getMqttUser();
