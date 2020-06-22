@@ -20,10 +20,22 @@ extern messageHandler_t controlHandler;
 
 typedef enum {mStatus, mOn, mOff} gpio_task_mode_t;
 
-typedef struct {
+typedef struct queueData {
 	uint32_t chan;
 	gpio_task_mode_t mode;
+	queueData() : chan(0), mode(mStatus) {}
+	queueData(uint32_t _chan, gpio_task_mode_t _mode) : chan(_chan), mode(_mode) {}
 } queueData_t;
+
+typedef enum {
+	pOFF, pHALF, pON
+} channelMode_t;
+
+typedef struct channelSet{
+	channelMode_t mode;
+	time_t time;
+	channelSet() : mode(pOFF), time(0) {}
+} channelSet_t;
 
 void handleChannelControl(const cJSON* const chan);
 int handleControlMsg(const char *, esp_mqtt_event_handle_t );

@@ -101,9 +101,25 @@ private:
 	char *MQTT_DEVICE = (char*) "esp32/";
 };
 
+class ChannelConfig: protected configBase {
+public:
+	ChannelConfig();
+	virtual esp_err_t init();
+	virtual char* stringify();
+	const char* getName(unsigned ch);
+	const char* getAlt(unsigned ch);
+	bool isEnabled(unsigned ch);
+	unsigned getTime(unsigned ch);
+	unsigned count() const { return m_channelCount; }
+private:
+	const cJSON* getItem(unsigned ch, const char* item);
+	unsigned m_channelCount;
+};
+
 } /* namespace Config */
 
 extern Config::MqttConfig mqtt;
 extern Config::SysConfig sys;
+extern Config::ChannelConfig chanConfig;
 
 #endif /* MAIN_CONFIG_H_ */

@@ -209,9 +209,71 @@ char* SysConfig::stringify() {
 	return m_string;
 }
 
+ChannelConfig::ChannelConfig() : m_channelCount(0) {
+}
+
+esp_err_t ChannelConfig::init() {
+	esp_err_t ret = ESP_FAIL;
+	if (!isInitialized()) {
+		ret = configBase::init();
+	}
+	cJSON *pChan = cJSON_GetObjectItem(getRoot(), "channels");
+	ESP_LOGI(TAG, "channels 0x%8X : isArray %d , Size %d",
+			(unsigned int)pChan,
+			pChan != NULL ? cJSON_IsArray(pChan) : false,
+			pChan != NULL ? cJSON_GetArraySize(pChan) : 0);
+	if (pChan != NULL  && cJSON_IsArray(pChan)) {
+		m_channelCount = cJSON_GetArraySize(pChan);
+		ret = ESP_OK;
+	}
+	return ret;
+}
+
+char* ChannelConfig::stringify() {
+	if (m_string != NULL) {
+		free(m_string);
+		m_string = NULL;
+	}
+
+	cJSON *pChan = cJSON_GetObjectItem(getRoot(), "channels");
+	m_string = cJSON_PrintUnformatted(pChan);
+
+	return m_string;
+}
+
+
+const char* ChannelConfig::getName(unsigned ch) {
+	char *ret = cJSON_GetStringValue(const_cast<cJSON*>(getItem(ch, "name")));
+	return ret != NULL ? ret : "no name";
+}
+
+const char* ChannelConfig::getAlt(unsigned ch) {
+	char *ret = cJSON_GetStringValue(const_cast<cJSON*>(getItem(ch, "alt")));
+	return ret != NULL ? ret : "no alt. name";
+}
+
+bool ChannelConfig::isEnabled(unsigned ch) {
+	return cJSON_IsTrue(const_cast<cJSON*>(getItem(ch, "enabled")));
+}
+
+unsigned ChannelConfig::getTime(unsigned ch) {
+	cJSON *pItem = const_cast<cJSON*>(getItem(ch, "maxTime"));
+	return cJSON_IsNumber(pItem) ? pItem->valueint : 0;
+}
+
+const cJSON* ChannelConfig::getItem(unsigned ch, const char* item) {
+	cJSON *ret = NULL;
+	if (isInitialized() && ch < m_channelCount) {
+		cJSON *pChan = cJSON_GetObjectItem(getRoot(), "channels");
+		cJSON *pItem = cJSON_GetArrayItem(pChan, ch);
+		ret = cJSON_GetObjectItem(pItem, item);
+	}
+	return ret;
+}
 
 } /* namespace Config */
 
 //Globals
 Config::MqttConfig mqtt;
 Config::SysConfig sys;
+Config::ChannelConfig chanConfig;

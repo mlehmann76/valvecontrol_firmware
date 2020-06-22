@@ -29,15 +29,6 @@ typedef struct {
 	size_t data_len;
 } message_t;
 
-typedef enum {
-	pOFF, pHALF, pON
-} channelMode_t;
-
-typedef struct {
-	channelMode_t mode;
-	time_t time;
-} channelSet_t;
-
 void mqtt_user_init(void);
 void mqtt_connect(void);
 void mqtt_disconnect(void);

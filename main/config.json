@@ -21,21 +21,25 @@
     "channels": [
     	{ 
     		"name" : "channel1",
+    		"alt" : "channel1",
     		"enabled" : true,
     		"maxTime" : 1800
     	},
     	{ 
     		"name" : "channel2",
+    		"alt" : "channel2",
     		"enabled" : true,
     		"maxTime" : 1800
     	},
     	{ 
     		"name" : "channel3",
+    		"alt" : "channel3",
     		"enabled" : true,
     		"maxTime" : 1800
     	},
     	{ 
     		"name" : "channel4",
+    		"alt" : "channel4",
     		"enabled" : true,
     		"maxTime" : 1800
     	}

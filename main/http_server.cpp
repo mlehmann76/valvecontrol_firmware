@@ -45,6 +45,7 @@ httpd_uri_t get_base = {
     .handler   = _get_handler,
     /* Let's pass response string in user
      * context to demonstrate it's usage */
+	.user_ctx = NULL
 };
 
 
@@ -52,6 +53,7 @@ httpd_uri_t put_config = {
     .uri       = "/config",
     .method    = HTTP_PUT,
     .handler   = _config_handler,
+	.user_ctx = NULL
 };
 
 
@@ -59,6 +61,7 @@ httpd_uri_t put_command = {
     .uri       = "/command",
     .method    = HTTP_PUT,
     .handler   = _command_handler,
+	.user_ctx = NULL
 };
 
 
