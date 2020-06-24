@@ -338,6 +338,7 @@ void app_main() {
 	sys.init();
 	mqtt.init();
 	chanConfig.init();
+	sensorConfig.init();
 
 	sntp_support();
 	status_task_setup();

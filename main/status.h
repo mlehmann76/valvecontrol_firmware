@@ -23,8 +23,16 @@ extern EventGroupHandle_t status_event_group;
 void status_task_setup(void);
 void status_task(void *pvParameters);
 
+
+
 #ifdef __cplusplus
 }
 #endif
 
+class StatusProvider {
+public:
+	virtual ~StatusProvider() {}
+	virtual bool hasUpdate() = 0;
+	virtual void addStatus(cJSON *) = 0;
+};
 #endif /* MAIN_STATUS_H_ */

@@ -116,10 +116,22 @@ private:
 	unsigned m_channelCount;
 };
 
+class SensorConfig: protected configBase {
+public:
+	SensorConfig();
+	virtual esp_err_t init();
+	virtual char* stringify();
+	bool isSHT1xEnabled();
+private:
+	const cJSON* getItem(const char *name, const char* item);
+	unsigned m_sensorCount;
+};
+
 } /* namespace Config */
 
 extern Config::MqttConfig mqtt;
 extern Config::SysConfig sys;
 extern Config::ChannelConfig chanConfig;
+extern Config::SensorConfig sensorConfig;
 
 #endif /* MAIN_CONFIG_H_ */

@@ -119,7 +119,7 @@ char* configBase::readJsonConfigStr(const cJSON *pRoot, const char *cfg, const c
 		if (cJSON_IsString(pName) && (pName->valuestring != NULL)) {
 			ret = (char*) malloc(strlen(pName->valuestring));
 			strcpy(ret, pName->valuestring);
-			ESP_LOGI(TAG, "section (%s), name (%s) in (%s) found (%s)", section, name, cfg, ret);
+			ESP_LOGD(TAG, "section (%s), name (%s) in (%s) found (%s)", section, name, cfg, ret);
 		} else {
 			ESP_LOGE(TAG, "name in (%s) not found (%s)", cfg, name);
 		}
@@ -144,7 +144,7 @@ void configBase::merge(const cJSON* patch) {
 
 void configBase::debug() {
 	char *out = cJSON_Print(pConfig);
-	ESP_LOGI(TAG, "debug: (%8X) %s ", (uint32_t)pConfig, out != NULL ? out : "error");
+	ESP_LOGD(TAG, "debug: (%8X) %s ", (uint32_t)pConfig, out != NULL ? out : "error");
 	free(out);
 }
 
@@ -180,7 +180,7 @@ esp_err_t MqttConfig::init() {
 		snprintf(mqtt_pub_msg, required_size + sizeof("state/") + 1, "%sstate/", mqtt_device_name);
 	}
 
-	ESP_LOGI(TAG, "sub: (%s) pub (%s)", getSubMsg(), getPubMsg());
+	ESP_LOGD(TAG, "sub: (%s) pub (%s)", getSubMsg(), getPubMsg());
 
 	return ESP_OK;
 }
@@ -218,7 +218,7 @@ esp_err_t ChannelConfig::init() {
 		ret = configBase::init();
 	}
 	cJSON *pChan = cJSON_GetObjectItem(getRoot(), "channels");
-	ESP_LOGI(TAG, "channels 0x%8X : isArray %d , Size %d",
+	ESP_LOGD(TAG, "channels 0x%8X : isArray %d , Size %d",
 			(unsigned int)pChan,
 			pChan != NULL ? cJSON_IsArray(pChan) : false,
 			pChan != NULL ? cJSON_GetArraySize(pChan) : 0);
@@ -271,9 +271,67 @@ const cJSON* ChannelConfig::getItem(unsigned ch, const char* item) {
 	return ret;
 }
 
+SensorConfig::SensorConfig() : m_sensorCount(0){
+}
+
+esp_err_t SensorConfig::init() {
+	esp_err_t ret = ESP_FAIL;
+	if (!isInitialized()) {
+		ret = configBase::init();
+	}
+	cJSON *pChan = cJSON_GetObjectItem(getRoot(), "sensors");
+	ESP_LOGD(TAG, "sensors 0x%8X : isArray %d , Size %d",
+			(unsigned int)pChan,
+			pChan != NULL ? cJSON_IsArray(pChan) : false,
+			pChan != NULL ? cJSON_GetArraySize(pChan) : 0);
+	if (pChan != NULL  && cJSON_IsArray(pChan)) {
+		m_sensorCount = cJSON_GetArraySize(pChan);
+		ret = ESP_OK;
+	}
+	return ret;
+}
+
+char* SensorConfig::stringify() {
+	if (m_string != NULL) {
+		free(m_string);
+		m_string = NULL;
+	}
+
+	cJSON *pChan = cJSON_GetObjectItem(getRoot(), "sensors");
+	m_string = cJSON_PrintUnformatted(pChan);
+
+	return m_string;
+}
+
+
+bool SensorConfig::isSHT1xEnabled() {
+	const cJSON *item = getItem("sht1x", "enabled");
+	ESP_LOGD(TAG, "sht1x: 0x%08X : %s", (unsigned int)item, cJSON_IsTrue(item) ? "true" : "false");
+	return cJSON_IsTrue(item);
+}
+
+const cJSON* SensorConfig::getItem(const char *name, const char *item) {
+	cJSON *ret = NULL;
+	if (isInitialized()) {
+		cJSON *pArray = cJSON_GetObjectItem(getRoot(), "sensors");
+		cJSON *aritem = pArray ? pArray->child : 0;
+		while (aritem) {
+			cJSON *sensitem = cJSON_GetObjectItem(cJSON_GetObjectItem(aritem, name), item);
+
+			if (sensitem != NULL) {
+				ret = sensitem;
+				break;
+			}
+			aritem = aritem->next;
+		}
+	}
+	return ret;
+}
 } /* namespace Config */
 
 //Globals
 Config::MqttConfig mqtt;
 Config::SysConfig sys;
 Config::ChannelConfig chanConfig;
+Config::SensorConfig sensorConfig;
+

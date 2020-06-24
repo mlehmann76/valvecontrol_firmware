@@ -23,10 +23,10 @@
 #include "mqtt_user.h"
 
 #include "controlTask.h"
-#include "sht1x.h"
 
 #include "config_user.h"
 #include "status.h"
+#include "sht1x.h"
 
 #define TAG "status"
 

@@ -14,8 +14,9 @@
     },
     "sensors": [
     	{ 
-    		"name" : "sht1x",
-    		"enabled" : false
+    		"sht1x": {
+    			"enabled" : false
+    		}
     	} 
     ],
     "channels": [

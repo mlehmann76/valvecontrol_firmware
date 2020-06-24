@@ -30,21 +30,46 @@ extern "C" {
 #define ACK_VAL 0x1                 /*!< I2C ack value */
 #define NACK_VAL 0x0                /*!< I2C nack value */
 
-typedef struct {
+void setupSHT1xTask(void);
+void addSHT1xStatus(cJSON *root);
+
+class Sht1x : public StatusProvider {
+public:
+
+	Sht1x(gpio_num_t _sda, gpio_num_t _scl) : i2c_gpio_sda(_sda), i2c_gpio_scl(_scl), m_error(false) {}
+	float readSHT1xTemp();
+	float readSHT1xHum();
+	bool hasError() const {return m_error; }
+	void reset();
+	//
+	virtual bool hasUpdate();
+	virtual void addStatus(cJSON *);
+	//
+private:
+	void delay_usec(int64_t usec) {
+		int64_t end = esp_timer_get_time() + usec;
+		while (esp_timer_get_time() < end) {	};
+	}
+
+	void _sda_(int lvl);
+	void _scl_(int lvl);
+	void start();
+	void connectionreset();
+	uint32_t read(uint32_t numBits, int ack);
+	int write(uint32_t data);
+	esp_err_t readSHT1xReg16(uint8_t reg, uint16_t *pData);
+
+private:
 	gpio_num_t i2c_gpio_sda;
 	gpio_num_t i2c_gpio_scl;
-	SemaphoreHandle_t sem;
-	float temp;
-	float hum;
-	bool hasError;
-} sht1x_handle_t;
+	bool m_error;
+};
 
 
-void addSHT1xStatus(cJSON *root);
-void setupSHT1xTask(void);
-bool isSHT1xEnabled(void);
 
 #ifdef __cplusplus
 }
+
+
 #endif
 #endif /* MAIN_SHT1X_H_ */
