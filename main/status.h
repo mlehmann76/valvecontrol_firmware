@@ -34,5 +34,23 @@ public:
 	virtual ~StatusProvider() {}
 	virtual bool hasUpdate() = 0;
 	virtual void addStatus(cJSON *) = 0;
+private:
+	uint32_t m_bit;
 };
+
+class FirmwareStatus : public StatusProvider {
+public:
+	virtual ~FirmwareStatus();
+	virtual bool hasUpdate();
+	virtual void addStatus(cJSON *);
+};
+
+class HardwareStatus : public StatusProvider {
+public:
+	virtual ~HardwareStatus();
+	virtual bool hasUpdate();
+	virtual void addStatus(cJSON *);
+};
+
+
 #endif /* MAIN_STATUS_H_ */

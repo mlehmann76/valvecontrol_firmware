@@ -24,9 +24,10 @@
 #include "driver/ledc.h"
 
 #include "status.h"
-#include "controlTask.h"
 #include "config_user.h"
 #include "config.h"
+
+#include "controlTask.h"
 
 #define TAG "gpio_task"
 
@@ -53,8 +54,11 @@ messageHandler_t controlHandler = {//
 		.onMessage = handleControlMsg,//
 		"control event" };
 /**/
-static channelSet_t chanMode[NUM_CONTROL]; //FIXME chanConfig.count()
-static bool isConnected = false;
+static int checkWPSButton();
+/**/
+ChannelStatus channel(&status_event_group);
+ChannelStatus::channelSet_t ChannelStatus::chanMode[NUM_CONTROL];
+/**/
 static ledc_channel_config_t ledc_channel[NUM_CONTROL] = { //FIXME chanConfig.count()
 		{
 				.gpio_num = CONTROL0_PIN, //
@@ -94,12 +98,139 @@ static ledc_channel_config_t ledc_channel[NUM_CONTROL] = { //FIXME chanConfig.co
 		}
 }; //
 
+
+ChannelStatus::ChannelStatus(EventGroupHandle_t *_status_event_group) : m_status_event_group(_status_event_group){
+}
+
+void ChannelStatus::updateStatus(void) {
+	if (*m_status_event_group != NULL) {
+		xEventGroupSetBits(*m_status_event_group, STATUS_EVENT_CONTROL);
+	}
+}
+
+void ChannelStatus::enableChan(uint32_t chan, time_t _runTime) {
+	if (chan < chanConfig.count()) {
+		// single channel mode, disable all other
+		for (int i = 0; i < chanConfig.count(); i++) {
+			if ((i != chan) && chanMode[i].mode != pOFF) {
+				disableChan(i);
+			}
+		}
+		// enable if not enabled
+		if (chanMode[chan].mode == pOFF) {
+			chanMode[chan].mode = pHALF;
+			updateChannel(chan);
+		}
+		updateStatus();
+		time(&chanMode[chan].startTime);
+		chanMode[chan].runTime = _runTime;
+	}
+}
+
+void ChannelStatus::disableChan(uint32_t chan) {
+	if ((chan < chanConfig.count())) {
+		chanMode[chan].mode = pOFF;
+		updateChannel(chan);
+		updateStatus();
+		time(&chanMode[chan].startTime);
+		chanMode[chan].runTime = 0;
+	}
+}
+
+void ChannelStatus::updateChannel(uint32_t chan) {
+	if ((chan < chanConfig.count())) {
+		ESP_LOGI(TAG, "update channel %d -> %d", chan, chanMode[chan].mode);
+		switch (chanMode[chan].mode) {
+		case pON:
+			ledc_set_duty(ledc_channel[chan].speed_mode, ledc_channel[chan].channel,
+			LED_C_ON);
+			break;
+		case pHALF:
+			ledc_set_duty(ledc_channel[chan].speed_mode, ledc_channel[chan].channel,
+			LED_C_HALF);
+			break;
+		case pOFF:
+			ledc_set_duty(ledc_channel[chan].speed_mode, ledc_channel[chan].channel,
+			LED_C_OFF);
+			break;
+		}
+		ledc_update_duty(ledc_channel[chan].speed_mode, ledc_channel[chan].channel);
+	}
+}
+
+
+ChannelStatus::~ChannelStatus() {
+}
+
+bool ChannelStatus::hasUpdate() {
+	return false;
+}
+
+void ChannelStatus::addStatus(cJSON* root) {
+
+	if (root == NULL) {
+		return;
+	}
+
+	cJSON *channel = cJSON_AddObjectToObject(root, "channel");
+	if (channel == NULL) {
+		return;
+	}
+
+	for (int i = 0; i < chanConfig.count(); i++) {
+		cJSON *channelv = cJSON_AddObjectToObject(channel, chanConfig.getName(i));
+		if (channelv == NULL) {
+			return;
+		}
+
+		if (cJSON_AddStringToObject(channelv, "val", chanMode[i].mode != pOFF ? "ON" : "OFF") == NULL) {
+			return;
+		}
+	}
+
+	return;
+}
 /**/
-static void updateStatus(void);
-static void disableChan(uint32_t chan);
-static void enableChan(uint32_t chan);
-static void updateChannel(uint32_t chan);
-static int checkButton();
+void ChannelStatus::checkMessage(queueData_t &rxData) {
+	switch (rxData.mode) {
+	case mStatus:
+		if (rxData.chan < chanConfig.count()) {
+			if (chanMode[rxData.chan].mode != pOFF) {
+				rxData.mode = mOn;
+			} else {
+				rxData.mode = mOff;
+			}
+		}
+		updateStatus();
+		break;
+	case mOn:
+		enableChan(rxData.chan, rxData.time);
+		break;
+	case mOff:
+		disableChan(rxData.chan);
+		break;
+	}
+}
+/**/
+void ChannelStatus::checkTimeout() {
+	for (int i = 0; i < chanConfig.count(); i++) {
+		if (chanMode[i].mode != pOFF) {
+			time_t now;
+			// test for duty cycle switch
+			time(&now);
+			if ((difftime(now, chanMode[i].startTime) >= LED_C_TIME) && (chanMode[i].mode != pON)) {
+				chanMode[i].mode = pON;
+				updateChannel(i);
+			}
+			// test for auto off
+			time(&now);
+			if (difftime(now, chanMode[i].startTime) > chanMode[i].runTime) {
+				chanMode[i].mode = pOFF;
+				disableChan(i);
+			}
+		}
+	}
+}
 /**/
 int handleControlMsg(const char * topic, esp_mqtt_event_handle_t event) {
 	int ret = 0;
@@ -130,31 +261,26 @@ void handleChannelControl(const cJSON* const chan) {
 		cJSON* pChanObj = cJSON_GetObjectItem(chan, chanConfig.getName(i));
 		if (pChanObj != NULL) {
 
-			int chanVal = -1;
+			gpio_task_mode_t func = mStatus;
+			uint32_t chanTime = chanConfig.getTime(i);
 			cJSON* pJsonChanVal = cJSON_GetObjectItem(pChanObj, "val");
-			if (pJsonChanVal != NULL) {
-				if (cJSON_IsString(pJsonChanVal)) {
-					const char * pS = pJsonChanVal->valuestring;
-					if (strncmp(pS, "ON", 2) == 0) {
-						chanVal = 1;
-					} else {
-						chanVal = 0;
-					}
+			if (cJSON_IsString(pJsonChanVal)) {
+				const char * pS = pJsonChanVal->valuestring;
+				if (strncmp(pS, "ON", 2) == 0) {
+					func = mOn;
+				} else {
+					func = mOff;
 				}
 			}
 
-			ESP_LOGD(TAG, "channel :%d found ->%s", i, chanVal == 1 ? "on" : "off");
-			gpio_task_mode_t func = mStatus;
-
-			if (chanVal == 1) {
-				func = mOn;
-			} else if (chanVal == 0) {
-				func = mOff;
-			} else {
-				func = mStatus;
+			cJSON* pJsonTime = cJSON_GetObjectItem(pChanObj, "time");
+			if (cJSON_IsNumber(pJsonTime)) {
+				chanTime = pJsonTime->valuedouble;
 			}
 
-			queueData_t cdata = { i, func };
+			ESP_LOGD(TAG, "channel :%d found ->%s, time : %d", i, func == mOn ? "on" : "off", chanTime);
+
+			queueData_t cdata = { i, func, chanTime };
 			if (xQueueSend(subQueue, (void * ) &cdata, 10 / portTICK_PERIOD_MS) != pdPASS) {
 				// Failed to post the message, even after 10 ticks.
 				ESP_LOGW(TAG, "subqueue post failure");
@@ -163,13 +289,33 @@ void handleChannelControl(const cJSON* const chan) {
 	}
 }
 
+static int checkWPSButton() {
+	static int wps_button_count = 0;
+	if ((gpio_get_level((gpio_num_t)WPS_BUTTON) == 0)) {
+		wps_button_count++;
+		if (wps_button_count > (WPS_LONG_MS / portTICK_PERIOD_MS)) {
+			xEventGroupSetBits(main_event_group, WPS_LONG_BIT);
+			wps_button_count = 0;
+		}
+	} else {
+		if (wps_button_count > (WPS_SHORT_MS / portTICK_PERIOD_MS)) {
+			xEventGroupSetBits(main_event_group, WPS_SHORT_BIT);
+		}
+		wps_button_count = 0;
+	}
+	return wps_button_count;
+}
+
 void gpio_task(void *pvParameters) {
+
+	ChannelStatus *pchan = reinterpret_cast<ChannelStatus*>(pvParameters);
+	static bool isConnected = false;
 
 	while (1) {
 
 		if (!isConnected && (xEventGroupGetBits(main_event_group) & MQTT_CONNECTED_BIT)) {
 			isConnected = true;
-			updateStatus();
+			pchan->updateStatus();
 		}
 
 		if (!(xEventGroupGetBits(main_event_group) & MQTT_CONNECTED_BIT)) {
@@ -177,54 +323,19 @@ void gpio_task(void *pvParameters) {
 		}
 
 		// timekeeping for auto off
-		for (int i = 0; i < chanConfig.count(); i++) {
-			if (chanMode[i].mode != pOFF) {
-				time_t now;
-				// test for duty cycle switch
-				time(&now);
-				if ((difftime(now, chanMode[i].time) >= LED_C_TIME) && (chanMode[i].mode != pON)) {
-					chanMode[i].mode = pON;
-					updateChannel(i);
-				}
-				// test for auto off
-				time(&now);
-				if (difftime(now, chanMode[i].time) > chanConfig.getTime(i)) {
-					chanMode[i].mode = pOFF;
-					disableChan(i);
-				}
-			}
-		}
+		pchan->checkTimeout();
 
 		if (subQueue != 0) {
 			queueData_t rxData;
 			// Receive a message on the created queue.
 			if (xQueueReceive(subQueue, &(rxData), (TickType_t ) 1)) {
 				ESP_LOGI(TAG, "received %08X, %d", rxData.chan, rxData.mode);
-
-				switch (rxData.mode) {
-				case mStatus:
-					if (rxData.chan < chanConfig.count()) {
-						if (chanMode[rxData.chan].mode != pOFF) {
-							rxData.mode = mOn;
-						} else {
-							rxData.mode = mOff;
-						}
-					}
-					updateStatus();
-					break;
-
-				case mOn:
-					enableChan(rxData.chan);
-					break;
-
-				case mOff:
-					disableChan(rxData.chan);
-					break;
-				}
+				pchan->checkMessage(rxData);
 			}
 		}
 
-		checkButton();
+		checkWPSButton();
+
 		vTaskDelay(10 / portTICK_PERIOD_MS);
 	}
 	vTaskDelete(NULL);
@@ -259,103 +370,6 @@ void gpio_task_setup(void) {
 		ESP_LOGI(TAG, "subqueue init failure");
 	}
 
-	xTaskCreate(&gpio_task, "gpio_task", 2048, NULL, 5, NULL);
-}
-
-void addChannelStatus(cJSON *root) {
-
-	if (root == NULL) {
-		return;
-	}
-
-	cJSON *channel = cJSON_AddObjectToObject(root, "channel");
-	if (channel == NULL) {
-		return;
-	}
-
-	for (int i = 0; i < chanConfig.count(); i++) {
-		cJSON *channelv = cJSON_AddObjectToObject(channel, chanConfig.getName(i));
-		if (channelv == NULL) {
-			return;
-		}
-
-		if (cJSON_AddStringToObject(channelv, "val", chanMode[i].mode != pOFF ? "ON" : "OFF") == NULL) {
-			return;
-		}
-	}
-
-	return;
-}
-
-static void updateStatus(void) {
-	if (status_event_group != NULL) {
-		xEventGroupSetBits(status_event_group, STATUS_EVENT_CONTROL);
-	}
-}
-
-static void enableChan(uint32_t chan) {
-	if (chan < chanConfig.count()) {
-		// single channel mode, disable all other
-		for (int i = 0; i < chanConfig.count(); i++) {
-			if ((i != chan) && chanMode[i].mode != pOFF) {
-				disableChan(i);
-			}
-		}
-		// enable if not enabled
-		if (chanMode[chan].mode == pOFF) {
-			chanMode[chan].mode = pHALF;
-			updateChannel(chan);
-		}
-		updateStatus();
-		time(&chanMode[chan].time);
-	}
-}
-
-static void disableChan(uint32_t chan) {
-//	if ((chan < chanConfig.count()) && (chanMode[chan].mode != pOFF)) {
-	if ((chan < chanConfig.count())) {
-		chanMode[chan].mode = pOFF;
-		updateChannel(chan);
-		updateStatus();
-		time(&chanMode[chan].time);
-	}
-}
-
-static void updateChannel(uint32_t chan) {
-	if ((chan < chanConfig.count())) {
-		ESP_LOGI(TAG, "update channel %d -> %d", chan, chanMode[chan].mode);
-		switch (chanMode[chan].mode) {
-		case pON:
-			ledc_set_duty(ledc_channel[chan].speed_mode, ledc_channel[chan].channel,
-			LED_C_ON);
-			break;
-		case pHALF:
-			ledc_set_duty(ledc_channel[chan].speed_mode, ledc_channel[chan].channel,
-			LED_C_HALF);
-			break;
-		case pOFF:
-			ledc_set_duty(ledc_channel[chan].speed_mode, ledc_channel[chan].channel,
-			LED_C_OFF);
-			break;
-		}
-		ledc_update_duty(ledc_channel[chan].speed_mode, ledc_channel[chan].channel);
-	}
-}
-
-static int checkButton() {
-	static int wps_button_count = 0;
-	if ((gpio_get_level((gpio_num_t)WPS_BUTTON) == 0)) {
-		wps_button_count++;
-		if (wps_button_count > (WPS_LONG_MS / portTICK_PERIOD_MS)) {
-			xEventGroupSetBits(main_event_group, WPS_LONG_BIT);
-			wps_button_count = 0;
-		}
-	} else {
-		if (wps_button_count > (WPS_SHORT_MS / portTICK_PERIOD_MS)) {
-			xEventGroupSetBits(main_event_group, WPS_SHORT_BIT);
-		}
-		wps_button_count = 0;
-	}
-	return wps_button_count;
+	xTaskCreate(&gpio_task, "gpio_task", 2048, &channel, 5, NULL);
 }
 

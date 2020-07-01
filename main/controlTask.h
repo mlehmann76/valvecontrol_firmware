@@ -18,32 +18,66 @@ extern "C" {
 extern QueueHandle_t pubQueue;
 extern messageHandler_t controlHandler;
 
-typedef enum {mStatus, mOn, mOff} gpio_task_mode_t;
+typedef enum {
+	mStatus, mOn, mOff
+} gpio_task_mode_t;
 
 typedef struct queueData {
 	uint32_t chan;
 	gpio_task_mode_t mode;
-	queueData() : chan(0), mode(mStatus) {}
-	queueData(uint32_t _chan, gpio_task_mode_t _mode) : chan(_chan), mode(_mode) {}
+	uint32_t time;
+	queueData() :
+			chan(0), mode(mStatus), time(0) {
+	}
+	queueData(uint32_t _chan, gpio_task_mode_t _mode, uint32_t _time) :
+			chan(_chan), mode(_mode), time(_time) {
+	}
 } queueData_t;
 
-typedef enum {
-	pOFF, pHALF, pON
-} channelMode_t;
-
-typedef struct channelSet{
-	channelMode_t mode;
-	time_t time;
-	channelSet() : mode(pOFF), time(0) {}
-} channelSet_t;
-
-void handleChannelControl(const cJSON* const chan);
-int handleControlMsg(const char *, esp_mqtt_event_handle_t );
+void handleChannelControl(const cJSON *const chan);
+int handleControlMsg(const char*, esp_mqtt_event_handle_t);
 extern void gpio_task_setup(void);
-void gpio_onConnect(void);
-void addChannelStatus(cJSON *root);
 
 #ifdef __cplusplus
 }
 #endif
+
+#include "status.h"
+
+class ChannelStatus: public StatusProvider {
+public:
+	ChannelStatus(EventGroupHandle_t*);
+	virtual ~ChannelStatus();
+	virtual bool hasUpdate();
+	virtual void addStatus(cJSON*);
+public:
+	void updateStatus(void);
+	void checkMessage(queueData_t&);
+	void checkTimeout();
+
+private:
+	enum channelMode_t {
+		pOFF, pHALF, pON
+	};
+
+	struct channelSet_t {
+		channelMode_t mode;
+		time_t startTime;
+		time_t runTime;
+		channelSet_t() :
+				mode(pOFF), startTime(0), runTime(0) {
+		}
+	};
+
+	void updateChannel(uint32_t chan);
+	void disableChan(uint32_t chan);
+	void enableChan(uint32_t chan, time_t _runTime);
+
+	static channelSet_t chanMode[]; //FIXME chanConfig.count()
+	EventGroupHandle_t *m_status_event_group;
+
+};
+
+extern ChannelStatus channel;
+
 #endif /* MAIN_GPIOTASK_H_ */

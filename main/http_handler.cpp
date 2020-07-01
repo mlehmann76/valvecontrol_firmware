@@ -29,6 +29,7 @@ extern "C" {
 }
 
 #include "config.h"
+#include "status.h"
 #include "mqtt_client.h"
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"

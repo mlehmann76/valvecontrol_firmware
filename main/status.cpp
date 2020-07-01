@@ -32,22 +32,21 @@
 
 EventGroupHandle_t status_event_group;
 
-void addFirmwareStatus(cJSON *root);
-void addHardwareStatus(cJSON *root);
-void addTimeStamp(cJSON *root);
-
-typedef void (*pStatusFunc)(cJSON *root);
-
 typedef struct {
 	uint32_t bit;
-	pStatusFunc pFunc;
+	StatusProvider &stat;
 } status_func_t;
 
+static void addTimeStamp(cJSON *root);
+
+FirmwareStatus firm;
+HardwareStatus hard;
+
 status_func_t status_func[] = { //
-		{ STATUS_EVENT_FIRMWARE, addFirmwareStatus },//
-		{ STATUS_EVENT_HARDWARE, addHardwareStatus },//
-		{ STATUS_EVENT_CONTROL, addChannelStatus },
-		{ STATUS_EVENT_SENSOR, addSHT1xStatus }};
+		{ STATUS_EVENT_FIRMWARE, firm },//
+		{ STATUS_EVENT_HARDWARE, hard },//
+		{ STATUS_EVENT_CONTROL, channel },
+		{ STATUS_EVENT_SENSOR, sht1x }};
 
 
 void status_task_setup(void) {
@@ -71,8 +70,8 @@ void status_task(void* pvParameters) {
 					//
 					for (size_t i = 0; i < (sizeof(status_func) / sizeof(status_func[0])); i++) {
 						//at least one is set, so send all status
-						if (status_func[i].pFunc != NULL && (bits & status_func[i].bit)) {
-							status_func[i].pFunc(pRoot);
+						if ((bits & status_func[i].bit)) {
+							status_func[i].stat.addStatus(pRoot);
 						}
 					}
 
@@ -105,75 +104,7 @@ void status_task(void* pvParameters) {
 	vTaskDelete(NULL);
 }
 
-void addFirmwareStatus(cJSON *root) {
-	if (root == NULL) {
-		return;
-	}
-
-	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "firmware");
-	if (pcjsonfirm == NULL) {
-		return;
-	}
-#if (1)
-	if (cJSON_AddStringToObject(pcjsonfirm, "date", __DATE__) == NULL) {
-		return;
-	}
-
-	if (cJSON_AddStringToObject(pcjsonfirm, "time", __TIME__) == NULL) {
-		return;
-	}
-	if (cJSON_AddStringToObject(pcjsonfirm, "version", PROJECT_GIT) == NULL) {
-		return;
-	}
-	if (cJSON_AddStringToObject(pcjsonfirm, "idf", esp_get_idf_version()) == NULL) {
-		return;
-	}
-
-#else
-	if (cJSON_AddStringToObject(pcjsonfirm, "name", esp_ota_get_app_description()->project_name) == NULL) {
-		return;
-	}
-
-	if (cJSON_AddStringToObject(pcjsonfirm, "version", esp_ota_get_app_description()->version) == NULL) {
-		return;
-	}
-
-	if (cJSON_AddStringToObject(pcjsonfirm, "date", esp_ota_get_app_description()->date) == NULL) {
-		return;
-	}
-
-	if (cJSON_AddStringToObject(pcjsonfirm, "time", esp_ota_get_app_description()->time) == NULL) {
-		return;
-	}
-#endif
-
-	return;
-}
-
-void addHardwareStatus(cJSON *root) {
-	if (root == NULL) {
-		return;
-	}
-
-	esp_chip_info_t chip_info;
-	esp_chip_info(&chip_info);
-
-	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "hardware");
-	if (pcjsonfirm == NULL) {
-		return;
-	}
-	if (cJSON_AddNumberToObject(pcjsonfirm, "cores", chip_info.cores) == NULL) {
-		return;
-	}
-
-	if (cJSON_AddNumberToObject(pcjsonfirm, "rev", chip_info.revision) == NULL) {
-		return;
-	}
-
-	return;
-}
-
-void addTimeStamp(cJSON *root) {
+static void addTimeStamp(cJSON *root) {
 	if (root == NULL) {
 		return;
 	}
@@ -202,4 +133,86 @@ void addTimeStamp(cJSON *root) {
 	}
 
 	return;
+}
+
+FirmwareStatus::~FirmwareStatus() {
+}
+
+bool FirmwareStatus::hasUpdate() {
+	return false;
+}
+
+void FirmwareStatus::addStatus(cJSON* root) {
+	if (root == NULL) {
+			return;
+		}
+
+		cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "firmware");
+		if (pcjsonfirm == NULL) {
+			return;
+		}
+	#if (1)
+		if (cJSON_AddStringToObject(pcjsonfirm, "date", __DATE__) == NULL) {
+			return;
+		}
+
+		if (cJSON_AddStringToObject(pcjsonfirm, "time", __TIME__) == NULL) {
+			return;
+		}
+		if (cJSON_AddStringToObject(pcjsonfirm, "version", PROJECT_GIT) == NULL) {
+			return;
+		}
+		if (cJSON_AddStringToObject(pcjsonfirm, "idf", esp_get_idf_version()) == NULL) {
+			return;
+		}
+
+	#else
+		if (cJSON_AddStringToObject(pcjsonfirm, "name", esp_ota_get_app_description()->project_name) == NULL) {
+			return;
+		}
+
+		if (cJSON_AddStringToObject(pcjsonfirm, "version", esp_ota_get_app_description()->version) == NULL) {
+			return;
+		}
+
+		if (cJSON_AddStringToObject(pcjsonfirm, "date", esp_ota_get_app_description()->date) == NULL) {
+			return;
+		}
+
+		if (cJSON_AddStringToObject(pcjsonfirm, "time", esp_ota_get_app_description()->time) == NULL) {
+			return;
+		}
+	#endif
+
+		return;
+}
+
+HardwareStatus::~HardwareStatus() {
+}
+
+bool HardwareStatus::hasUpdate() {
+	return false;
+}
+
+void HardwareStatus::addStatus(cJSON* root) {
+	if (root == NULL) {
+			return;
+		}
+
+		esp_chip_info_t chip_info;
+		esp_chip_info(&chip_info);
+
+		cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "hardware");
+		if (pcjsonfirm == NULL) {
+			return;
+		}
+		if (cJSON_AddNumberToObject(pcjsonfirm, "cores", chip_info.cores) == NULL) {
+			return;
+		}
+
+		if (cJSON_AddNumberToObject(pcjsonfirm, "rev", chip_info.revision) == NULL) {
+			return;
+		}
+
+		return;
 }

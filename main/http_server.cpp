@@ -29,6 +29,7 @@
 #include "mqtt_user_ota.h"
 
 #include "esp_https_server.h"
+#include "status.h"
 #include "controlTask.h"
 #include "config.h"
 

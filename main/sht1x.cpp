@@ -28,7 +28,7 @@
 static const char *TAG = "I2C";
 static const int _us = 20;
 
-Sht1x *psht1x_handle = NULL;
+Sht1x sht1x(GPIO_NUM_21, GPIO_NUM_22);
 SemaphoreHandle_t sem;
 
 float Sht1x::readSHT1xTemp() {
@@ -218,18 +218,18 @@ esp_err_t Sht1x::readSHT1xReg16(uint8_t reg, uint16_t *pData) {
 	return ret;
 }
 
-void addSHT1xStatus(cJSON *root) {
-
-	const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;
-
-	if (psht1x_handle != NULL && xSemaphoreTake( sem, xTicksToWait) == pdTRUE) {
-
-		psht1x_handle->addStatus(root);
-
-		xSemaphoreGive(sem);
-	}
-	return;
-}
+//void addSHT1xStatus(cJSON *root) {
+//
+//	const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;
+//
+//	if (psht1x_handle != NULL && xSemaphoreTake( sem, xTicksToWait) == pdTRUE) {
+//
+//		psht1x_handle->addStatus(root);
+//
+//		xSemaphoreGive(sem);
+//	}
+//	return;
+//}
 
 void sht1x_task(void *pvParameters) {
 	Sht1x *pHandle = (Sht1x*) pvParameters;
@@ -258,7 +258,6 @@ void sht1x_task(void *pvParameters) {
 }
 
 void setupSHT1xTask(void) {
-	static Sht1x sht1x_handle(GPIO_NUM_21, GPIO_NUM_22);
 
 	gpio_config_t io_conf;
 	io_conf.intr_type = GPIO_INTR_DISABLE;
@@ -281,9 +280,7 @@ void setupSHT1xTask(void) {
 			xSemaphoreGive(sem);
 		}
 
-		psht1x_handle = &sht1x_handle;
-
-		xTaskCreate(&sht1x_task, "sht1x_task", 2048, &sht1x_handle, 5, NULL);
+		xTaskCreate(&sht1x_task, "sht1x_task", 2048, &sht1x, 5, NULL);
 	}
 }
 

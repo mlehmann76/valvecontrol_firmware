@@ -65,7 +65,7 @@ private:
 	bool m_error;
 };
 
-
+extern Sht1x sht1x;
 
 #ifdef __cplusplus
 }
