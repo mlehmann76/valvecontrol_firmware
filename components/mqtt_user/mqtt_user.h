@@ -12,8 +12,6 @@
 extern "C" {
 #endif
 
-extern EventGroupHandle_t main_event_group;
-
 typedef int (*pOnMessageFunc)(const char *, esp_mqtt_event_handle_t);
 
 typedef struct {

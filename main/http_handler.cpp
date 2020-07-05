@@ -11,8 +11,7 @@
 
 #include "sdkconfig.h"
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "TaskCPP.h"
 #include "freertos/event_groups.h"
 #include "freertos/queue.h"
 #include "esp_system.h"
@@ -318,7 +317,7 @@ esp_err_t _command_handler(httpd_req_t *req) {
 	cJSON *command_str = cJSON_GetObjectItem(root, "channel");
 
 	if (command_str != NULL) {
-		handleChannelControl(command_str);
+		//handleChannelControl(command_str);
 	}
 
 	cJSON_Delete(root);

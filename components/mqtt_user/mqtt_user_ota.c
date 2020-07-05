@@ -34,6 +34,7 @@
 #define TAG "OTA"
 
 extern QueueHandle_t otaQueue;
+extern EventGroupHandle_t main_event_group;
 
 static mbedtls_md5_context ctx;
 static decode_t decodeCtx;

@@ -6,8 +6,7 @@
  */
 
 #include <time.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "TaskCPP.h"
 #include "freertos/queue.h"
 #include "freertos/event_groups.h"
 #include "freertos/semphr.h"
@@ -30,81 +29,9 @@
 
 #define TAG "status"
 
-EventGroupHandle_t status_event_group;
+extern QueueHandle_t pubQueue;
 
-typedef struct {
-	uint32_t bit;
-	StatusProvider &stat;
-} status_func_t;
-
-static void addTimeStamp(cJSON *root);
-
-FirmwareStatus firm;
-HardwareStatus hard;
-
-status_func_t status_func[] = { //
-		{ STATUS_EVENT_FIRMWARE, firm },//
-		{ STATUS_EVENT_HARDWARE, hard },//
-		{ STATUS_EVENT_CONTROL, channel },
-		{ STATUS_EVENT_SENSOR, sht1x }};
-
-
-void status_task_setup(void) {
-	status_event_group = xEventGroupCreate();
-	xTaskCreate(&status_task, "status_task", 2048, NULL, 5, NULL);
-}
-
-void status_task(void* pvParameters) {
-	EventBits_t bits;
-	while (1) {
-		if ((status_event_group != NULL) && (main_event_group != NULL)) {
-
-			if (((xEventGroupGetBits(main_event_group) & (CONNECTED_BIT | MQTT_CONNECTED_BIT | MQTT_OTA_BIT))
-					== (CONNECTED_BIT | MQTT_CONNECTED_BIT))
-					&& ((bits = xEventGroupGetBits(status_event_group)) != 0)) {
-
-				cJSON *pRoot = cJSON_CreateObject();
-				if (pRoot != NULL) {
-					//
-					addTimeStamp(pRoot);
-					//
-					for (size_t i = 0; i < (sizeof(status_func) / sizeof(status_func[0])); i++) {
-						//at least one is set, so send all status
-						if ((bits & status_func[i].bit)) {
-							status_func[i].stat.addStatus(pRoot);
-						}
-					}
-
-					xEventGroupClearBits(status_event_group, bits);
-
-					char *string = cJSON_Print(pRoot);
-					if (string == NULL) {
-						ESP_LOGI(TAG, "Failed to print channel.");
-						return;
-					}
-
-					message_t message = { .pTopic = (char*) mqtt.getPubMsg(), .pData = string, .topic_len = 0, .data_len =
-							strlen(string) };
-
-					if ( xQueueSendToBack(pubQueue, &message, 10) != pdPASS) {
-						// Failed to post the message, even after 10 ticks.
-						ESP_LOGI(TAG, "pubqueue post failure");
-						free(string);
-					}
-
-
-					cJSON_Delete(pRoot);
-					/* reduce frequency by waiting some time*/
-					vTaskDelay(500 / portTICK_PERIOD_MS);
-				}
-			}
-		}
-		vTaskDelay(10 / portTICK_PERIOD_MS);
-	}
-	vTaskDelete(NULL);
-}
-
-static void addTimeStamp(cJSON *root) {
+void StatusTask::addTimeStamp(cJSON *root) {
 	if (root == NULL) {
 		return;
 	}
@@ -115,7 +42,6 @@ static void addTimeStamp(cJSON *root) {
 	localtime_r(&now, &timeinfo);
 	char strftime_buf[64];
 	localtime_r(&now, &timeinfo);
-
 
 	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "datetime");
 	if (pcjsonfirm == NULL) {
@@ -139,34 +65,39 @@ FirmwareStatus::~FirmwareStatus() {
 }
 
 bool FirmwareStatus::hasUpdate() {
-	return false;
+	bool ret = false;
+	if(m_sem.take(10)) {
+		ret = m_update;
+		m_sem.give();
+	}
+	return ret;
 }
 
-void FirmwareStatus::addStatus(cJSON* root) {
+void FirmwareStatus::addStatus(cJSON *root) {
 	if (root == NULL) {
-			return;
-		}
+		return;
+	}
 
-		cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "firmware");
-		if (pcjsonfirm == NULL) {
-			return;
-		}
-	#if (1)
-		if (cJSON_AddStringToObject(pcjsonfirm, "date", __DATE__) == NULL) {
-			return;
-		}
+	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "firmware");
+	if (pcjsonfirm == NULL) {
+		return;
+	}
+#if (1)
+	if (cJSON_AddStringToObject(pcjsonfirm, "date", __DATE__) == NULL) {
+		return;
+	}
 
-		if (cJSON_AddStringToObject(pcjsonfirm, "time", __TIME__) == NULL) {
-			return;
-		}
-		if (cJSON_AddStringToObject(pcjsonfirm, "version", PROJECT_GIT) == NULL) {
-			return;
-		}
-		if (cJSON_AddStringToObject(pcjsonfirm, "idf", esp_get_idf_version()) == NULL) {
-			return;
-		}
+	if (cJSON_AddStringToObject(pcjsonfirm, "time", __TIME__) == NULL) {
+		return;
+	}
+	if (cJSON_AddStringToObject(pcjsonfirm, "version", PROJECT_GIT) == NULL) {
+		return;
+	}
+	if (cJSON_AddStringToObject(pcjsonfirm, "idf", esp_get_idf_version()) == NULL) {
+		return;
+	}
 
-	#else
+#else
 		if (cJSON_AddStringToObject(pcjsonfirm, "name", esp_ota_get_app_description()->project_name) == NULL) {
 			return;
 		}
@@ -184,35 +115,106 @@ void FirmwareStatus::addStatus(cJSON* root) {
 		}
 	#endif
 
-		return;
+	return;
 }
 
 HardwareStatus::~HardwareStatus() {
 }
 
 bool HardwareStatus::hasUpdate() {
-	return false;
+	bool ret = false;
+	if(m_sem.take(10)) {
+		ret = m_update;
+		m_sem.give();
+	}
+	return ret;
 }
 
-void HardwareStatus::addStatus(cJSON* root) {
+void HardwareStatus::addStatus(cJSON *root) {
 	if (root == NULL) {
-			return;
-		}
-
-		esp_chip_info_t chip_info;
-		esp_chip_info(&chip_info);
-
-		cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "hardware");
-		if (pcjsonfirm == NULL) {
-			return;
-		}
-		if (cJSON_AddNumberToObject(pcjsonfirm, "cores", chip_info.cores) == NULL) {
-			return;
-		}
-
-		if (cJSON_AddNumberToObject(pcjsonfirm, "rev", chip_info.revision) == NULL) {
-			return;
-		}
-
 		return;
+	}
+
+	esp_chip_info_t chip_info;
+	esp_chip_info(&chip_info);
+
+	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "hardware");
+	if (pcjsonfirm == NULL) {
+		return;
+	}
+	if (cJSON_AddNumberToObject(pcjsonfirm, "cores", chip_info.cores) == NULL) {
+		return;
+	}
+
+	if (cJSON_AddNumberToObject(pcjsonfirm, "rev", chip_info.revision) == NULL) {
+		return;
+	}
+
+	return;
 }
+
+StatusTask::StatusTask(EventGroupHandle_t &main) :
+		TaskClass("status", TaskPrio_HMI, 2048), m_statusFunc(), m_statusFuncCount(0), main_event_group(&main) {
+}
+
+void StatusTask::task() {
+	while (1) {
+		if ((*main_event_group != NULL)) {
+			bool needUpdate = false;
+			for (size_t i = 0; i < (m_statusFuncCount); i++) {
+				if (m_statusFunc[i]->hasUpdate()) {
+					needUpdate = true;
+					break;
+				}
+			}
+
+			if (((xEventGroupGetBits(*main_event_group) & (CONNECTED_BIT | MQTT_CONNECTED_BIT | MQTT_OTA_BIT))
+					== (CONNECTED_BIT | MQTT_CONNECTED_BIT))
+					&& needUpdate) {
+
+
+				cJSON *pRoot = cJSON_CreateObject();
+				if (pRoot != NULL) {
+					//
+					addTimeStamp(pRoot);
+					//
+					for (size_t i = 0; i < (m_statusFuncCount); i++) {
+						//at least one is set, so send all status
+						if (m_statusFunc[i]->hasUpdate()) {
+							m_statusFunc[i]->addStatus(pRoot);
+							m_statusFunc[i]->setUpdate(false);
+						}
+					}
+
+					char *string = cJSON_Print(pRoot);
+					if (string == NULL) {
+						ESP_LOGI(TAG, "Failed to print channel.");
+						return;
+					}
+
+					message_t message = { .pTopic = (char*) mqtt.getPubMsg(), .pData = string, .topic_len = 0,
+							.data_len = strlen(string) };
+
+					if ( xQueueSendToBack(pubQueue, &message, 10) != pdPASS) {
+						// Failed to post the message, even after 10 ticks.
+						ESP_LOGI(TAG, "pubqueue post failure");
+						free(string);
+					}
+
+					cJSON_Delete(pRoot);
+					/* reduce frequency by waiting some time*/
+					vTaskDelay(500 / portTICK_PERIOD_MS);
+				}
+			}
+		}
+		vTaskDelay(10 / portTICK_PERIOD_MS);
+	}
+}
+
+void StatusTask::addProvider(StatusProvider& _stat) {
+	if (m_statusFuncCount < (sizeof(m_statusFunc)/sizeof(*m_statusFunc))) {
+		m_statusFunc[m_statusFuncCount] = &_stat;
+		m_statusFuncCount++;
+	}
+}
+

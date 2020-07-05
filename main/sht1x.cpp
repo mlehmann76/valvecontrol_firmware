@@ -10,8 +10,7 @@
 
 #include "sdkconfig.h"
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "TaskCPP.h"
 #include "freertos/event_groups.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
@@ -28,8 +27,20 @@
 static const char *TAG = "I2C";
 static const int _us = 20;
 
-Sht1x sht1x(GPIO_NUM_21, GPIO_NUM_22);
-SemaphoreHandle_t sem;
+Sht1x::Sht1x(gpio_num_t _sda, gpio_num_t _scl) :
+		TaskClass("sht1x", TaskPrio_HMI, 2048), i2c_gpio_sda(_sda), i2c_gpio_scl(_scl), m_error(false), m_update(false), m_sem(
+				"sht1x") {
+	gpio_config_t io_conf;
+	io_conf.intr_type = GPIO_INTR_DISABLE;
+	io_conf.mode = GPIO_MODE_INPUT_OUTPUT_OD;
+	io_conf.pin_bit_mask = (1 << GPIO_NUM_21) | (1 << GPIO_NUM_22);
+	io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+	io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
+
+	gpio_config(&io_conf);
+	gpio_set_level(GPIO_NUM_21, 1);
+	gpio_set_level(GPIO_NUM_22, 1);
+}
 
 float Sht1x::readSHT1xTemp() {
 	static const float d1 = -40.1;
@@ -89,11 +100,16 @@ void Sht1x::reset() {
 }
 
 bool Sht1x::hasUpdate() {
-	return false;
+	bool ret = false;
+	if(m_sem.take(10)) {
+		ret = m_update;
+		m_sem.give();
+	}
+	return ret;
 }
 
 void Sht1x::addStatus(cJSON *root) {
-	if (root != NULL) {
+	if (root != NULL && m_sem.take(10)) {
 		char buf[16];
 		cJSON *channel = cJSON_AddObjectToObject(root, "sensors");
 		if (channel != NULL) {
@@ -106,9 +122,9 @@ void Sht1x::addStatus(cJSON *root) {
 				cJSON_AddStringToObject(channelv, "status", hasError() ? "err" : "ok");
 			}
 		}
+		m_sem.give();
 	}
 }
-
 
 void Sht1x::_sda_(int lvl) {
 	gpio_set_level(i2c_gpio_sda, lvl ? 1 : 0);
@@ -218,69 +234,21 @@ esp_err_t Sht1x::readSHT1xReg16(uint8_t reg, uint16_t *pData) {
 	return ret;
 }
 
-//void addSHT1xStatus(cJSON *root) {
-//
-//	const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;
-//
-//	if (psht1x_handle != NULL && xSemaphoreTake( sem, xTicksToWait) == pdTRUE) {
-//
-//		psht1x_handle->addStatus(root);
-//
-//		xSemaphoreGive(sem);
-//	}
-//	return;
-//}
-
-void sht1x_task(void *pvParameters) {
-	Sht1x *pHandle = (Sht1x*) pvParameters;
+void Sht1x::task() {
 	while (1) {
-		if (1) {
-			//block till data was processed by ota task
-			const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;
-			if ((sem != NULL) && xSemaphoreTake( sem, xTicksToWait) == pdTRUE) {
-				if (pHandle->hasError()) {
-					pHandle->reset();
-					vTaskDelay(20 / portTICK_PERIOD_MS);
-				} else {
+		//block till data was processed by ota task
+		const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;
+		if (m_sem.take(xTicksToWait) == pdTRUE) {
+			if (hasError()) {
+				reset();
+				vTaskDelay(20 / portTICK_PERIOD_MS);
+			} else {
 
-					if (status_event_group != NULL) {
-						xEventGroupSetBits(status_event_group, STATUS_EVENT_SENSOR);
-					}
-				}
-				xSemaphoreGive(sem);
+				m_update = true;
 			}
-			vTaskDelay(60000 / portTICK_PERIOD_MS);
-		} else {
-			vTaskDelay(10000 / portTICK_PERIOD_MS);
+			m_sem.give();
 		}
-	}
-	vTaskDelete(NULL);
-}
-
-void setupSHT1xTask(void) {
-
-	gpio_config_t io_conf;
-	io_conf.intr_type = GPIO_INTR_DISABLE;
-	io_conf.mode = GPIO_MODE_INPUT_OUTPUT_OD;
-	io_conf.pin_bit_mask = (1 << GPIO_NUM_21) | (1 << GPIO_NUM_22);
-	io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-	io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
-
-	gpio_config(&io_conf);
-	gpio_set_level(GPIO_NUM_21, 1);
-	gpio_set_level(GPIO_NUM_22, 1);
-
-	if (sensorConfig.isSHT1xEnabled()) {
-
-		sem = xSemaphoreCreateBinary();
-
-		if (sem == NULL) {
-			ESP_LOGE(TAG, "error creating semaphore");
-		} else {
-			xSemaphoreGive(sem);
-		}
-
-		xTaskCreate(&sht1x_task, "sht1x_task", 2048, &sht1x, 5, NULL);
+		vTaskDelay(60000 / portTICK_PERIOD_MS);
 	}
 }
 

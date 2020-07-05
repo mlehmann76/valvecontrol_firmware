@@ -8,7 +8,7 @@
 #
 $(eval GIT_BRANCH=$(shell git describe --tags))
 
-COMPONENT_ADD_INCLUDEDIRS := . ../components/mqtt_user ../components/jsonconfig
+COMPONENT_ADD_INCLUDEDIRS := . ../components/mqtt_user ../components/jsonconfig ../components/FreeRTOScpp
 COMPONENT_SRCDIRS := $(COMPONENT_ADD_INCLUDEDIRS)
 CPPFLAGS += -DPROJECT_GIT='"'$(GIT_BRANCH)'"'
 COMPONENT_EMBED_TXTFILES := config.json

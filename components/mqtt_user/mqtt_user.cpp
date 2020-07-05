@@ -15,7 +15,6 @@
 #include "freertos/event_groups.h"
 #include "freertos/queue.h"
 
-#include "esp_log.h"
 #include "cJSON.h"
 
 #include "mqtt_client.h"
@@ -24,6 +23,8 @@
 #include "config.h"
 #include "config_user.h"
 
+#include "esp_log.h"
+
 static const char *TAG = "MQTTS";
 static esp_mqtt_client_handle_t client = NULL;
 static messageHandler_t* messageHandle[8] = { 0 };
@@ -31,6 +32,7 @@ static bool isMqttConnected = false;
 static bool isMqttInit = false;
 
 QueueHandle_t pubQueue, otaQueue;
+extern EventGroupHandle_t main_event_group;
 
 static void mqtt_message_handler(esp_mqtt_event_handle_t event);
 static void handleFirmwareMsg(cJSON* firmware);
@@ -247,13 +249,13 @@ void mqtt_user_init(void) {
 	pubQueue = xQueueCreate(10, sizeof(message_t));
 	if (pubQueue == 0) {
 		// Queue was not created and must not be used.
-		ESP_LOGI(TAG, "pubqueue init failure");
+		ESP_LOGE(TAG, "pubqueue init failure");
 	}
 
 	otaQueue = xQueueCreate(2, sizeof(md5_update_t));
 	if (otaQueue == 0) {
 		// Queue was not created and must not be used.
-		ESP_LOGI(TAG, "otaQueue init failure");
+		ESP_LOGE(TAG, "otaQueue init failure");
 	}
 
 	esp_mqtt_client_config_t mqtt_cfg;
@@ -274,8 +276,12 @@ void mqtt_user_init(void) {
 }
 
 void mqtt_connect(void) {
-	if (client != NULL)
+	if (client != NULL) {
+		ESP_LOGE(TAG,"starting client");
 		esp_mqtt_client_start(client);
+	} else {
+		ESP_LOGE(TAG,"mqtt connect failed, client not initialized");
+	}
 }
 
 void mqtt_disconnect(void) {
@@ -291,6 +297,9 @@ int mqtt_user_addHandler(messageHandler_t *pHandle) {
 			ret = 1;
 			break;
 		}
+	}
+	if (ret) {
+		ESP_LOGD(TAG, "added mqtt handler %s", pHandle->handlerName);
 	}
 	return ret;
 }

@@ -8,10 +8,7 @@
 #ifndef MAIN_SHT1X_H_
 #define MAIN_SHT1X_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+#include "status.h"
 #include "hal/gpio_types.h"
 
 #define SHT1X_MEASURE_TEMP 0x03
@@ -30,13 +27,11 @@ extern "C" {
 #define ACK_VAL 0x1                 /*!< I2C ack value */
 #define NACK_VAL 0x0                /*!< I2C nack value */
 
-void setupSHT1xTask(void);
-void addSHT1xStatus(cJSON *root);
 
-class Sht1x : public StatusProvider {
+class Sht1x : public StatusProvider, public TaskClass {
 public:
 
-	Sht1x(gpio_num_t _sda, gpio_num_t _scl) : i2c_gpio_sda(_sda), i2c_gpio_scl(_scl), m_error(false) {}
+	Sht1x(gpio_num_t _sda, gpio_num_t _scl);
 	float readSHT1xTemp();
 	float readSHT1xHum();
 	bool hasError() const {return m_error; }
@@ -44,6 +39,9 @@ public:
 	//
 	virtual bool hasUpdate();
 	virtual void addStatus(cJSON *);
+	void setUpdate(bool _up) { m_sem.take(); m_update = _up; m_sem.give();}
+	//
+	virtual void task();
 	//
 private:
 	void delay_usec(int64_t usec) {
@@ -63,13 +61,8 @@ private:
 	gpio_num_t i2c_gpio_sda;
 	gpio_num_t i2c_gpio_scl;
 	bool m_error;
+	bool m_update;
+	Semaphore m_sem;
 };
 
-extern Sht1x sht1x;
-
-#ifdef __cplusplus
-}
-
-
-#endif
 #endif /* MAIN_SHT1X_H_ */

@@ -1,9 +1,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-//#include "sdkconfig.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "TaskCPP.h"
 #include "freertos/event_groups.h"
 #include "freertos/queue.h"
 #include "esp_system.h"
@@ -61,9 +59,17 @@ void app_main();
 #ifdef __cplusplus
 }
 #endif
-/* FreeRTOS event group to signal when we are connected & ready to make a request */
+/**/
+extern messageHandler_t controlHandler;
+/**/
 EventGroupHandle_t main_event_group;
 httpd_handle_t server_handle;
+/**/
+GpioTask channel(main_event_group);
+StatusTask status(main_event_group);
+FirmwareStatus firm;
+HardwareStatus hard;
+Sht1x sht1x(GPIO_NUM_21, GPIO_NUM_22);
 
 #pragma GCC diagnostic pop
 static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
@@ -173,9 +179,9 @@ static void got_ip_event_handler(void *arg, esp_event_base_t event_base, int32_t
 	case IP_EVENT_STA_GOT_IP:
 		ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
 		xEventGroupSetBits(main_event_group, CONNECTED_BIT);
-		if (status_event_group != NULL) {
-			xEventGroupSetBits(status_event_group, STATUS_EVENT_FIRMWARE | STATUS_EVENT_HARDWARE);
-		}
+
+		firm.setUpdate(true);
+		hard.setUpdate(true);
 
 		/* Start the web server */
 		if (*server == NULL) {
@@ -232,7 +238,6 @@ void wifi_init_sta(void *param) {
 		case w_connected:
 			if (!isConnected) {
 				if (timeout == 0) {
-
 					ESP_LOGI(TAG, "wifi_init_sta stop sta");
 					ESP_ERROR_CHECK(esp_wifi_stop());
 					ESP_LOGI(TAG, "wifi_init_sta deinit sta");
@@ -316,22 +321,9 @@ void spiffsInit(void) {
 
 void app_main() {
 	esp_log_level_set("phy_init", ESP_LOG_ERROR);
-	esp_log_level_set("MQTT_CLIENT", ESP_LOG_ERROR);
-	esp_log_level_set("HTTP", ESP_LOG_VERBOSE);
-	esp_log_level_set("JSON", ESP_LOG_VERBOSE);
+	esp_log_level_set("wifi", ESP_LOG_ERROR);
 
 	static httpd_handle_t server = NULL;
-
-	/* Initialize NVS — it is used to store PHY calibration data */
-	esp_err_t ret = nvs_flash_init();
-	if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
-		ESP_ERROR_CHECK(nvs_flash_erase());
-		ret = nvs_flash_init();
-	}
-	ESP_ERROR_CHECK(ret);
-
-	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-	xTaskCreate(wifi_init_sta, "wifi init task", 4096, &server, 10, NULL);
 
 	spiffsInit();
 
@@ -339,14 +331,19 @@ void app_main() {
 	mqtt.init();
 	chanConfig.init();
 	sensorConfig.init();
-
 	sntp_support();
-	status_task_setup();
-	gpio_task_setup();
-	setupSHT1xTask();
+	channel.setup();
+
+	status.addProvider(firm);
+	status.addProvider(hard);
+	status.addProvider(channel);
+	status.addProvider(sht1x);
 
 	mqtt_user_init();
 	mqtt_user_addHandler(&controlHandler);
+
+	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
+	xTaskCreate(wifi_init_sta, "wifi init task", 4096, &server, 10, NULL);
 
 	ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
 
