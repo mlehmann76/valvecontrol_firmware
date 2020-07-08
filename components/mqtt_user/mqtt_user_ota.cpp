@@ -22,6 +22,7 @@
 #include "freertos/semphr.h"
 
 #include "cJSON.h"
+#include "config.h"
 #include "mqtt_client.h"
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
@@ -44,10 +45,12 @@ static QueueHandle_t dataQueue;
 ota_state_t ota_state = OTA_IDLE;
 SemaphoreHandle_t xSemaphore = NULL;
 
+/* FIXME
 messageHandler_t mqttOtaHandler = { //
 		.topicName = "/ota/$implementation/binary",//
 		.onMessage = handleOtaMessage,//
 		"ota event" };
+*/
 
 static void __attribute__((noreturn)) task_fatal_error() {
 	ESP_LOGE(TAG, "Exiting task due to fatal error...");
@@ -155,7 +158,7 @@ void mqtt_ota_task(void *pvParameters) {
 
 	for (;;) {
 		if (otaQueue != NULL) {
-			md5_update_t rxData = { 0 };
+			md5_update_t rxData = { {0}, 0 };
 			// Receive a message on the created queue.  Block for 10 ticks if a
 			// message is not immediately available.
 			const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;

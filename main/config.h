@@ -13,20 +13,36 @@
 
 namespace Config {
 
-class configBase {
+class ParseHandler {
+public:
+	ParseHandler(const char *_name) : m_name(_name), m_next() {}
+	virtual ~ParseHandler() {	}
+	virtual int parse(const char*) = 0;
+	const char* name() const {
+		return m_name;
+	}
+	ParseHandler* setNext(ParseHandler *_handler) {
+		m_next = _handler;
+		return m_next;
+	}
+	ParseHandler* next() const {
+		return m_next;
+	}
 private:
+	const char *m_name;
+	ParseHandler *m_next;
+};
+
+
+class configBase: public ParseHandler {
 	static bool m_isInitialized;
 	static cJSON *pConfig;
-	esp_err_t readStr(nvs_handle *pHandle, const char *pName, char **dest);
-	esp_err_t writeStr(nvs_handle *pHandle, const char *pName, const char *str);
-	char* readJsonConfigStr(const cJSON *pRoot, const char *cfg, const char *section, const char *name) ;
 public:
-	configBase();
-	virtual esp_err_t init();
+	configBase(const char *_name);
 	virtual ~configBase();
-	virtual char* stringify() = 0;
-	virtual void parse(const char*);
-	esp_err_t readConfig(const char *section, const char *name, char **dest) ;
+	virtual esp_err_t init();
+	virtual char* stringify();
+	virtual int parse(const char*);
 	char* readString(const char *section, const char *name);
 	const cJSON* getRoot() const {
 		return pConfig;
@@ -34,19 +50,27 @@ public:
 	bool isInitialized() const {
 		return m_isInitialized;
 	}
+
+protected:
 	void merge(const cJSON*);
 	void debug();
-protected:
-	nvs_handle_t my_handle;
 	char *m_string;
+private:
+	esp_err_t readStr(nvs_handle *pHandle, const char *pName, char **dest);
+	esp_err_t writeStr(nvs_handle *pHandle, const char *pName, const char *str);
+	esp_err_t readConfig(const char *section, const char *name, char **dest);
+	char* readJsonConfigStr(const cJSON *pRoot, const char *cfg, const char *section, const char *name);
+	nvs_handle_t my_handle;
 };
 
-class SysConfig: protected configBase {
+class SysConfig: public configBase {
 public:
-	virtual esp_err_t init() {
-		return ESP_OK;
+	SysConfig() :
+			configBase("system") {
 	}
-	virtual char* stringify();
+
+	virtual int parse(const char*);
+
 	const char* getUser() {
 		return readString("system", "user");
 	}
@@ -62,12 +86,17 @@ public:
 private:
 };
 
-class MqttConfig: protected configBase {
+class MqttConfig: public configBase {
 	static const char MQTT_PUB_MESSAGE_FORMAT[];
+	static const size_t MAX_DEVICE_NAME = 32;
 
 public:
+	MqttConfig() :
+			configBase("mqtt") {
+	}
 	virtual esp_err_t init();
-	virtual char* stringify();
+
+	virtual int parse(const char*);
 
 	const char* getSubMsg() {
 		return mqtt_sub_msg;
@@ -101,37 +130,39 @@ private:
 	char *MQTT_DEVICE = (char*) "esp32/";
 };
 
-class ChannelConfig: protected configBase {
+class ChannelConfig: public configBase {
 public:
 	ChannelConfig();
 	virtual esp_err_t init();
-	virtual char* stringify();
+	virtual int parse(const char*);
 	const char* getName(unsigned ch);
 	const char* getAlt(unsigned ch);
 	bool isEnabled(unsigned ch);
 	unsigned getTime(unsigned ch);
-	unsigned count() const { return m_channelCount; }
+	unsigned count() const {
+		return m_channelCount;
+	}
 private:
-	const cJSON* getItem(unsigned ch, const char* item);
+	const cJSON* getItem(unsigned ch, const char *item);
 	unsigned m_channelCount;
 };
 
-class SensorConfig: protected configBase {
+class SensorConfig: public configBase {
 public:
 	SensorConfig();
 	virtual esp_err_t init();
-	virtual char* stringify();
+	virtual int parse(const char*);
 	bool isSHT1xEnabled();
 private:
-	const cJSON* getItem(const char *name, const char* item);
+	const cJSON* getItem(const char *name, const char *item);
 	unsigned m_sensorCount;
 };
 
 } /* namespace Config */
 
-extern Config::MqttConfig mqtt;
-extern Config::SysConfig sys;
-extern Config::ChannelConfig chanConfig;
-extern Config::SensorConfig sensorConfig;
+extern Config::MqttConfig mqttConf;
+extern Config::SysConfig sysConf;
+extern Config::ChannelConfig chanConf;
+extern Config::SensorConfig sensorConf;
 
 #endif /* MAIN_CONFIG_H_ */

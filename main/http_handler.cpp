@@ -196,8 +196,8 @@ esp_err_t _get_handler(httpd_req_t *req)
     	buf = (char*)malloc(buf_len);
 		/* Copy null terminated value string into buffer */
 		if (httpd_req_get_hdr_value_str(req, AUTHORIZATION_HEADER, buf, buf_len) == ESP_OK) {
-			const char *pUser = sys.getUser();
-			const char *pPass = sys.getPass();
+			const char *pUser = sysConf.getUser();
+			const char *pPass = sysConf.getPass();
 			if(authenticate(buf, buf_len, pUser, pPass) == ESP_OK) {
 
 			} else {

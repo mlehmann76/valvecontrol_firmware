@@ -192,7 +192,7 @@ void StatusTask::task() {
 						return;
 					}
 
-					message_t message = { .pTopic = (char*) mqtt.getPubMsg(), .pData = string, .topic_len = 0,
+					message_t message = { .pTopic = (char*) mqttConf.getPubMsg(), .pData = string, .topic_len = 0,
 							.data_len = strlen(string) };
 
 					if ( xQueueSendToBack(pubQueue, &message, 10) != pdPASS) {

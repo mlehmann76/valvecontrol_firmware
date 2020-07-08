@@ -29,8 +29,8 @@ bool configBase::m_isInitialized = false;
 cJSON *configBase::pConfig = NULL;
 const char MqttConfig::MQTT_PUB_MESSAGE_FORMAT[] = "%s%02X%02X%02X%02X%02X%02X%s";
 
-configBase::configBase() :
-		my_handle(0), m_string(NULL) {
+configBase::configBase(const char *_name) :
+		ParseHandler(_name), m_string(), my_handle() {
 	m_isInitialized = false;
 }
 
@@ -103,7 +103,7 @@ esp_err_t configBase::readConfig(const char *section, const char *name, char **d
 	return ret != NULL ? ESP_OK : !ESP_OK;
 }
 
-char* configBase::readString(const char *section, const char *name){
+char* configBase::readString(const char *section, const char *name) {
 	char *ret;
 	readConfig(section, name, &ret);
 	return ret;
@@ -129,22 +129,33 @@ char* configBase::readJsonConfigStr(const cJSON *pRoot, const char *cfg, const c
 	return ret;
 }
 
-void configBase::parse(const char* value) {
-	cJSON *patch = cJSON_Parse(value);
-
-	if (patch != NULL) {
-		merge(patch);
-		cJSON_Delete(patch);
+int configBase::parse(const char *value) {
+	if (next() != NULL) {
+		return next()->parse(value);
+	} else {
+		return 0;
 	}
 }
 
-void configBase::merge(const cJSON* patch) {
+void configBase::merge(const cJSON *patch) {
 	pConfig = cJSONUtils_MergePatch(pConfig, patch);
+}
+
+char* configBase::stringify() {
+	if (m_string != NULL) {
+		free(m_string);
+		m_string = NULL;
+	}
+
+	cJSON *mqtt = cJSON_GetObjectItem(getRoot(), name());
+	m_string = cJSON_PrintUnformatted(mqtt);
+
+	return m_string;
 }
 
 void configBase::debug() {
 	char *out = cJSON_Print(pConfig);
-	ESP_LOGD(TAG, "debug: (%8X) %s ", (uint32_t)pConfig, out != NULL ? out : "error");
+	ESP_LOGD(TAG, "debug: (%8X) %s ", (uint32_t )pConfig, out != NULL ? out : "error");
 	free(out);
 }
 
@@ -159,9 +170,10 @@ esp_err_t MqttConfig::init() {
 	}
 	size_t required_size = 0;
 	/* read mqtt device name */
+	mqtt_device_name = readString("mqtt", "device");
 
-	if (ESP_OK == readConfig("mqtt", "device", &mqtt_device_name)) {
-		required_size = strlen(mqtt_device_name);		//TODO strlen is risky here
+	if (NULL != mqtt_device_name) {
+		required_size = strnlen(mqtt_device_name, MAX_DEVICE_NAME);
 	} else {
 		/* set default device name */
 		uint8_t mac[6] = { 0 };
@@ -185,31 +197,23 @@ esp_err_t MqttConfig::init() {
 	return ESP_OK;
 }
 
-char* MqttConfig::stringify() {
-	if (m_string != NULL) {
-		free(m_string);
-		m_string = NULL;
+int MqttConfig::parse(const char* value) {
+	int ret = 0;
+	cJSON *patch = cJSON_Parse(value);
+
+	if (patch != NULL && cJSON_GetObjectItem(patch, name())) {
+		/* test config */
+		merge(patch);
+		ret = 1;
+		cJSON_Delete(patch);
+	} else {
+		ret = configBase::parse(value);
 	}
-
-	cJSON *mqtt = cJSON_GetObjectItem(getRoot(), "mqtt");
-	m_string = cJSON_PrintUnformatted(mqtt);
-
-	return m_string;
+	return ret;
 }
 
-char* SysConfig::stringify() {
-	if (m_string != NULL) {
-		free(m_string);
-		m_string = NULL;
-	}
-
-	cJSON *mqtt = cJSON_GetObjectItem(getRoot(), "system");
-	m_string = cJSON_PrintUnformatted(mqtt);
-
-	return m_string;
-}
-
-ChannelConfig::ChannelConfig() : m_channelCount(0) {
+ChannelConfig::ChannelConfig() :
+		configBase("channels"), m_channelCount(0) {
 }
 
 esp_err_t ChannelConfig::init() {
@@ -218,29 +222,29 @@ esp_err_t ChannelConfig::init() {
 		ret = configBase::init();
 	}
 	cJSON *pChan = cJSON_GetObjectItem(getRoot(), "channels");
-	ESP_LOGD(TAG, "channels 0x%8X : isArray %d , Size %d",
-			(unsigned int)pChan,
-			pChan != NULL ? cJSON_IsArray(pChan) : false,
-			pChan != NULL ? cJSON_GetArraySize(pChan) : 0);
-	if (pChan != NULL  && cJSON_IsArray(pChan)) {
+	ESP_LOGD(TAG, "channels 0x%8X : isArray %d , Size %d", (unsigned int )pChan,
+			pChan != NULL ? cJSON_IsArray(pChan) : false, pChan != NULL ? cJSON_GetArraySize(pChan) : 0);
+	if (pChan != NULL && cJSON_IsArray(pChan)) {
 		m_channelCount = cJSON_GetArraySize(pChan);
 		ret = ESP_OK;
 	}
 	return ret;
 }
 
-char* ChannelConfig::stringify() {
-	if (m_string != NULL) {
-		free(m_string);
-		m_string = NULL;
+int ChannelConfig::parse(const char* value) {
+	int ret = 0;
+	cJSON *patch = cJSON_Parse(value);
+
+	if (patch != NULL && cJSON_GetObjectItem(patch, name())) {
+		/* test config */
+		merge(patch);
+		ret = 1;
+		cJSON_Delete(patch);
+	} else {
+		ret = configBase::parse(value);
 	}
-
-	cJSON *pChan = cJSON_GetObjectItem(getRoot(), "channels");
-	m_string = cJSON_PrintUnformatted(pChan);
-
-	return m_string;
+	return ret;
 }
-
 
 const char* ChannelConfig::getName(unsigned ch) {
 	char *ret = cJSON_GetStringValue(const_cast<cJSON*>(getItem(ch, "name")));
@@ -261,7 +265,8 @@ unsigned ChannelConfig::getTime(unsigned ch) {
 	return cJSON_IsNumber(pItem) ? pItem->valueint : 0;
 }
 
-const cJSON* ChannelConfig::getItem(unsigned ch, const char* item) {
+
+const cJSON* ChannelConfig::getItem(unsigned ch, const char *item) {
 	cJSON *ret = NULL;
 	if (isInitialized() && ch < m_channelCount) {
 		cJSON *pChan = cJSON_GetObjectItem(getRoot(), "channels");
@@ -271,7 +276,8 @@ const cJSON* ChannelConfig::getItem(unsigned ch, const char* item) {
 	return ret;
 }
 
-SensorConfig::SensorConfig() : m_sensorCount(0){
+SensorConfig::SensorConfig() :
+		configBase("sensors"), m_sensorCount(0) {
 }
 
 esp_err_t SensorConfig::init() {
@@ -280,33 +286,33 @@ esp_err_t SensorConfig::init() {
 		ret = configBase::init();
 	}
 	cJSON *pChan = cJSON_GetObjectItem(getRoot(), "sensors");
-	ESP_LOGD(TAG, "sensors 0x%8X : isArray %d , Size %d",
-			(unsigned int)pChan,
-			pChan != NULL ? cJSON_IsArray(pChan) : false,
-			pChan != NULL ? cJSON_GetArraySize(pChan) : 0);
-	if (pChan != NULL  && cJSON_IsArray(pChan)) {
+	ESP_LOGD(TAG, "sensors 0x%8X : isArray %d , Size %d", (unsigned int )pChan,
+			pChan != NULL ? cJSON_IsArray(pChan) : false, pChan != NULL ? cJSON_GetArraySize(pChan) : 0);
+	if (pChan != NULL && cJSON_IsArray(pChan)) {
 		m_sensorCount = cJSON_GetArraySize(pChan);
 		ret = ESP_OK;
 	}
 	return ret;
 }
 
-char* SensorConfig::stringify() {
-	if (m_string != NULL) {
-		free(m_string);
-		m_string = NULL;
+int SensorConfig::parse(const char* value) {
+	int ret = 0;
+	cJSON *patch = cJSON_Parse(value);
+
+	if (patch != NULL && cJSON_GetObjectItem(patch, name())) {
+		/* test config */
+		merge(patch);
+		ret = 1;
+		cJSON_Delete(patch);
+	} else {
+		ret = configBase::parse(value);
 	}
-
-	cJSON *pChan = cJSON_GetObjectItem(getRoot(), "sensors");
-	m_string = cJSON_PrintUnformatted(pChan);
-
-	return m_string;
+	return ret;
 }
-
 
 bool SensorConfig::isSHT1xEnabled() {
 	const cJSON *item = getItem("sht1x", "enabled");
-	ESP_LOGD(TAG, "sht1x: 0x%08X : %s", (unsigned int)item, cJSON_IsTrue(item) ? "true" : "false");
+	ESP_LOGD(TAG, "sht1x: 0x%08X : %s", (unsigned int )item, cJSON_IsTrue(item) ? "true" : "false");
 	return cJSON_IsTrue(item);
 }
 
@@ -327,11 +333,28 @@ const cJSON* SensorConfig::getItem(const char *name, const char *item) {
 	}
 	return ret;
 }
+
+int SysConfig::parse(const char *value) {
+	int ret = 0;
+	cJSON *patch = cJSON_Parse(value);
+
+	if (patch != NULL && cJSON_GetObjectItem(patch, name())) {
+		/* test config */
+		merge(patch);
+		ret = 1;
+		cJSON_Delete(patch);
+	} else {
+		ret = configBase::parse(value);
+	}
+	return ret;
+}
+
+
 } /* namespace Config */
 
 //Globals
-Config::MqttConfig mqtt;
-Config::SysConfig sys;
-Config::ChannelConfig chanConfig;
-Config::SensorConfig sensorConfig;
+Config::MqttConfig mqttConf;
+Config::SysConfig sysConf;
+Config::ChannelConfig chanConf;
+Config::SensorConfig sensorConf;
 

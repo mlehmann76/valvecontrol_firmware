@@ -49,8 +49,8 @@ esp_err_t update_time(void) {
 void sntp_support(void) {
 	ESP_LOGI(TAG, "Initializing SNTP");
 	//FIXME free memory before reallocate
-	server = const_cast<char*>(sys.getTimeServer());
-	timeZone = const_cast<char*>(sys.getTimeZone());
+	server = const_cast<char*>(sysConf.getTimeServer());
+	timeZone = const_cast<char*>(sysConf.getTimeZone());
 	if (server && timeZone) {
 		ESP_LOGI(TAG, "sntp server (%s) (%s)", server, timeZone);
 		sntp_setoperatingmode(SNTP_OPMODE_POLL);

@@ -22,6 +22,7 @@
 #include "esp_task_wdt.h"
 #include "cJSON.h"
 
+#include "config.h"
 #include "mqtt_config.h"
 #include "mqtt_client.h"
 #include "mqtt_user.h"
@@ -30,7 +31,6 @@
 #include "esp_https_server.h"
 #include "status.h"
 #include "controlTask.h"
-#include "config.h"
 
 #include "http_handler.h"
 #include "http_server.h"

@@ -8,17 +8,11 @@
 #ifndef MAIN_MQTT_USER_H_
 #define MAIN_MQTT_USER_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-typedef int (*pOnMessageFunc)(const char *, esp_mqtt_event_handle_t);
-
-typedef struct {
+struct messageHandler{
 	const char * topicName;
-	pOnMessageFunc onMessage;
-	const char* handlerName;
-} messageHandler_t;
+	Config::ParseHandler *handler;
+	messageHandler(const char *_topicName = "none", Config::ParseHandler *_handler = NULL) : topicName(_topicName), handler(_handler) {}
+};
 
 typedef struct {
 	char *pTopic;
@@ -30,14 +24,7 @@ typedef struct {
 void mqtt_user_init(void);
 void mqtt_connect(void);
 void mqtt_disconnect(void);
-int  mqtt_user_addHandler(messageHandler_t *pHandle);
+int  mqtt_user_addHandler(const char *topic, Config::ParseHandler *pHandle);
 bool isTopic(esp_mqtt_event_handle_t event, const char * pCommand);
-
-#ifdef __cplusplus
-}
-#endif
-
-
-
 
 #endif /* MAIN_MQTT_USER_H_ */

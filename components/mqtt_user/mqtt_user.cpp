@@ -16,18 +16,18 @@
 #include "freertos/queue.h"
 
 #include "cJSON.h"
+#include "config.h"
+#include "config_user.h"
 
 #include "mqtt_client.h"
 #include "mqtt_user.h"
 #include "mqtt_user_ota.h"
-#include "config.h"
-#include "config_user.h"
 
 #include "esp_log.h"
 
 static const char *TAG = "MQTTS";
 static esp_mqtt_client_handle_t client = NULL;
-static messageHandler_t* messageHandle[8] = { 0 };
+static messageHandler messageHandle[8];
 static bool isMqttConnected = false;
 static bool isMqttInit = false;
 
@@ -37,8 +37,9 @@ extern EventGroupHandle_t main_event_group;
 static void mqtt_message_handler(esp_mqtt_event_handle_t event);
 static void handleFirmwareMsg(cJSON* firmware);
 
-int handleSysMessage(const char * topic, esp_mqtt_event_handle_t event);
-int handleConfigMsg(const char * topic, esp_mqtt_event_handle_t event);
+/*
+FIXME int handleSysMessage(const char * topic, esp_mqtt_event_handle_t event);
+FIXME int handleConfigMsg(const char * topic, esp_mqtt_event_handle_t event);
 
 messageHandler_t mqttConfigHandler = { //
 		.topicName = "/config", //
@@ -49,6 +50,7 @@ messageHandler_t sysConfigHandler = { //
 		.topicName = "/system", //
 				.onMessage = handleSysMessage, //
 				"sys event" };
+*/
 
 static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 	client = event->client;
@@ -57,7 +59,7 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 	case MQTT_EVENT_CONNECTED:
 		ESP_LOGD(TAG, "MQTT_EVENT_CONNECTED");
 		xEventGroupSetBits(main_event_group, MQTT_CONNECTED_BIT);
-		msg_id = esp_mqtt_client_subscribe(client, mqtt.getSubMsg(), 1);
+		msg_id = esp_mqtt_client_subscribe(client, mqttConf.getSubMsg(), 1);
 		ESP_LOGD(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 		isMqttConnected = true;
 		break;
@@ -102,15 +104,21 @@ static void mqtt_message_handler(esp_mqtt_event_handle_t event) {
 	}
 
 	for (int i = 0; i < (sizeof(messageHandle) / sizeof(messageHandle[0])); i++) {
+		/*
 		if ((messageHandle[i] != NULL) && (messageHandle[i]->onMessage != NULL)) {
 			if (messageHandle[i]->onMessage(messageHandle[i]->topicName, event)) {
 				ESP_LOGI(TAG, "%s handled", messageHandle[i]->handlerName);
 				break;
 			}
 		}
+		*/
+		if ((messageHandle[i].handler != NULL) && isTopic(event, messageHandle[i].topicName)) {
+			messageHandle[i].handler->parse(event->data);
+		}
 	}
 }
 
+/*
 int handleSysMessage(const char * topic, esp_mqtt_event_handle_t event) {
 	int ret = 0;
 	if (isTopic(event, topic)) {
@@ -125,7 +133,8 @@ int handleSysMessage(const char * topic, esp_mqtt_event_handle_t event) {
 	}
 	return ret;
 }
-
+*/
+/*
 int handleConfigMsg(const char * topic, esp_mqtt_event_handle_t event) {
 	int ret = 0;
 	if (isTopic(event, topic)) {
@@ -135,7 +144,7 @@ int handleConfigMsg(const char * topic, esp_mqtt_event_handle_t event) {
 	}
 	return ret;
 }
-
+*/
 /* */
 static int md5StrToAr(char* pMD5, uint8_t* md5) {
 	int error = 0;
@@ -162,6 +171,7 @@ static int md5StrToAr(char* pMD5, uint8_t* md5) {
 	return error;
 }
 
+/*
 static void handleFirmwareMsg(cJSON* firmware) {
 	int error = 0;
 	md5_update_t md5_update;
@@ -211,7 +221,7 @@ static void handleFirmwareMsg(cJSON* firmware) {
 		}
 	}
 }
-
+*/
 void mqtt_task(void *pvParameters) {
 	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
 
@@ -260,19 +270,19 @@ void mqtt_user_init(void) {
 
 	esp_mqtt_client_config_t mqtt_cfg;
 	memset(&mqtt_cfg,0,sizeof(mqtt_cfg));
-	mqtt_cfg.uri = mqtt.getMqttServer();
+	mqtt_cfg.uri = mqttConf.getMqttServer();
 	mqtt_cfg.event_handle = mqtt_event_handler;
-	mqtt_cfg.username = mqtt.getMqttUser();
-	mqtt_cfg.password = mqtt.getMqttPass();
+	mqtt_cfg.username = mqttConf.getMqttUser();
+	mqtt_cfg.password = mqttConf.getMqttPass();
 
 	client = esp_mqtt_client_init(&mqtt_cfg);
 
 	xTaskCreatePinnedToCore(&mqtt_task, "mqtt_task", 2 * 8192, NULL, 5, NULL, 0);
 	xTaskCreatePinnedToCore(&mqtt_ota_task, "mqtt_ota_task", 2 * 8192, NULL, 5, NULL, 0);
 
-	mqtt_user_addHandler(&sysConfigHandler);
-	mqtt_user_addHandler(&mqttConfigHandler);
-	mqtt_user_addHandler(&mqttOtaHandler);
+//	mqtt_user_addHandler(&sysConfigHandler);
+//	mqtt_user_addHandler(&mqttConfigHandler);
+//	mqtt_user_addHandler(&mqttOtaHandler);
 }
 
 void mqtt_connect(void) {
@@ -289,22 +299,22 @@ void mqtt_disconnect(void) {
 		esp_mqtt_client_stop(client);
 }
 
-int mqtt_user_addHandler(messageHandler_t *pHandle) {
+int mqtt_user_addHandler(const char *topic, Config::ParseHandler *pHandle) {
 	int ret = 0;
 	for (int i = 0; i < (sizeof(messageHandle) / sizeof(messageHandle[0])); i++) {
-		if (messageHandle[i] == NULL) {
-			messageHandle[i] = pHandle;
+		if (messageHandle[i].handler == NULL) {
+			messageHandle[i] = {topic,pHandle};
 			ret = 1;
 			break;
 		}
 	}
 	if (ret) {
-		ESP_LOGD(TAG, "added mqtt handler %s", pHandle->handlerName);
+		ESP_LOGD(TAG, "added mqtt handler %s", pHandle->name());
 	}
 	return ret;
 }
 
 bool isTopic(esp_mqtt_event_handle_t event, const char * pCommand) {
-	const char* psTopic = event->topic_len >= strlen(mqtt.getSubMsg()) ? &event->topic[strlen(mqtt.getSubMsg()) - 2] : "";
+	const char* psTopic = event->topic_len >= strlen(mqttConf.getSubMsg()) ? &event->topic[strlen(mqttConf.getSubMsg()) - 2] : "";
 	return strncmp(psTopic, pCommand, strlen(pCommand)) == 0;
 }

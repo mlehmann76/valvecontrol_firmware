@@ -15,13 +15,13 @@
 #include "esp_log.h"
 #include "cJSON.h"
 
+#include "config_user.h"
+#include "config.h"
 #include "mqtt_config.h"
 #include "mqtt_client.h"
 #include "mqtt_user.h"
 
 #include "status.h"
-#include "config_user.h"
-#include "config.h"
 
 #include "controlTask.h"
 
@@ -49,9 +49,10 @@ int handleControlMsg(const char *topic, esp_mqtt_event_handle_t event) {
 	return (channel.handleControlMsg(topic, event));
 }
 
-messageHandler_t controlHandler = { //
+/*
+FIXME messageHandler_t controlHandler = { //
 		.topicName = "/control", .onMessage = handleControlMsg, "control event" };
-/**/
+*/
 
 /**/
 GpioTask::channelSet_t GpioTask::chanMode[NUM_CONTROL];
@@ -123,9 +124,9 @@ void GpioTask::task() {
 }
 
 void GpioTask::enableChan(uint32_t chan, time_t _runTime) {
-	if (chan < chanConfig.count()) {
+	if (chan < chanConf.count()) {
 		// single channel mode, disable all other
-		for (int i = 0; i < chanConfig.count(); i++) {
+		for (int i = 0; i < chanConf.count(); i++) {
 			if ((i != chan) && chanMode[i].mode != pOFF) {
 				disableChan(i);
 			}
@@ -142,7 +143,7 @@ void GpioTask::enableChan(uint32_t chan, time_t _runTime) {
 }
 
 void GpioTask::disableChan(uint32_t chan) {
-	if ((chan < chanConfig.count())) {
+	if ((chan < chanConf.count())) {
 		chanMode[chan].mode = pOFF;
 		updateChannel(chan);
 		setUpdate(true);
@@ -152,7 +153,7 @@ void GpioTask::disableChan(uint32_t chan) {
 }
 
 void GpioTask::updateChannel(uint32_t chan) {
-	if ((chan < chanConfig.count())) {
+	if ((chan < chanConf.count())) {
 		ESP_LOGI(TAG, "update channel %d -> %d", chan, chanMode[chan].mode);
 		switch (chanMode[chan].mode) {
 		case pON:
@@ -190,8 +191,8 @@ void GpioTask::addStatus(cJSON *root) {
 		return;
 	}
 
-	for (int i = 0; i < chanConfig.count(); i++) {
-		cJSON *channelv = cJSON_AddObjectToObject(channel, chanConfig.getName(i));
+	for (int i = 0; i < chanConf.count(); i++) {
+		cJSON *channelv = cJSON_AddObjectToObject(channel, chanConf.getName(i));
 		if (channelv == NULL) {
 			return;
 		}
@@ -207,7 +208,7 @@ void GpioTask::addStatus(cJSON *root) {
 void GpioTask::checkMessage(queueData &rxData) {
 	switch (rxData.mode) {
 	case mStatus:
-		if (rxData.chan < chanConfig.count()) {
+		if (rxData.chan < chanConf.count()) {
 			if (chanMode[rxData.chan].mode != pOFF) {
 				rxData.mode = mOn;
 			} else {
@@ -226,7 +227,7 @@ void GpioTask::checkMessage(queueData &rxData) {
 }
 /**/
 void GpioTask::checkTimeout() {
-	for (int i = 0; i < chanConfig.count(); i++) {
+	for (int i = 0; i < chanConf.count(); i++) {
 		if (chanMode[i].mode != pOFF) {
 			time_t now;
 			// test for duty cycle switch
@@ -275,12 +276,12 @@ int GpioTask::handleControlMsg(const char *topic, esp_mqtt_event_handle_t event)
  * TODO: move function outside off GpioTask
  * */
 void GpioTask::handleChannelControl(const cJSON *const chan) {
-	for (uint32_t i = 0; i < chanConfig.count(); i++) {
-		cJSON *pChanObj = cJSON_GetObjectItem(chan, chanConfig.getName(i));
+	for (uint32_t i = 0; i < chanConf.count(); i++) {
+		cJSON *pChanObj = cJSON_GetObjectItem(chan, chanConf.getName(i));
 		if (pChanObj != NULL) {
 
 			gpio_task_mode_t func = mStatus;
-			uint32_t chanTime = chanConfig.getTime(i);
+			uint32_t chanTime = chanConf.getTime(i);
 			cJSON *pJsonChanVal = cJSON_GetObjectItem(pChanObj, "val");
 			if (cJSON_IsString(pJsonChanVal)) {
 				const char *pS = pJsonChanVal->valuestring;
@@ -335,10 +336,10 @@ void GpioTask::setup(void) {
 	// Set configuration of timer0 for high speed channels
 
 	ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
-	assert(NUM_CONTROL >= chanConfig.count());
+	assert(NUM_CONTROL >= chanConf.count());
 
 	// Set LED Controller with previously prepared configuration
-	for (int ch = 0; ch < chanConfig.count(); ch++) {
+	for (int ch = 0; ch < chanConf.count(); ch++) {
 		ledc_channel_config(&ledc_channel[ch]);
 		ledc_set_duty(ledc_channel[ch].speed_mode, ledc_channel[ch].channel, ledc_channel[ch].duty);
 		ledc_update_duty(ledc_channel[ch].speed_mode, ledc_channel[ch].channel);
