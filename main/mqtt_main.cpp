@@ -1,9 +1,13 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "sdkconfig.h"
+
 #include "TaskCPP.h"
+#include "SemaphoreCPP.h"
+#include "QueueCPP.h"
+#include "TimerCPP.h"
 #include "freertos/event_groups.h"
-#include "freertos/queue.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
@@ -42,10 +46,6 @@
 #define PINSTR "%c%c%c%c%c%c%c%c"
 #endif
 
-static esp_wps_config_t config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
-static bool enableWPS = false;
-static time_t lastMqttSeen;
-
 /* The event group allows multiple bits for each event,
  but we only care about one event - are we connected
  to the AP with an IP? */
@@ -64,13 +64,17 @@ extern messageHandler_t controlHandler;
 */
 EventGroupHandle_t main_event_group;
 httpd_handle_t server_handle;
-/**/
-GpioTask channel(main_event_group);
-StatusTask status(main_event_group);
-FirmwareStatus firm;
-HardwareStatus hard;
-Sht1x sht1x(GPIO_NUM_21, GPIO_NUM_22);
+static esp_wps_config_t config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
+static bool enableWPS = false;
+static time_t lastMqttSeen;
+static httpd_handle_t server = NULL;
+static GpioTask channel(main_event_group);
+static Sht1x sht1x(GPIO_NUM_21, GPIO_NUM_22);
+static mqtt::MqttOtaWorker mqttOta;
+static mqtt::MqttUserTask mqttUser;
+static StatusTask status(main_event_group, mqttUser.queue());
 
+/**/
 #pragma GCC diagnostic pop
 static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
 	httpd_handle_t *server = (httpd_handle_t*) arg;
@@ -124,7 +128,7 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
 			stop_webserver(*server);
 			*server = NULL;
 		}
-		mqtt_disconnect();
+		mqttUser.disconnect();
 		break;
 		break;
 	case WIFI_EVENT_STA_AUTHMODE_CHANGE: /**< the auth mode of AP connected by ESP32 station changed */
@@ -180,14 +184,13 @@ static void got_ip_event_handler(void *arg, esp_event_base_t event_base, int32_t
 		ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
 		xEventGroupSetBits(main_event_group, CONNECTED_BIT);
 
-		firm.setUpdate(true);
-		hard.setUpdate(true);
+		status.setUpdate(true);
 
 		/* Start the web server */
 		if (*server == NULL) {
 			*server = start_webserver();
 		}
-		mqtt_connect();
+		mqttUser.connect();
 		break;
 	case IP_EVENT_STA_LOST_IP:
 		break;
@@ -323,8 +326,6 @@ void app_main() {
 	esp_log_level_set("phy_init", ESP_LOG_ERROR);
 	esp_log_level_set("wifi", ESP_LOG_ERROR);
 
-	static httpd_handle_t server = NULL;
-
 	spiffsInit();
 
 	mqttConf.init();
@@ -333,15 +334,12 @@ void app_main() {
 	sntp_support();
 	channel.setup();
 
-	status.addProvider(firm);
-	status.addProvider(hard);
-	status.addProvider(channel);
-	status.addProvider(sht1x);
+	status.addProvider(channel.status());
+	status.addProvider(sht1x.status());
 
-	mqtt_user_init();
+	mqttUser.init();
 	mqttConf.setNext(&sysConf)->setNext(&chanConf)->setNext(&sensorConf);
-	mqtt_user_addHandler("/config", &mqttConf);
-
+	mqttUser.addHandler("/config", &mqttConf);
 
 	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
 	xTaskCreate(wifi_init_sta, "wifi init task", 4096, &server, 10, NULL);

@@ -12,24 +12,26 @@
 
 #include "TaskCPP.h"
 #include "freertos/event_groups.h"
-#include "freertos/queue.h"
-#include "freertos/semphr.h"
+#include "QueueCPP.h"
+#include "SemaphoreCPP.h"
 
 #include "driver/i2c.h"
 #include "esp_log.h"
 
 #include "cJSON.h"
 
-#include "status.h"
 #include "config.h"
+#include "mqtt_client.h"
+#include "mqtt_user.h"
+#include "status.h"
 #include "sht1x.h"
 
 static const char *TAG = "I2C";
 static const int _us = 20;
 
 Sht1x::Sht1x(gpio_num_t _sda, gpio_num_t _scl) :
-		TaskClass("sht1x", TaskPrio_HMI, 2048), i2c_gpio_sda(_sda), i2c_gpio_scl(_scl), m_error(false), m_update(false), m_sem(
-				"sht1x") {
+	 i2c_gpio_sda(_sda), i2c_gpio_scl(_scl), m_hum(0), m_temp(0), m_error(false), m_update(false), m_sem(
+				"sht1x"), m_status(this) {
 	gpio_config_t io_conf;
 	io_conf.intr_type = GPIO_INTR_DISABLE;
 	io_conf.mode = GPIO_MODE_INPUT_OUTPUT_OD;
@@ -100,12 +102,19 @@ void Sht1x::reset() {
 }
 
 bool Sht1x::hasUpdate() {
-	bool ret = false;
-	if(m_sem.take(10)) {
-		ret = m_update;
+	const TickType_t xTicksToWait = 1;
+	m_update = false;
+	if (m_sem.take(xTicksToWait) == pdTRUE) {
+		if (hasError()) {
+			reset();
+		} else {
+			m_temp = readSHT1xTemp();
+			m_hum = readSHT1xHum();
+			m_update = true;
+		}
 		m_sem.give();
 	}
-	return ret;
+	return m_update;
 }
 
 void Sht1x::addStatus(cJSON *root) {
@@ -114,10 +123,10 @@ void Sht1x::addStatus(cJSON *root) {
 		cJSON *channel = cJSON_AddObjectToObject(root, "sensors");
 		if (channel != NULL) {
 			cJSON *channelv = cJSON_AddObjectToObject(channel, "sht1x");
-			snprintf(buf, sizeof(buf), "%3.2f", readSHT1xTemp());
+			snprintf(buf, sizeof(buf), "%3.2f", m_temp);
 			if (channelv != NULL) {
 				cJSON_AddStringToObject(channelv, "temp", buf);
-				snprintf(buf, sizeof(buf), "%3.2f", readSHT1xHum());
+				snprintf(buf, sizeof(buf), "%3.2f", m_hum);
 				cJSON_AddStringToObject(channelv, "hum", buf);
 				cJSON_AddStringToObject(channelv, "status", hasError() ? "err" : "ok");
 			}
@@ -234,21 +243,4 @@ esp_err_t Sht1x::readSHT1xReg16(uint8_t reg, uint16_t *pData) {
 	return ret;
 }
 
-void Sht1x::task() {
-	while (1) {
-		//block till data was processed by ota task
-		const TickType_t xTicksToWait = 10000 / portTICK_PERIOD_MS;
-		if (m_sem.take(xTicksToWait) == pdTRUE) {
-			if (hasError()) {
-				reset();
-				vTaskDelay(20 / portTICK_PERIOD_MS);
-			} else {
-
-				m_update = true;
-			}
-			m_sem.give();
-		}
-		vTaskDelay(60000 / portTICK_PERIOD_MS);
-	}
-}
 

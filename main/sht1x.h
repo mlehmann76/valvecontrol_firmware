@@ -28,7 +28,7 @@
 #define NACK_VAL 0x0                /*!< I2C nack value */
 
 
-class Sht1x : public StatusProvider, public TaskClass {
+class Sht1x {
 public:
 
 	Sht1x(gpio_num_t _sda, gpio_num_t _scl);
@@ -40,8 +40,7 @@ public:
 	virtual bool hasUpdate();
 	virtual void addStatus(cJSON *);
 	void setUpdate(bool _up) { m_sem.take(); m_update = _up; m_sem.give();}
-	//
-	virtual void task();
+	StatusProviderBase &status() { return m_status; }
 	//
 private:
 	void delay_usec(int64_t usec) {
@@ -60,9 +59,11 @@ private:
 private:
 	gpio_num_t i2c_gpio_sda;
 	gpio_num_t i2c_gpio_scl;
+	float m_hum, m_temp;
 	bool m_error;
 	bool m_update;
 	Semaphore m_sem;
+	StatusProvider<Sht1x> m_status;
 };
 
 #endif /* MAIN_SHT1X_H_ */

@@ -10,10 +10,11 @@
 
 #include "sdkconfig.h"
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "TaskCPP.h"
+#include "SemaphoreCPP.h"
+#include "QueueCPP.h"
+#include "TimerCPP.h"
 #include "freertos/event_groups.h"
-#include "freertos/queue.h"
 
 #include "cJSON.h"
 #include "config.h"
@@ -26,17 +27,12 @@
 #include "esp_log.h"
 
 static const char *TAG = "MQTTS";
-static esp_mqtt_client_handle_t client = NULL;
-static messageHandler messageHandle[8];
-static bool isMqttConnected = false;
-static bool isMqttInit = false;
 
-QueueHandle_t pubQueue, otaQueue;
 extern EventGroupHandle_t main_event_group;
 
-static void mqtt_message_handler(esp_mqtt_event_handle_t event);
 static void handleFirmwareMsg(cJSON* firmware);
 
+namespace mqtt {
 /*
 FIXME int handleSysMessage(const char * topic, esp_mqtt_event_handle_t event);
 FIXME int handleConfigMsg(const char * topic, esp_mqtt_event_handle_t event);
@@ -51,9 +47,9 @@ messageHandler_t sysConfigHandler = { //
 				.onMessage = handleSysMessage, //
 				"sys event" };
 */
-
-static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
-	client = event->client;
+ esp_err_t MqttUserTask::mqtt_event_handler(esp_mqtt_event_handle_t event) {
+	esp_mqtt_client_handle_t client = event->client;
+	MqttUserTask *mqtt = reinterpret_cast<MqttUserTask*> (event->user_context);
 	int msg_id;
 	switch (event->event_id) {
 	case MQTT_EVENT_CONNECTED:
@@ -61,13 +57,13 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 		xEventGroupSetBits(main_event_group, MQTT_CONNECTED_BIT);
 		msg_id = esp_mqtt_client_subscribe(client, mqttConf.getSubMsg(), 1);
 		ESP_LOGD(TAG, "sent subscribe successful, msg_id=%d", msg_id);
-		isMqttConnected = true;
+		mqtt->isMqttConnected = true;
 		break;
 	case MQTT_EVENT_DISCONNECTED:
 		xEventGroupClearBits(main_event_group, MQTT_CONNECTED_BIT);
 		ESP_LOGD(TAG, "MQTT_EVENT_DISCONNECTED");
-		isMqttConnected = false;
-		isMqttInit = false;
+		mqtt->isMqttConnected = false;
+		mqtt->isMqttInit = false;
 		break;
 	case MQTT_EVENT_SUBSCRIBED:
 		ESP_LOGD(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
@@ -80,7 +76,7 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 		break;
 	case MQTT_EVENT_DATA:
 		ESP_LOGD(TAG, "MQTT_EVENT_DATA");
-		mqtt_message_handler(event);
+		mqtt->handler(event);
 		break;
 	case MQTT_EVENT_ERROR:
 		ESP_LOGE(TAG, "MQTT_EVENT_ERROR");
@@ -94,7 +90,7 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
 	return ESP_OK;
 }
 
-static void mqtt_message_handler(esp_mqtt_event_handle_t event) {
+void MqttUserTask::handler(esp_mqtt_event_handle_t event) {
 
 	if (event->data_len < 64) {
 		ESP_LOGD(TAG, "Topic received!: (%d) %.*s (%d) %.*s", event->topic_len, event->topic_len, event->topic,
@@ -222,14 +218,14 @@ static void handleFirmwareMsg(cJSON* firmware) {
 	}
 }
 */
-void mqtt_task(void *pvParameters) {
+void MqttUserTask::task() {
 	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
 
 	while (1) {
 
 		message_t rxData;
 
-		if ((client != NULL) && (xQueueReceive(pubQueue, &(rxData), xTicksToWait))) {
+		if ((client != NULL) && (m_pubQueue.pop((rxData), xTicksToWait))) {
 
 			if (isMqttConnected) {
 				ESP_LOGD(TAG, "publish %.*s : %.*s", strlen(rxData.pTopic), rxData.pTopic, strlen(rxData.pData),
@@ -254,19 +250,7 @@ void mqtt_task(void *pvParameters) {
 	vTaskDelete(NULL);
 }
 
-void mqtt_user_init(void) {
-
-	pubQueue = xQueueCreate(10, sizeof(message_t));
-	if (pubQueue == 0) {
-		// Queue was not created and must not be used.
-		ESP_LOGE(TAG, "pubqueue init failure");
-	}
-
-	otaQueue = xQueueCreate(2, sizeof(md5_update_t));
-	if (otaQueue == 0) {
-		// Queue was not created and must not be used.
-		ESP_LOGE(TAG, "otaQueue init failure");
-	}
+void MqttUserTask::init(void) {
 
 	esp_mqtt_client_config_t mqtt_cfg;
 	memset(&mqtt_cfg,0,sizeof(mqtt_cfg));
@@ -274,18 +258,12 @@ void mqtt_user_init(void) {
 	mqtt_cfg.event_handle = mqtt_event_handler;
 	mqtt_cfg.username = mqttConf.getMqttUser();
 	mqtt_cfg.password = mqttConf.getMqttPass();
+	mqtt_cfg.user_context = this;
 
 	client = esp_mqtt_client_init(&mqtt_cfg);
-
-	xTaskCreatePinnedToCore(&mqtt_task, "mqtt_task", 2 * 8192, NULL, 5, NULL, 0);
-	xTaskCreatePinnedToCore(&mqtt_ota_task, "mqtt_ota_task", 2 * 8192, NULL, 5, NULL, 0);
-
-//	mqtt_user_addHandler(&sysConfigHandler);
-//	mqtt_user_addHandler(&mqttConfigHandler);
-//	mqtt_user_addHandler(&mqttOtaHandler);
 }
 
-void mqtt_connect(void) {
+void MqttUserTask::connect(void) {
 	if (client != NULL) {
 		ESP_LOGE(TAG,"starting client");
 		esp_mqtt_client_start(client);
@@ -294,12 +272,12 @@ void mqtt_connect(void) {
 	}
 }
 
-void mqtt_disconnect(void) {
+void MqttUserTask::disconnect(void) {
 	if (client != NULL && isMqttConnected)
 		esp_mqtt_client_stop(client);
 }
 
-int mqtt_user_addHandler(const char *topic, Config::ParseHandler *pHandle) {
+int MqttUserTask::addHandler(const char *topic, Config::ParseHandler *pHandle) {
 	int ret = 0;
 	for (int i = 0; i < (sizeof(messageHandle) / sizeof(messageHandle[0])); i++) {
 		if (messageHandle[i].handler == NULL) {
@@ -317,4 +295,5 @@ int mqtt_user_addHandler(const char *topic, Config::ParseHandler *pHandle) {
 bool isTopic(esp_mqtt_event_handle_t event, const char * pCommand) {
 	const char* psTopic = event->topic_len >= strlen(mqttConf.getSubMsg()) ? &event->topic[strlen(mqttConf.getSubMsg()) - 2] : "";
 	return strncmp(psTopic, pCommand, strlen(pCommand)) == 0;
+}
 }

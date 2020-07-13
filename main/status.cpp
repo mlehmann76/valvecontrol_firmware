@@ -7,9 +7,9 @@
 
 #include <time.h>
 #include "TaskCPP.h"
-#include "freertos/queue.h"
+#include "QueueCPP.h"
 #include "freertos/event_groups.h"
-#include "freertos/semphr.h"
+#include "SemaphoreCPP.h"
 
 #include "sdkconfig.h"
 #include "esp_log.h"
@@ -28,8 +28,6 @@
 #include "sht1x.h"
 
 #define TAG "status"
-
-extern QueueHandle_t pubQueue;
 
 void StatusTask::addTimeStamp(cJSON *root) {
 	if (root == NULL) {
@@ -61,100 +59,10 @@ void StatusTask::addTimeStamp(cJSON *root) {
 	return;
 }
 
-FirmwareStatus::~FirmwareStatus() {
-}
-
-bool FirmwareStatus::hasUpdate() {
-	bool ret = false;
-	if(m_sem.take(10)) {
-		ret = m_update;
-		m_sem.give();
-	}
-	return ret;
-}
-
-void FirmwareStatus::addStatus(cJSON *root) {
-	if (root == NULL) {
-		return;
-	}
-
-	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "firmware");
-	if (pcjsonfirm == NULL) {
-		return;
-	}
-#if (1)
-	if (cJSON_AddStringToObject(pcjsonfirm, "date", __DATE__) == NULL) {
-		return;
-	}
-
-	if (cJSON_AddStringToObject(pcjsonfirm, "time", __TIME__) == NULL) {
-		return;
-	}
-	if (cJSON_AddStringToObject(pcjsonfirm, "version", PROJECT_GIT) == NULL) {
-		return;
-	}
-	if (cJSON_AddStringToObject(pcjsonfirm, "idf", esp_get_idf_version()) == NULL) {
-		return;
-	}
-
-#else
-		if (cJSON_AddStringToObject(pcjsonfirm, "name", esp_ota_get_app_description()->project_name) == NULL) {
-			return;
-		}
-
-		if (cJSON_AddStringToObject(pcjsonfirm, "version", esp_ota_get_app_description()->version) == NULL) {
-			return;
-		}
-
-		if (cJSON_AddStringToObject(pcjsonfirm, "date", esp_ota_get_app_description()->date) == NULL) {
-			return;
-		}
-
-		if (cJSON_AddStringToObject(pcjsonfirm, "time", esp_ota_get_app_description()->time) == NULL) {
-			return;
-		}
-	#endif
-
-	return;
-}
-
-HardwareStatus::~HardwareStatus() {
-}
-
-bool HardwareStatus::hasUpdate() {
-	bool ret = false;
-	if(m_sem.take(10)) {
-		ret = m_update;
-		m_sem.give();
-	}
-	return ret;
-}
-
-void HardwareStatus::addStatus(cJSON *root) {
-	if (root == NULL) {
-		return;
-	}
-
-	esp_chip_info_t chip_info;
-	esp_chip_info(&chip_info);
-
-	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "hardware");
-	if (pcjsonfirm == NULL) {
-		return;
-	}
-	if (cJSON_AddNumberToObject(pcjsonfirm, "cores", chip_info.cores) == NULL) {
-		return;
-	}
-
-	if (cJSON_AddNumberToObject(pcjsonfirm, "rev", chip_info.revision) == NULL) {
-		return;
-	}
-
-	return;
-}
-
-StatusTask::StatusTask(EventGroupHandle_t &main) :
-		TaskClass("status", TaskPrio_HMI, 2048), m_statusFunc(), m_statusFuncCount(0), main_event_group(&main) {
+StatusTask::StatusTask(EventGroupHandle_t &main, mqtt::PubQueue &_queue) :
+		TaskClass("status", TaskPrio_HMI, 2048), m_statusFunc(), m_statusFuncCount(0),
+		main_event_group(&main), queue(_queue), m_status(this) {
+	addProvider(status());
 }
 
 void StatusTask::task() {
@@ -192,10 +100,13 @@ void StatusTask::task() {
 						return;
 					}
 
-					message_t message = { .pTopic = (char*) mqttConf.getPubMsg(), .pData = string, .topic_len = 0,
+					mqtt::message_t message = {
+							.pTopic = (char*) mqttConf.getPubMsg(),
+							.pData = string,
+							.topic_len = 0,
 							.data_len = strlen(string) };
 
-					if ( xQueueSendToBack(pubQueue, &message, 10) != pdPASS) {
+					if ( queue.push(message, 10) != pdPASS) {
 						// Failed to post the message, even after 10 ticks.
 						ESP_LOGI(TAG, "pubqueue post failure");
 						free(string);
@@ -211,10 +122,74 @@ void StatusTask::task() {
 	}
 }
 
-void StatusTask::addProvider(StatusProvider& _stat) {
+void StatusTask::addProvider(StatusProviderBase& _stat) {
 	if (m_statusFuncCount < (sizeof(m_statusFunc)/sizeof(*m_statusFunc))) {
 		m_statusFunc[m_statusFuncCount] = &_stat;
 		m_statusFuncCount++;
 	}
 }
 
+void StatusTask::addFirmwareStatus(cJSON *root) {
+	if (root == NULL) {
+			return;
+		}
+
+		cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "firmware");
+		if (pcjsonfirm == NULL) {
+			return;
+		}
+	#if (1)
+		if (cJSON_AddStringToObject(pcjsonfirm, "date", __DATE__) == NULL) {
+			return;
+		}
+
+		if (cJSON_AddStringToObject(pcjsonfirm, "time", __TIME__) == NULL) {
+			return;
+		}
+		if (cJSON_AddStringToObject(pcjsonfirm, "version", PROJECT_GIT) == NULL) {
+			return;
+		}
+		if (cJSON_AddStringToObject(pcjsonfirm, "idf", esp_get_idf_version()) == NULL) {
+			return;
+		}
+
+	#else
+			if (cJSON_AddStringToObject(pcjsonfirm, "name", esp_ota_get_app_description()->project_name) == NULL) {
+				return;
+			}
+
+			if (cJSON_AddStringToObject(pcjsonfirm, "version", esp_ota_get_app_description()->version) == NULL) {
+				return;
+			}
+
+			if (cJSON_AddStringToObject(pcjsonfirm, "date", esp_ota_get_app_description()->date) == NULL) {
+				return;
+			}
+
+			if (cJSON_AddStringToObject(pcjsonfirm, "time", esp_ota_get_app_description()->time) == NULL) {
+				return;
+			}
+		#endif
+
+}
+
+void StatusTask::addHardwareStatus(cJSON *root) {
+	if (root == NULL) {
+			return;
+		}
+
+		esp_chip_info_t chip_info;
+		esp_chip_info(&chip_info);
+
+		cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "hardware");
+		if (pcjsonfirm == NULL) {
+			return;
+		}
+		if (cJSON_AddNumberToObject(pcjsonfirm, "cores", chip_info.cores) == NULL) {
+			return;
+		}
+
+		if (cJSON_AddNumberToObject(pcjsonfirm, "rev", chip_info.revision) == NULL) {
+			return;
+		}
+}

@@ -8,7 +8,8 @@
 #include <time.h>
 #include <assert.h>
 #include "TaskCPP.h"
-#include "freertos/queue.h"
+#include "QueueCPP.h"
+#include "SemaphoreCPP.h"
 #include "freertos/event_groups.h"
 
 #include "sdkconfig.h"
@@ -57,7 +58,7 @@ FIXME messageHandler_t controlHandler = { //
 /**/
 GpioTask::channelSet_t GpioTask::chanMode[NUM_CONTROL];
 /**/
-ledc_channel_config_t GpioTask::ledc_channel[NUM_CONTROL] = { { //FIXME chanConfig.count()
+const ledc_channel_config_t GpioTask::ledc_channel[NUM_CONTROL] = { { //FIXME chanConfig.count()
 		CONTROL0_PIN, //
 				LEDC_LOW_SPEED_MODE, //
 				LEDC_CHANNEL_0, LEDC_INTR_DISABLE, //
@@ -91,7 +92,7 @@ ledc_channel_config_t GpioTask::ledc_channel[NUM_CONTROL] = { { //FIXME chanConf
 
 GpioTask::GpioTask(EventGroupHandle_t &_main) :
 		TaskClass("channel", TaskPrio_HMI, 2048), m_isConnected(false),
-		m_update(false), m_sem("gpio"), m_subQueue(8), m_pMain(&_main) {
+		m_update(false), m_sem("gpio"), m_subQueue(8), m_pMain(&_main), m_status(this) {
 }
 
 void GpioTask::task() {
@@ -250,7 +251,8 @@ void GpioTask::checkTimeout() {
  * */
 int GpioTask::handleControlMsg(const char *topic, esp_mqtt_event_handle_t event) {
 	int ret = 0;
-	if (isTopic(event, topic)) {
+	//FIXME if (isTopic(event, topic))
+	{
 		ESP_LOGI(TAG, "%.*s", event->topic_len, event->topic);
 
 		cJSON *root = cJSON_Parse(event->data);

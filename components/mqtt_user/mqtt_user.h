@@ -8,10 +8,14 @@
 #ifndef MAIN_MQTT_USER_H_
 #define MAIN_MQTT_USER_H_
 
-struct messageHandler{
-	const char * topicName;
+namespace mqtt {
+
+struct messageHandler {
+	const char *topicName;
 	Config::ParseHandler *handler;
-	messageHandler(const char *_topicName = "none", Config::ParseHandler *_handler = NULL) : topicName(_topicName), handler(_handler) {}
+	messageHandler(const char *_topicName = "none", Config::ParseHandler *_handler = NULL) :
+			topicName(_topicName), handler(_handler) {
+	}
 };
 
 typedef struct {
@@ -21,10 +25,30 @@ typedef struct {
 	size_t data_len;
 } message_t;
 
-void mqtt_user_init(void);
-void mqtt_connect(void);
-void mqtt_disconnect(void);
-int  mqtt_user_addHandler(const char *topic, Config::ParseHandler *pHandle);
-bool isTopic(esp_mqtt_event_handle_t event, const char * pCommand);
+typedef Queue<message_t,10> PubQueue;
 
+bool isTopic(esp_mqtt_event_handle_t event, const char *pCommand);
+
+class MqttUserTask : public TaskClass {
+public:
+	MqttUserTask() : TaskClass("mqttuser", TaskPrio_HMI, 2048) {}
+	virtual void task();
+	void init(void);
+	void connect(void);
+	void disconnect(void);
+	int addHandler(const char *topic, Config::ParseHandler *pHandle);
+	PubQueue& queue() { return m_pubQueue; }
+
+private:
+	void handler(esp_mqtt_event_handle_t event);
+	static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event);
+
+	PubQueue m_pubQueue;
+	esp_mqtt_client_handle_t client = NULL;
+	messageHandler messageHandle[8];
+	bool isMqttConnected = false;
+	bool isMqttInit = false;
+};
+
+}
 #endif /* MAIN_MQTT_USER_H_ */

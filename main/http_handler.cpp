@@ -12,8 +12,9 @@
 #include "sdkconfig.h"
 
 #include "TaskCPP.h"
+#include "SemaphoreCPP.h"
+#include "QueueCPP.h"
 #include "freertos/event_groups.h"
-#include "freertos/queue.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
@@ -28,10 +29,9 @@ extern "C" {
 }
 
 #include "config.h"
-#include "status.h"
 #include "mqtt_client.h"
 #include "mqtt_user.h"
-#include "mqtt_user_ota.h"
+#include "status.h"
 
 #include "esp_https_server.h"
 #include "controlTask.h"

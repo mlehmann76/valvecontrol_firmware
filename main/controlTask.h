@@ -31,7 +31,7 @@ struct queueData {
 
 typedef Queue<queueData, 0> GpioQueue;
 
-class GpioTask: public StatusProvider, public TaskClass {
+class GpioTask: public TaskClass {
 private:
 	enum channelMode_t {pOFF, pHALF, pON};
 
@@ -47,9 +47,10 @@ private:
 public:
 	GpioTask(EventGroupHandle_t &);
 	virtual ~GpioTask();
-	virtual bool hasUpdate();
-	virtual void addStatus(cJSON*);
+	bool hasUpdate();
+	void addStatus(cJSON*);
 	void setUpdate(bool _up) { m_sem.take(); m_update = _up; m_sem.give();}
+	StatusProviderBase &status() { return m_status; }
 	virtual void task();
 	void setup();
 
@@ -68,12 +69,13 @@ private:
 	}
 private:
 	static channelSet_t chanMode[]; //FIXME chanConfig.count()
-	static ledc_channel_config_t ledc_channel[];
+	static const ledc_channel_config_t ledc_channel[];
 	bool m_isConnected;
 	bool m_update;
 	Semaphore m_sem;
 	GpioQueue m_subQueue;
 	EventGroupHandle_t *m_pMain;
+	StatusProvider<GpioTask> m_status;
 };
 
 #endif /* MAIN_GPIOTASK_H_ */

@@ -40,18 +40,20 @@ class configBase: public ParseHandler {
 public:
 	configBase(const char *_name);
 	virtual ~configBase();
-	virtual esp_err_t init();
+	esp_err_t init();
 	virtual char* stringify();
+protected:
 	virtual int parse(const char*);
 	char* readString(const char *section, const char *name);
+
 	const cJSON* getRoot() const {
 		return pConfig;
 	}
+
 	bool isInitialized() const {
 		return m_isInitialized;
 	}
 
-protected:
 	void merge(const cJSON*);
 	void debug();
 	char *m_string;
@@ -94,7 +96,7 @@ public:
 	MqttConfig() :
 			configBase("mqtt") {
 	}
-	virtual esp_err_t init();
+	esp_err_t init();
 
 	virtual int parse(const char*);
 
