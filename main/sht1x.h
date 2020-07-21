@@ -32,9 +32,7 @@ class Sht1x {
 public:
 
 	Sht1x(gpio_num_t _sda, gpio_num_t _scl);
-	float readSHT1xTemp();
-	float readSHT1xHum();
-	bool hasError() const {return m_error; }
+	virtual ~Sht1x() = default;
 	void reset();
 	//
 	virtual bool hasUpdate();
@@ -43,6 +41,10 @@ public:
 	StatusProviderBase &status() { return m_status; }
 	//
 private:
+	float readSHT1xTemp();
+	float readSHT1xHum();
+	bool hasError() const {return m_error; }
+
 	void delay_usec(int64_t usec) {
 		int64_t end = esp_timer_get_time() + usec;
 		while (esp_timer_get_time() < end) {	};
@@ -55,8 +57,10 @@ private:
 	uint32_t read(uint32_t numBits, int ack);
 	int write(uint32_t data);
 	esp_err_t readSHT1xReg16(uint8_t reg, uint16_t *pData);
+	void readSensor();
 
 private:
+	TimerMember<Sht1x> m_timeout;
 	gpio_num_t i2c_gpio_sda;
 	gpio_num_t i2c_gpio_scl;
 	float m_hum, m_temp;

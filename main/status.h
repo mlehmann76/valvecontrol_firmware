@@ -8,6 +8,8 @@
 #ifndef MAIN_STATUS_H_
 #define MAIN_STATUS_H_
 
+#include "mqttUserTask.h"
+
 class StatusProviderBase {
 public:
 	virtual ~StatusProviderBase() {}

@@ -26,9 +26,9 @@
 #include "config.h"
 #include "config_user.h"
 #include "mqtt_client.h"
-#include "mqtt_user.h"
 #include "mqtt_user_ota.h"
 #include "mqtt_config.h"
+#include "mqttUserTask.h"
 
 #define TAG "OTA"
 

@@ -27,8 +27,7 @@
 #include "config.h"
 #include "mqtt_config.h"
 #include "mqtt_client.h"
-#include "mqtt_user.h"
-
+#include "mqttUserTask.h"
 #include "esp_https_server.h"
 #include "status.h"
 #include "controlTask.h"

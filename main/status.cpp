@@ -10,6 +10,7 @@
 #include "QueueCPP.h"
 #include "freertos/event_groups.h"
 #include "SemaphoreCPP.h"
+#include "TimerCPP.h"
 
 #include "sdkconfig.h"
 #include "esp_log.h"
@@ -19,12 +20,11 @@
 
 #include "config.h"
 #include "mqtt_client.h"
-#include "mqtt_user.h"
-
 #include "controlTask.h"
 
 #include "config_user.h"
 #include "status.h"
+
 #include "sht1x.h"
 
 #define TAG "status"

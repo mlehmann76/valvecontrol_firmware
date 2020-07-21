@@ -14,6 +14,7 @@
 #include "freertos/event_groups.h"
 #include "QueueCPP.h"
 #include "SemaphoreCPP.h"
+#include "TimerCPP.h"
 
 #include "driver/i2c.h"
 #include "esp_log.h"
@@ -22,7 +23,6 @@
 
 #include "config.h"
 #include "mqtt_client.h"
-#include "mqtt_user.h"
 #include "status.h"
 #include "sht1x.h"
 
@@ -30,6 +30,7 @@ static const char *TAG = "I2C";
 static const int _us = 20;
 
 Sht1x::Sht1x(gpio_num_t _sda, gpio_num_t _scl) :
+		m_timeout("otaTimer",this,&Sht1x::readSensor,( 1000 / portTICK_PERIOD_MS ),false),
 	 i2c_gpio_sda(_sda), i2c_gpio_scl(_scl), m_hum(0), m_temp(0), m_error(false), m_update(false), m_sem(
 				"sht1x"), m_status(this) {
 	gpio_config_t io_conf;
@@ -42,6 +43,7 @@ Sht1x::Sht1x(gpio_num_t _sda, gpio_num_t _scl) :
 	gpio_config(&io_conf);
 	gpio_set_level(GPIO_NUM_21, 1);
 	gpio_set_level(GPIO_NUM_22, 1);
+	m_timeout.start();
 }
 
 float Sht1x::readSHT1xTemp() {
@@ -101,19 +103,24 @@ void Sht1x::reset() {
 	write( SHT1X_RESET);
 }
 
-bool Sht1x::hasUpdate() {
-	const TickType_t xTicksToWait = 1;
-	m_update = false;
-	if (m_sem.take(xTicksToWait) == pdTRUE) {
+void Sht1x::readSensor() {
+	//if (m_sem.take(xTicksToWait) == pdTRUE) {
 		if (hasError()) {
+			m_timeout.period(( 30000 / portTICK_PERIOD_MS ));
+			m_timeout.start();
 			reset();
 		} else {
+			m_timeout.period(( 1000 / portTICK_PERIOD_MS ));
+			m_timeout.start();
 			m_temp = readSHT1xTemp();
 			m_hum = readSHT1xHum();
 			m_update = true;
 		}
-		m_sem.give();
-	}
+	//	m_sem.give();
+	//}
+}
+
+bool Sht1x::hasUpdate() {
 	return m_update;
 }
 

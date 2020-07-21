@@ -1,7 +1,14 @@
+/*
+ * WifiTask.cpp
+ *
+ *  Created on: 21.07.2020
+ *      Author: marco
+ */
 #include <string.h>
 #include <stdlib.h>
 
 #include "sdkconfig.h"
+#include "config_user.h"
 
 #include "TaskCPP.h"
 #include "SemaphoreCPP.h"
@@ -13,25 +20,6 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_wps.h"
-#include "esp_spiffs.h"
-#include "nvs_flash.h"
-#include "esp_task_wdt.h"
-#include "esp_http_server.h"
-#include "cJSON.h"
-
-#include "config.h"
-#include "mqtt_client.h"
-#include "mqtt_user.h"
-#include "mqtt_user_ota.h"
-
-#include "config_user.h"
-#include "controlTask.h"
-#include "http_server.h"
-#include "status.h"
-#include "sht1x.h"
-#include "sntp.h"
-#include "config.h"
-
 
 #if CONFIG_EXAMPLE_WPS_TYPE_PBC
 #define WPS_TEST_MODE WPS_TYPE_PBC
@@ -41,45 +29,35 @@
 #define WPS_TEST_MODE WPS_TYPE_PBC
 #endif /*CONFIG_EXAMPLE_WPS_TYPE_PBC*/
 
+#include "WifiTask.h"
+
 #ifndef PIN2STR
 #define PIN2STR(a) (a)[0], (a)[1], (a)[2], (a)[3], (a)[4], (a)[5], (a)[6], (a)[7]
 #define PINSTR "%c%c%c%c%c%c%c%c"
 #endif
 
-/* The event group allows multiple bits for each event,
- but we only care about one event - are we connected
- to the AP with an IP? */
+esp_wps_config_t WifiTask::config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
+const char WifiTask::TAG[] = "WifiTask";
 
-#define TAG "MAIN"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-void app_main();
-#ifdef __cplusplus
+WifiTask::WifiTask() : TaskClass("wifi", TaskPrio_HMI, 2048){
+	// TODO Auto-generated constructor stub
 }
-#endif
-/*
-extern messageHandler_t controlHandler;
-*/
-EventGroupHandle_t main_event_group;
-httpd_handle_t server_handle;
-static esp_wps_config_t config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
-static bool enableWPS = false;
-static time_t lastMqttSeen;
-static httpd_handle_t server = NULL;
-static GpioTask channel(main_event_group);
-static Sht1x sht1x(GPIO_NUM_21, GPIO_NUM_22);
-static mqtt::MqttOtaWorker mqttOta;
-static mqtt::MqttUserTask mqttUser;
-static StatusTask status(main_event_group, mqttUser.queue());
 
-/**/
-#pragma GCC diagnostic pop
-static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
-	httpd_handle_t *server = (httpd_handle_t*) arg;
-	enableWPS = false;
+WifiTask::~WifiTask() {
+	// TODO Auto-generated destructor stub
+}
 
+void WifiTask::event_handler_s(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
+	WifiTask* _t = reinterpret_cast<WifiTask*>(arg);
+	_t->event_handler(event_base, event_id, event_data);
+}
+
+void WifiTask::got_ip_event_handler_s(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
+	WifiTask* _t = reinterpret_cast<WifiTask*>(arg);
+	_t->got_ip_event_handler(event_base, event_id, event_data);
+}
+
+void WifiTask::event_handler(esp_event_base_t event_base, int32_t event_id, void *event_data) {
 	switch (event_id) {
 	case WIFI_EVENT_WIFI_READY: /**< ESP32 WiFi ready */
 		break;
@@ -113,7 +91,6 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
 			break;
 		}
 		break;
-		break;
 	case WIFI_EVENT_STA_STOP: /**< ESP32 station stop */
 		break;
 	case WIFI_EVENT_STA_CONNECTED: /**< ESP32 station connected to AP */
@@ -123,12 +100,12 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
 		 auto-reassociate. */
 		esp_wifi_connect();
 		xEventGroupClearBits(main_event_group, CONNECTED_BIT);
-		/* Stop the web server */
-		if (*server) {
-			stop_webserver(*server);
-			*server = NULL;
-		}
-		mqttUser.disconnect();
+//		/* Stop the web server */
+//		if (*server) {
+//			stop_webserver(*server);
+//			*server = NULL;
+//		}
+//		mqttUser.disconnect();
 		break;
 		break;
 	case WIFI_EVENT_STA_AUTHMODE_CHANGE: /**< the auth mode of AP connected by ESP32 station changed */
@@ -176,31 +153,29 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
 	}
 }
 /** Event handler for IP_EVENT_ETH_GOT_IP */
-static void got_ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
-	httpd_handle_t *server = (httpd_handle_t*) arg;
+void WifiTask::got_ip_event_handler(esp_event_base_t event_base, int32_t event_id, void *event_data) {
+	//httpd_handle_t *server = (httpd_handle_t*) arg;
 	ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
 	switch (event_id) {
 	case IP_EVENT_STA_GOT_IP:
 		ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
 		xEventGroupSetBits(main_event_group, CONNECTED_BIT);
-
-		status.setUpdate(true);
-
-		/* Start the web server */
-		if (*server == NULL) {
-			*server = start_webserver();
-		}
-		mqttUser.connect();
+//
+//		status.setUpdate(true);
+//
+//		/* Start the web server */
+//		if (*server == NULL) {
+//			*server = start_webserver();
+//		}
+//		mqttUser.connect();
 		break;
 	case IP_EVENT_STA_LOST_IP:
 		break;
 	}
 }
 
-void wifi_init_sta(void *param) {
-	enum state_t {
-		w_disconnected, w_connected, w_wps_enable, w_wps
-	} w_state = w_disconnected;
+void WifiTask::task() {
+
 	int timeout = 0;
 
 	main_event_group = xEventGroupCreate();
@@ -214,13 +189,16 @@ void wifi_init_sta(void *param) {
 	esp_event_handler_instance_t instance_got_ip;
 
 	ESP_ERROR_CHECK(
-			esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, &server_handle, &instance_any_id));
+			esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &WifiTask::event_handler_s, this, &instance_any_id));
 	ESP_ERROR_CHECK(
-			esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &got_ip_event_handler, &server_handle, &instance_got_ip));
+			esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &WifiTask::got_ip_event_handler_s, this, &instance_got_ip));
 
 	while (1) {
-		bool isConnected = (xEventGroupGetBits(main_event_group) & CONNECTED_BIT) != 0;
-		bool isMQTTConnected = (xEventGroupGetBits(main_event_group) & MQTT_CONNECTED_BIT) != 0;
+		EventBits_t uxBits;
+		uxBits = xEventGroupClearBits(main_event_group, WPS_LONG_BIT);
+		if ((uxBits & WPS_LONG_BIT) == WPS_LONG_BIT){
+			enableWPS = true;
+		}
 
 		switch (w_state) {
 		case w_disconnected:
@@ -239,7 +217,7 @@ void wifi_init_sta(void *param) {
 			break;
 
 		case w_connected:
-			if (!isConnected) {
+			if (!isConnected()) {
 				if (timeout == 0) {
 					ESP_LOGI(TAG, "wifi_init_sta stop sta");
 					ESP_ERROR_CHECK(esp_wifi_stop());
@@ -252,14 +230,14 @@ void wifi_init_sta(void *param) {
 				}
 			} else {
 				timeout = 30;
-				if (isMQTTConnected) {
-					time(&lastMqttSeen);
-				}
+//				if (isMQTTConnected) {
+//					time(&lastMqttSeen);
+//				}
 			}
 			break;
 
 		case w_wps_enable:
-			if (!isConnected) {
+			if (!isConnected()) {
 				if (timeout == 0) {
 					ESP_LOGI(TAG, "start wps...");
 					ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_wps_enable(&config));
@@ -275,7 +253,7 @@ void wifi_init_sta(void *param) {
 			break;
 
 		case w_wps:
-			if (isConnected) {
+			if (isConnected()) {
 				w_state = w_connected;
 			} else {
 				vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -291,111 +269,11 @@ void wifi_init_sta(void *param) {
 	}
 }
 
-void spiffsInit(void) {
-	ESP_LOGI(TAG, "Initializing SPIFFS");
-
-	esp_vfs_spiffs_conf_t conf = { .base_path = "/spiffs", .partition_label = NULL, .max_files = 5,
-			.format_if_mount_failed = false };
-
-	// Use settings defined above to initialize and mount SPIFFS filesystem.
-	// Note: esp_vfs_spiffs_register is an all-in-one convenience function.
-	esp_err_t ret = esp_vfs_spiffs_register(&conf);
-
-	if (ret != ESP_OK) {
-		if (ret == ESP_FAIL) {
-			ESP_LOGE(TAG, "Failed to mount or format filesystem");
-		} else if (ret == ESP_ERR_NOT_FOUND) {
-			ESP_LOGE(TAG, "Failed to find SPIFFS partition");
-		} else {
-			ESP_LOGE(TAG, "Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
-		}
-		return;
-	}
-
-	size_t total = 0, used = 0;
-	ret = esp_spiffs_info(NULL, &total, &used);
-	if (ret != ESP_OK) {
-		ESP_LOGE(TAG, "Failed to get SPIFFS partition information (%s)", esp_err_to_name(ret));
-	} else {
-		ESP_LOGI(TAG, "Partition size: total: %d, used: %d", total, used);
-	}
+bool WifiTask::isConnected() {
+	return (xEventGroupGetBits(main_event_group) & CONNECTED_BIT) != 0;
 }
 
-
-void app_main() {
-	esp_log_level_set("phy_init", ESP_LOG_ERROR);
-	esp_log_level_set("wifi", ESP_LOG_ERROR);
-
-	spiffsInit();
-
-	mqttConf.init();
-	chanConf.init();
-	sensorConf.init();
-	sntp_support();
-	channel.setup();
-
-	status.addProvider(channel.status());
-	status.addProvider(sht1x.status());
-
-	mqttUser.init();
-	mqttConf.setNext(&sysConf)->setNext(&chanConf)->setNext(&sensorConf);
-	mqttUser.addHandler("/config", &mqttConf);
-
-	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-	xTaskCreate(wifi_init_sta, "wifi init task", 4096, &server, 10, NULL);
-
-	ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
-
-	size_t heapFree = esp_get_free_heap_size();
-	time_t now;
-	struct tm timeinfo;
-	time(&lastMqttSeen);
-
-	while (1) {
-
-#if 0
-		char strftime_buf[64];
-		time(&now);
-		localtime_r(&now, &timeinfo);
-		//if (xEventGroupWaitBits(button_event_group, WPS_SHORT_BIT, true, true,10)) {
-		/*
-		 time(&now);
-		 if (difftime(now,last) >=2 ) {
-		 vTaskGetRunTimeStats(task_debug_buf);
-		 ESP_LOGI(TAG, "%s", task_debug_buf);
-		 last = now;
-		 }
-		 */
-		if (timeinfo.tm_year > (2016 - 1900)) {
-			localtime_r(&now, &timeinfo);
-			strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-			ESP_LOGI(TAG, "The current date/time is: %s", strftime_buf);
-			vTaskDelay(5000 / portTICK_PERIOD_MS);
-		} else {
-			vTaskDelay(500 / portTICK_PERIOD_MS);
-		}
-#else
-		time(&now);
-		localtime_r(&now, &timeinfo);
-		if (timeinfo.tm_year > (2016 - 1900)) {
-			//reboot @0:0:0 if received sntp
-			if ((timeinfo.tm_hour == 0) && (timeinfo.tm_min == 0)) {
-				if ((timeinfo.tm_sec == 0) || (timeinfo.tm_sec == 1)) {
-					esp_restart();
-				}
-			}
-		} else { // reboot after 1h when not connected to mqtt server
-			if (difftime(now, lastMqttSeen) > 3600) {
-				esp_restart();
-			}
-		}
-		if (esp_get_free_heap_size() != heapFree) {
-			heapFree = esp_get_free_heap_size();
-			ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
-		}
-		vTaskDelay(500 / portTICK_PERIOD_MS);
-#endif
-	}
+bool WifiTask::isMQTTConnected() {
+	return (xEventGroupGetBits(main_event_group) & MQTT_CONNECTED_BIT) != 0;
 }
-
 
