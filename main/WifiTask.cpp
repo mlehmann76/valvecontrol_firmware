@@ -20,6 +20,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_wps.h"
+#include "driver/gpio.h"
 
 #if CONFIG_EXAMPLE_WPS_TYPE_PBC
 #define WPS_TEST_MODE WPS_TYPE_PBC
@@ -35,6 +36,9 @@
 #define PIN2STR(a) (a)[0], (a)[1], (a)[2], (a)[3], (a)[4], (a)[5], (a)[6], (a)[7]
 #define PINSTR "%c%c%c%c%c%c%c%c"
 #endif
+
+#define WPS_SHORT_MS	(100 / portTICK_PERIOD_MS)
+#define WPS_LONG_MS 	(500 / portTICK_PERIOD_MS)
 
 esp_wps_config_t WifiTask::config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
 const char WifiTask::TAG[] = "WifiTask";
@@ -100,13 +104,6 @@ void WifiTask::event_handler(esp_event_base_t event_base, int32_t event_id, void
 		 auto-reassociate. */
 		esp_wifi_connect();
 		xEventGroupClearBits(main_event_group, CONNECTED_BIT);
-//		/* Stop the web server */
-//		if (*server) {
-//			stop_webserver(*server);
-//			*server = NULL;
-//		}
-//		mqttUser.disconnect();
-		break;
 		break;
 	case WIFI_EVENT_STA_AUTHMODE_CHANGE: /**< the auth mode of AP connected by ESP32 station changed */
 		break;
@@ -154,20 +151,11 @@ void WifiTask::event_handler(esp_event_base_t event_base, int32_t event_id, void
 }
 /** Event handler for IP_EVENT_ETH_GOT_IP */
 void WifiTask::got_ip_event_handler(esp_event_base_t event_base, int32_t event_id, void *event_data) {
-	//httpd_handle_t *server = (httpd_handle_t*) arg;
 	ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
 	switch (event_id) {
 	case IP_EVENT_STA_GOT_IP:
 		ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
 		xEventGroupSetBits(main_event_group, CONNECTED_BIT);
-//
-//		status.setUpdate(true);
-//
-//		/* Start the web server */
-//		if (*server == NULL) {
-//			*server = start_webserver();
-//		}
-//		mqttUser.connect();
 		break;
 	case IP_EVENT_STA_LOST_IP:
 		break;
@@ -194,8 +182,11 @@ void WifiTask::task() {
 			esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &WifiTask::got_ip_event_handler_s, this, &instance_got_ip));
 
 	while (1) {
+		checkWPSButton();
+
 		EventBits_t uxBits;
 		uxBits = xEventGroupClearBits(main_event_group, WPS_LONG_BIT);
+
 		if ((uxBits & WPS_LONG_BIT) == WPS_LONG_BIT){
 			enableWPS = true;
 		}
@@ -208,10 +199,10 @@ void WifiTask::task() {
 			ESP_ERROR_CHECK(esp_wifi_start());
 
 			if (!enableWPS) {
-				timeout = 30;
+				timeout = 300;
 				w_state = w_connected;
 			} else {
-				timeout = 5;
+				timeout = 50;
 				w_state = w_wps_enable;
 			}
 			break;
@@ -225,14 +216,10 @@ void WifiTask::task() {
 					ESP_ERROR_CHECK(esp_wifi_deinit());
 					w_state = w_disconnected;
 				} else {
-					vTaskDelay(1000 / portTICK_PERIOD_MS);
 					timeout--;
 				}
 			} else {
-				timeout = 30;
-//				if (isMQTTConnected) {
-//					time(&lastMqttSeen);
-//				}
+				timeout = 300;
 			}
 			break;
 
@@ -243,10 +230,9 @@ void WifiTask::task() {
 					ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_wps_enable(&config));
 					ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_wps_start(0));
 					enableWPS = false;
-					timeout = 60;
+					timeout = 600;
 					w_state = w_wps;
 				} else {
-					vTaskDelay(1000 / portTICK_PERIOD_MS);
 					timeout--;
 				}
 			}
@@ -256,7 +242,6 @@ void WifiTask::task() {
 			if (isConnected()) {
 				w_state = w_connected;
 			} else {
-				vTaskDelay(1000 / portTICK_PERIOD_MS);
 				timeout--;
 				if (timeout == 0) {
 					w_state = w_disconnected;
@@ -277,3 +262,19 @@ bool WifiTask::isMQTTConnected() {
 	return (xEventGroupGetBits(main_event_group) & MQTT_CONNECTED_BIT) != 0;
 }
 
+int WifiTask::checkWPSButton() {
+	static int wps_button_count = 0;
+	if ((gpio_get_level((gpio_num_t) WPS_BUTTON) == 0)) {
+		wps_button_count++;
+		if (wps_button_count > (WPS_LONG_MS / portTICK_PERIOD_MS)) {
+			xEventGroupSetBits(WifiTask::instance()->eventGroup(), WPS_LONG_BIT);
+			wps_button_count = 0;
+		}
+	} else {
+		if (wps_button_count > (WPS_SHORT_MS / portTICK_PERIOD_MS)) {
+			xEventGroupSetBits(WifiTask::instance()->eventGroup(), WPS_SHORT_BIT);
+		}
+		wps_button_count = 0;
+	}
+	return wps_button_count;
+}

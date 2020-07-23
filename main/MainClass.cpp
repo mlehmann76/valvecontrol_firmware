@@ -31,6 +31,9 @@
 #include "config_user.h"
 #include "messager.h"
 #include "sntp.h"
+#include "channel.h"
+#include "channelFactory.h"
+#include "channelAdapter.h"
 
 #include "MainClass.h"
 
@@ -75,23 +78,6 @@ void MainClass::spiffsInit(void) {
 	}
 }
 
-int MainClass::checkWPSButton() {
-	static int wps_button_count = 0;
-	if ((gpio_get_level((gpio_num_t) WPS_BUTTON) == 0)) {
-		wps_button_count++;
-		if (wps_button_count > (WPS_LONG_MS / portTICK_PERIOD_MS)) {
-			xEventGroupSetBits(WifiTask::instance()->eventGroup(), WPS_LONG_BIT);
-			wps_button_count = 0;
-		}
-	} else {
-		if (wps_button_count > (WPS_SHORT_MS / portTICK_PERIOD_MS)) {
-			xEventGroupSetBits(WifiTask::instance()->eventGroup(), WPS_SHORT_BIT);
-		}
-		wps_button_count = 0;
-	}
-	return wps_button_count;
-}
-
 int MainClass::loop() {
 	esp_log_level_set("phy_init", ESP_LOG_ERROR);
 	esp_log_level_set("wifi", ESP_LOG_ERROR);
@@ -108,8 +94,13 @@ int MainClass::loop() {
 	status.addProvider(sht1x.status());
 
 	mqttUser.init();
-	mqttConf.setNext(&sysConf)->setNext(&chanConf)->setNext(&sensorConf);
-	messager.addHandler("/config", &mqttConf);
+	//mqttConf.setNext(&sysConf)->setNext(&chanConf)->setNext(&sensorConf);
+	//messager.addHandler("/config", &mqttConf);
+
+	LedcChannelFactory fact;
+
+	Channel channel0 = {fact.channel(0, 1800)};
+	channel0.add(new MqttChannelAdapter(messager,std::string(mqttConf.getSubMsg()) + "/channel0"));
 
 	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
 	//xTaskCreate(wifi_init_sta, "wifi init task", 4096, &server, 10, NULL);
@@ -163,7 +154,6 @@ int MainClass::loop() {
 			heapFree = esp_get_free_heap_size();
 			ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
 		}
-		checkWPSButton();
 		vTaskDelay(1);
 #endif
 	}

@@ -22,20 +22,16 @@
 #include "mqtt_config.h"
 #include "mqtt_client.h"
 #include "mqttUserTask.h"
-#include "status.h"
-#include "channelFactory.h"
 #include "controlTask.h"
+
+#include "channelFactory.h"
+#include "statusTask.h"
 
 #define TAG "gpio_task"
 /**/
-extern ControlTask channel;
-
-//int handleControlMsg(const char *topic, esp_mqtt_event_handle_t event) {
-//	return (channel.handleControlMsg(topic, event));
-//}
 
 ControlTask::ControlTask(EventGroupHandle_t &_main) :
-		TaskClass("channel", TaskPrio_HMI, 2048), m_isConnected(false), m_update(false), m_sem("gpio"), m_subQueue(), m_pMain(
+		TaskClass("channel", TaskPrio_HMI, 2048), m_isConnected(false), m_update(false), m_subQueue(), m_pMain(
 				&_main), m_status(this) {
 }
 
@@ -52,7 +48,7 @@ void ControlTask::task() {
 			}
 
 
-			Channel *rxData;
+			AbstractChannel *rxData;
 			// Receive a message on the created queue.
 			if (m_subQueue.pop(rxData, (TickType_t) 1)) {
 //				ESP_LOGI(TAG, "received %08X, %d", rxData.chan, rxData.mode);

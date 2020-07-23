@@ -23,8 +23,8 @@
 
 #include "config.h"
 #include "mqtt_client.h"
-#include "status.h"
 #include "sht1x.h"
+#include "statusTask.h"
 
 static const char *TAG = "I2C";
 static const int _us = 20;

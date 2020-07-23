@@ -23,9 +23,9 @@
 #include "controlTask.h"
 
 #include "config_user.h"
-#include "status.h"
-
 #include "sht1x.h"
+
+#include "statusTask.h"
 
 #define TAG "status"
 
@@ -69,6 +69,16 @@ void StatusTask::task() {
 	while (1) {
 		if ((*main_event_group != NULL)) {
 			bool needUpdate = false;
+
+			if ((xEventGroupGetBits(*main_event_group) & CONNECTED_BIT) && !m_isConnected) {
+				setUpdate(true);
+				m_isConnected = true;
+			}
+
+			if (m_isConnected && !(xEventGroupGetBits(*main_event_group) & CONNECTED_BIT)) {
+				m_isConnected = false;
+			}
+
 			for (size_t i = 0; i < (m_statusFuncCount); i++) {
 				if (m_statusFunc[i]->hasUpdate()) {
 					needUpdate = true;

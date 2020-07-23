@@ -12,10 +12,10 @@
 
 #include "sdkconfig.h"
 #include "esp_log.h"
+#include "channelAdapter.h"
 
 static const char *TAG = "MESSAGER";
 
-Messager messager;
 
 
 Messager::Messager() {
@@ -34,12 +34,17 @@ void Messager::handle(esp_mqtt_event_handle_t event) {
 	} else {
 		ESP_LOGD(TAG, "Topic received!: (%d) %.*s", event->topic_len, event->topic_len, event->topic);
 	}
+
+	for (auto m : m_mqttAdapter) {
+		if (m->onMessage(event)) {
+			break;
+		}
+	}
 }
 
-int Messager::addHandler(const char *topic, Config::ParseHandler *pHandle) {
-	return 0;
+void Messager::addHandle(MqttChannelAdapter* _a) {
+	m_mqttAdapter.push_back(_a);
 }
-
 /*
  * static int md5StrToAr(char* pMD5, uint8_t* md5) {
 	int error = 0;

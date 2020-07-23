@@ -9,6 +9,7 @@
 #define WIFITASK_H_
 
 #include "TaskCPP.h"
+#include "esp_wps.h"
 
 class WifiTask: public TaskClass {
 	static const char TAG[];
@@ -37,6 +38,8 @@ private:
 
 	void event_handler(esp_event_base_t event_base, int32_t event_id, void *event_data);
 	void got_ip_event_handler(esp_event_base_t event_base, int32_t event_id, void *event_data);
+
+	int checkWPSButton();
 
 	bool enableWPS = false;
 	EventGroupHandle_t main_event_group = nullptr;

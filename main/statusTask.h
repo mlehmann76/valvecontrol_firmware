@@ -5,8 +5,8 @@
  *      Author: marco
  */
 
-#ifndef MAIN_STATUS_H_
-#define MAIN_STATUS_H_
+#ifndef MAIN_STATUSTASK_H_
+#define MAIN_STATUSTASK_H_
 
 #include "mqttUserTask.h"
 
@@ -55,6 +55,7 @@ private:
 	mqtt::PubQueue &queue;
 	StatusProvider<StatusTask> m_status;
 	bool m_update = false;
+	bool m_isConnected = false;
 };
 
-#endif /* MAIN_STATUS_H_ */
+#endif /* MAIN_STATUSTASK_H_ */

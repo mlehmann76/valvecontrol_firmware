@@ -13,27 +13,31 @@
 #include "sht1x.h"
 #include "mqttUserTask.h"
 #include "mqtt_user_ota.h"
-#include "status.h"
 #include "sht1x.h"
+#include "statusTask.h"
+#include "messager.h"
 
 class MainClass {
 	WifiTask wifitask;
 	ControlTask channel = {wifitask.eventGroup()};
 	Sht1x sht1x = {GPIO_NUM_21, GPIO_NUM_22};
 	mqtt::MqttOtaWorker mqttOta;
-	mqtt::MqttUserTask mqttUser = {wifitask.eventGroup()};
+	mqtt::MqttUserTask mqttUser;
 	StatusTask status = {wifitask.eventGroup(), mqttUser.queue()};
+	Messager messager;
+
 public:
 	int loop();
 	static MainClass *instance() {
 		static MainClass _inst;
 		return &_inst;
 	}
+	Messager& getMessager() { return messager;}
+	EventGroupHandle_t& eventGroup() {return (wifitask.eventGroup());}
 private:
 	MainClass();
 	virtual ~MainClass();
 	void spiffsInit(void);
-	int checkWPSButton();
 };
 
 #endif /* MAIN_MAINCLASS_H_ */

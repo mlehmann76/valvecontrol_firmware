@@ -8,6 +8,8 @@
 #ifndef MAIN_MQTT_USER_H_
 #define MAIN_MQTT_USER_H_
 
+class MainClass;
+
 namespace mqtt {
 
 //TODO
@@ -24,7 +26,7 @@ bool isTopic(esp_mqtt_event_handle_t event, const char *pCommand);
 
 class MqttUserTask : public TaskClass {
 public:
-	MqttUserTask(EventGroupHandle_t &_main) : TaskClass("mqttuser", TaskPrio_HMI, 2048),m_pMain(&_main) {}
+	MqttUserTask() : TaskClass("mqttuser", TaskPrio_HMI, 2048) {}
 	virtual void task();
 	void init(void);
 	void connect(void);
@@ -38,7 +40,6 @@ private:
 	esp_mqtt_client_handle_t client = NULL;
 	bool isMqttConnected = false;
 	bool isMqttInit = false;
-	EventGroupHandle_t *m_pMain;
 };
 
 }

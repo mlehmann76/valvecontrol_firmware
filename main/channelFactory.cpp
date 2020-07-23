@@ -21,32 +21,33 @@ const ledc_channel_config_t LedcChannelFactory::ledc_channel[] = { { //FIXME cha
 		CONTROL2_PIN, LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_2, LEDC_INTR_DISABLE, LEDC_TIMER_0,	LED_C_OFF, 0, }, {
 		CONTROL3_PIN, LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_3, LEDC_INTR_DISABLE, LEDC_TIMER_0, LED_C_OFF, 0, } };
 
-LedcChan::LedcChan(const char* _n, const ledc_channel_config_t _c, uint32_t _p) : Channel(_n),
+LedcChan::LedcChan(const char* _n, const ledc_channel_config_t _c, uint32_t _p) : AbstractChannel(_n),
 		_config(_c), _mode(eoff), _timer("ledc", this, &LedcChan::onTimer, 0, false), _period(_p) {
 	ledc_channel_config(&_c);
-	off();
+	set(false);
 }
 
 LedcChan::~LedcChan() {
-	off();
+	set(false);
 }
 
-void LedcChan::on() {
-	ledc_set_duty(_config.speed_mode, _config.channel,LED_C_ON);
-	ledc_update_duty(_config.speed_mode, _config.channel);
-	_timer.period(LED_C_TIME / portTICK_PERIOD_MS);
-	_timer.start();
-	_mode = efull;
+void LedcChan::set(bool _b) {
+	if (_b) {
+		ledc_set_duty(_config.speed_mode, _config.channel, LED_C_ON);
+		ledc_update_duty(_config.speed_mode, _config.channel);
+		_timer.period(LED_C_TIME / portTICK_PERIOD_MS);
+		_timer.start();
+		_mode = efull;
+	} else {
+		ledc_set_duty(_config.speed_mode, _config.channel, LED_C_OFF);
+		ledc_update_duty(_config.speed_mode, _config.channel);
+		_timer.stop();
+		_mode = eoff;
+	}
+	notify();
 }
 
-void LedcChan::off() {
-	ledc_set_duty(_config.speed_mode, _config.channel,LED_C_OFF);
-	ledc_update_duty(_config.speed_mode, _config.channel);
-	_timer.stop();
-	_mode = eoff;
-}
-
-bool LedcChan::active() {
+bool LedcChan::get() const {
 	return (_mode == efull || _mode == ehalf);
 }
 
@@ -64,7 +65,7 @@ void LedcChan::onTimer() {
 		half();
 		break;
 	case ehalf:
-		off();
+		set(false);
 		break;
 	case eoff:
 		break;
@@ -78,7 +79,7 @@ LedcChannelFactory::LedcChannelFactory() {
 	ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
 }
 
-Channel* LedcChannelFactory::channel(uint32_t index, uint32_t _periodInMs) {
+AbstractChannel* LedcChannelFactory::channel(uint32_t index, uint32_t _periodInMs) {
 	assert(index < count());
 	return new LedcChan(chanConf.getName(index),ledc_channel[index], _periodInMs);
 }

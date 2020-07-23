@@ -10,14 +10,11 @@
 
 #include "driver/gpio.h"
 #include "driver/ledc.h"
-#include "status.h"
 #include "QueueCPP.h"
+#include "statusTask.h"
 
-#define WPS_SHORT_MS	(100)
-#define WPS_LONG_MS (500)
-
-class Channel;
-typedef Queue<Channel*, 8> GpioQueue;
+class AbstractChannel;
+typedef Queue<AbstractChannel*, 8> GpioQueue;
 
 class ControlTask: public TaskClass {
 private:
@@ -39,7 +36,6 @@ private:
 private:
 	bool m_isConnected;
 	bool m_update;
-	Semaphore m_sem;
 	GpioQueue m_subQueue;
 	EventGroupHandle_t *m_pMain;
 	StatusProvider<ControlTask> m_status;

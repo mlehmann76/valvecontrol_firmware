@@ -25,6 +25,7 @@
 #include "mqtt_user_ota.h"
 #include "esp_log.h"
 #include "mqttUserTask.h"
+#include "MainClass.h"
 
 static const char *TAG = "MQTTS";
 
@@ -37,13 +38,13 @@ namespace mqtt {
 	switch (event->event_id) {
 	case MQTT_EVENT_CONNECTED:
 		ESP_LOGD(TAG, "MQTT_EVENT_CONNECTED");
-		xEventGroupSetBits(*mqtt->m_pMain, MQTT_CONNECTED_BIT);
+		xEventGroupSetBits(MainClass::instance()->eventGroup(), MQTT_CONNECTED_BIT);
 		msg_id = esp_mqtt_client_subscribe(client, mqttConf.getSubMsg(), 1);
 		ESP_LOGD(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 		mqtt->isMqttConnected = true;
 		break;
 	case MQTT_EVENT_DISCONNECTED:
-		xEventGroupClearBits(*mqtt->m_pMain, MQTT_CONNECTED_BIT);
+		xEventGroupClearBits(MainClass::instance()->eventGroup(), MQTT_CONNECTED_BIT);
 		ESP_LOGD(TAG, "MQTT_EVENT_DISCONNECTED");
 		mqtt->isMqttConnected = false;
 		mqtt->isMqttInit = false;
@@ -59,7 +60,7 @@ namespace mqtt {
 		break;
 	case MQTT_EVENT_DATA:
 		ESP_LOGD(TAG, "MQTT_EVENT_DATA");
-		messager.handle(event);
+		MainClass::instance()->getMessager().handle(event);
 		break;
 	case MQTT_EVENT_ERROR:
 		ESP_LOGE(TAG, "MQTT_EVENT_ERROR");
@@ -80,6 +81,13 @@ void MqttUserTask::task() {
 	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
 
 	while (1) {
+
+		if ((xEventGroupGetBits(MainClass::instance()->eventGroup()) & CONNECTED_BIT) && !isMqttConnected) {
+			connect();
+		}
+		if (!(xEventGroupGetBits(MainClass::instance()->eventGroup()) & CONNECTED_BIT) && isMqttConnected) {
+			disconnect();
+		}
 
 		message_t rxData;
 
