@@ -8,6 +8,8 @@
 #ifndef MAIN_MQTT_USER_H_
 #define MAIN_MQTT_USER_H_
 
+#include "QueueCPP.h"
+
 class MainClass;
 
 namespace mqtt {
@@ -32,6 +34,8 @@ public:
 	void connect(void);
 	void disconnect(void);
 	PubQueue& queue() { return m_pubQueue; }
+
+	void send(const message_t &rxData);
 
 private:
 	static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event);

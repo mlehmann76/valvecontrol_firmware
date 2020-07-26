@@ -193,7 +193,9 @@ void WifiTask::task() {
 
 		switch (w_state) {
 		case w_disconnected:
-			ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+			if (!(ESP_OK == esp_wifi_init(&cfg))) {
+				break;
+			}
 			ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 			ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
 			ESP_ERROR_CHECK(esp_wifi_start());

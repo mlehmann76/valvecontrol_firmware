@@ -34,7 +34,6 @@ extern "C" {
 #include "statusTask.h"
 
 #include "esp_https_server.h"
-#include "controlTask.h"
 
 #include "http_handler.h"
 #include "http_server.h"

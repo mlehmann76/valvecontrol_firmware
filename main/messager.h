@@ -14,7 +14,6 @@
 
 class MqttChannelAdapter;
 
-
 class Messager {
 public:
 	Messager();
@@ -22,10 +21,9 @@ public:
 	void addHandle(MqttChannelAdapter *);
 	virtual ~Messager();
 private:
-	int handleControlMsg(const char * topic, esp_mqtt_event_handle_t event);
-	void handleChannelControl(const cJSON* const chan);
 
 	std::vector<MqttChannelAdapter*> m_mqttAdapter;
+	MqttChannelAdapter* m_lastMqttAdapter = nullptr;
 };
 
 #endif /* MAIN_MESSAGER_H_ */

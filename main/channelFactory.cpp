@@ -11,9 +11,13 @@
 #include "sdkconfig.h"
 #include "config.h"
 #include "config_user.h"
+#include "esp_log.h"
 
 #include "TimerCPP.h"
+#include "channelAdapter.h"
 #include "channelFactory.h"
+
+#define TAG "CHANNEL"
 
 const ledc_channel_config_t LedcChannelFactory::ledc_channel[] = { { //FIXME chanConfig.count()
 		CONTROL0_PIN, LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, LEDC_INTR_DISABLE, LEDC_TIMER_0, LED_C_OFF, 0, }, { //
@@ -24,20 +28,21 @@ const ledc_channel_config_t LedcChannelFactory::ledc_channel[] = { { //FIXME cha
 LedcChan::LedcChan(const char* _n, const ledc_channel_config_t _c, uint32_t _p) : AbstractChannel(_n),
 		_config(_c), _mode(eoff), _timer("ledc", this, &LedcChan::onTimer, 0, false), _period(_p) {
 	ledc_channel_config(&_c);
-	set(false);
+	set(false,_period);
 }
 
 LedcChan::~LedcChan() {
-	set(false);
+	set(false,_period);
 }
 
-void LedcChan::set(bool _b) {
+void LedcChan::set(bool _b, int _time = -1) {
 	if (_b) {
 		ledc_set_duty(_config.speed_mode, _config.channel, LED_C_ON);
 		ledc_update_duty(_config.speed_mode, _config.channel);
 		_timer.period(LED_C_TIME / portTICK_PERIOD_MS);
 		_timer.start();
 		_mode = efull;
+		_period = _time != -1 ? _time : _period;
 	} else {
 		ledc_set_duty(_config.speed_mode, _config.channel, LED_C_OFF);
 		ledc_update_duty(_config.speed_mode, _config.channel);
@@ -49,6 +54,13 @@ void LedcChan::set(bool _b) {
 
 bool LedcChan::get() const {
 	return (_mode == efull || _mode == ehalf);
+}
+
+void LedcChan::notify() {
+	ESP_LOGD(TAG,"notify %s = %d", name(), get());
+	for(auto m : m_adapter) {
+		m->onNotify();
+	}
 }
 
 void LedcChan::half() {
@@ -84,6 +96,6 @@ AbstractChannel* LedcChannelFactory::channel(uint32_t index, uint32_t _periodInM
 	return new LedcChan(chanConf.getName(index),ledc_channel[index], _periodInMs);
 }
 
-uint32_t LedcChannelFactory::count() const {
+uint32_t LedcChannelFactory::count() {
 	return sizeof(ledc_channel)/sizeof(*ledc_channel);
 }

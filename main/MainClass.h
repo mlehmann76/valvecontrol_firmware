@@ -8,8 +8,9 @@
 #ifndef MAIN_MAINCLASS_H_
 #define MAIN_MAINCLASS_H_
 
+#include "TimerCPP.h"
+#include "SemaphoreCPP.h"
 #include "WifiTask.h"
-#include "controlTask.h"
 #include "sht1x.h"
 #include "mqttUserTask.h"
 #include "mqtt_user_ota.h"
@@ -19,7 +20,6 @@
 
 class MainClass {
 	WifiTask wifitask;
-	ControlTask channel = {wifitask.eventGroup()};
 	Sht1x sht1x = {GPIO_NUM_21, GPIO_NUM_22};
 	mqtt::MqttOtaWorker mqttOta;
 	mqtt::MqttUserTask mqttUser;
@@ -34,6 +34,7 @@ public:
 	}
 	Messager& getMessager() { return messager;}
 	EventGroupHandle_t& eventGroup() {return (wifitask.eventGroup());}
+	mqtt::MqttUserTask& mqtt() {return mqttUser;}
 private:
 	MainClass();
 	virtual ~MainClass();

@@ -14,7 +14,6 @@
 #include "SemaphoreCPP.h"
 #include "QueueCPP.h"
 #include "TimerCPP.h"
-#include "freertos/event_groups.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
@@ -31,7 +30,6 @@
 #include "config_user.h"
 #include "messager.h"
 #include "sntp.h"
-#include "channel.h"
 #include "channelFactory.h"
 #include "channelAdapter.h"
 
@@ -88,22 +86,20 @@ int MainClass::loop() {
 	chanConf.init();
 	sensorConf.init();
 	sntp_support();
-	channel.setup();
-
-	status.addProvider(channel.status());
-	status.addProvider(sht1x.status());
 
 	mqttUser.init();
 	//mqttConf.setNext(&sysConf)->setNext(&chanConf)->setNext(&sensorConf);
 	//messager.addHandler("/config", &mqttConf);
 
-	LedcChannelFactory fact;
+	std::vector<AbstractChannel*> _channels(4);
 
-	Channel channel0 = {fact.channel(0, 1800)};
-	channel0.add(new MqttChannelAdapter(messager,std::string(mqttConf.getSubMsg()) + "/channel0"));
+	for (size_t i=0; i< _channels.size();i++) {
+		_channels[i] = LedcChannelFactory::channel(i, 1800);
+		_channels[i]->add(new MqttChannelAdapter(messager,std::string(mqttConf.getDevName()) + "channel" + std::to_string(i)));
+		_channels[i]->add(new MqttJsonChannelAdapter(messager,std::string(mqttConf.getDevName()) + "control"));
+	}
 
 	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-	//xTaskCreate(wifi_init_sta, "wifi init task", 4096, &server, 10, NULL);
 
 	ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
 
@@ -111,31 +107,9 @@ int MainClass::loop() {
 	time_t now, lastMqttSeen;
 	struct tm timeinfo;
 	time(&lastMqttSeen);
+	int count=0;
 
 	while (1) {
-
-#if 0
-			char strftime_buf[64];
-			time(&now);
-			localtime_r(&now, &timeinfo);
-			//if (xEventGroupWaitBits(button_event_group, WPS_SHORT_BIT, true, true,10)) {
-			/*
-			 time(&now);
-			 if (difftime(now,last) >=2 ) {
-			 vTaskGetRunTimeStats(task_debug_buf);
-			 ESP_LOGI(TAG, "%s", task_debug_buf);
-			 last = now;
-			 }
-			 */
-			if (timeinfo.tm_year > (2016 - 1900)) {
-				localtime_r(&now, &timeinfo);
-				strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-				ESP_LOGI(TAG, "The current date/time is: %s", strftime_buf);
-				vTaskDelay(5000 / portTICK_PERIOD_MS);
-			} else {
-				vTaskDelay(500 / portTICK_PERIOD_MS);
-			}
-	#else
 		time(&now);
 		localtime_r(&now, &timeinfo);
 		if (timeinfo.tm_year > (2016 - 1900)) {
@@ -145,16 +119,16 @@ int MainClass::loop() {
 					esp_restart();
 				}
 			}
-		} else { // reboot after 1h when not connected to mqtt server
-			if (difftime(now, lastMqttSeen) > 3600) {
-				esp_restart();
-			}
 		}
-		if (esp_get_free_heap_size() != heapFree) {
-			heapFree = esp_get_free_heap_size();
-			ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
+		if (0 == count) {
+			if( esp_get_free_heap_size() != heapFree) {
+				heapFree = esp_get_free_heap_size();
+				ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
+				count = 500;
+			}
+		} else {
+			count--;
 		}
 		vTaskDelay(1);
-#endif
 	}
 }

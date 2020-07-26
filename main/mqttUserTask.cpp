@@ -21,7 +21,7 @@
 #include "config_user.h"
 
 #include "mqtt_client.h"
-#include "../../main/messager.h"
+#include "messager.h"
 #include "mqtt_user_ota.h"
 #include "esp_log.h"
 #include "mqttUserTask.h"
@@ -74,8 +74,19 @@ namespace mqtt {
 	return ESP_OK;
 }
 
-
-
+void MqttUserTask::send(const message_t &rxData) {
+	if ((client != NULL) && isMqttConnected) {
+		ESP_LOGD(TAG, "publish %.*s : %.*s", strlen(rxData.pTopic), rxData.pTopic, strlen(rxData.pData), rxData.pData);
+		int msg_id = esp_mqtt_client_publish(client, rxData.pTopic, rxData.pData, strlen(rxData.pData) + 1, 1, 0);
+		ESP_LOGD(TAG, "sent publish successful, msg_id=%d", msg_id);
+	}
+//	if (rxData.topic_len > 0) {
+//		free(rxData.pTopic);
+//	}
+//	if (rxData.data_len > 0) {
+//		free(rxData.pData);
+//	}
+}
 
 void MqttUserTask::task() {
 	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
@@ -91,23 +102,9 @@ void MqttUserTask::task() {
 
 		message_t rxData;
 
-		if ((client != NULL) && (m_pubQueue.pop((rxData), xTicksToWait))) {
+		if ( (m_pubQueue.pop((rxData), xTicksToWait))) {
 
-			if (isMqttConnected) {
-				ESP_LOGD(TAG, "publish %.*s : %.*s", strlen(rxData.pTopic), rxData.pTopic, strlen(rxData.pData),
-					rxData.pData);
-
-				int msg_id = esp_mqtt_client_publish(client, rxData.pTopic, rxData.pData, strlen(rxData.pData) + 1, 1, 0);
-
-				ESP_LOGD(TAG, "sent publish successful, msg_id=%d", msg_id);
-			}
-
-			if (rxData.topic_len > 0) {
-				free(rxData.pTopic);
-			}
-			if (rxData.data_len > 0) {
-				free(rxData.pData);
-			}
+			send(rxData);
 		}
 
 		vTaskDelay(10 / portTICK_PERIOD_MS);

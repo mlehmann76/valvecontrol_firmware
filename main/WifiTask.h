@@ -9,6 +9,7 @@
 #define WIFITASK_H_
 
 #include "TaskCPP.h"
+#include "freertos/event_groups.h"
 #include "esp_wps.h"
 
 class WifiTask: public TaskClass {

@@ -18,16 +18,9 @@ public:
 	virtual ~AbstractChannelAdapter() = default;
 	AbstractChannel *channel() {return m_channel;}
 	void setChannel(AbstractChannel *_channel) {m_channel = _channel;}
+	virtual void onNotify() = 0;
 protected:
 	AbstractChannel *m_channel;
-};
-
-/**
- *
- */
-class DirectChannelAdapter : public AbstractChannelAdapter {
-public:
-	DirectChannelAdapter() : AbstractChannelAdapter() {}
 };
 
 /**
@@ -41,11 +34,28 @@ public:
 		m_client.addHandle(this);
 	}
 	//
-	int onMessage(esp_mqtt_event_handle_t event);
+	virtual int onMessage(esp_mqtt_event_handle_t event);
+	virtual void onNotify();
 	//
-private:
+protected:
 	Messager &m_client;
 	std::string m_topic;
+};
+
+/**
+ * control format for channel control
+ {
+ "channel": { "channel1": { "val": 1 } }
+ }
+ */
+class MqttJsonChannelAdapter : public MqttChannelAdapter {
+public:
+	MqttJsonChannelAdapter(Messager &_me, std::string topic) :
+		MqttChannelAdapter(_me, topic) {}
+	//
+	virtual int onMessage(esp_mqtt_event_handle_t event);
+	virtual void onNotify();
+	//
 };
 
 #endif /* MAIN_ABSTRACTCHANNELADAPTER_H_ */

@@ -20,8 +20,6 @@
 
 #include "config.h"
 #include "mqtt_client.h"
-#include "controlTask.h"
-
 #include "config_user.h"
 #include "sht1x.h"
 

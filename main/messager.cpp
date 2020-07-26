@@ -35,9 +35,19 @@ void Messager::handle(esp_mqtt_event_handle_t event) {
 		ESP_LOGD(TAG, "Topic received!: (%d) %.*s", event->topic_len, event->topic_len, event->topic);
 	}
 
-	for (auto m : m_mqttAdapter) {
-		if (m->onMessage(event)) {
-			break;
+	int ret = 0;
+	//provide message to last handler for accelarated test
+	if (m_lastMqttAdapter != nullptr) {
+		ret = m_lastMqttAdapter->onMessage(event);
+	}
+	if (!ret) { //not handled yet
+		m_lastMqttAdapter = nullptr;
+		for (auto m : m_mqttAdapter) {
+			ret = m->onMessage(event);
+			if (ret) {
+				m_lastMqttAdapter = m;
+				break;
+			}
 		}
 	}
 }
@@ -45,6 +55,8 @@ void Messager::handle(esp_mqtt_event_handle_t event) {
 void Messager::addHandle(MqttChannelAdapter* _a) {
 	m_mqttAdapter.push_back(_a);
 }
+
+
 /*
  * static int md5StrToAr(char* pMD5, uint8_t* md5) {
 	int error = 0;
@@ -149,71 +161,5 @@ int handleConfigMsg(const char * topic, esp_mqtt_event_handle_t event) {
 }
 */
 /* */
-/**
- * control format for channel control
- {
- "channel": { "channel1": { "val": 1 } }
- }
- */
-/*
- * TODO: move function outside off GpioTask
- *
-int Messager::handleControlMsg(const char *topic, esp_mqtt_event_handle_t event) {
-	int ret = 0;
-	//FIXME if (isTopic(event, topic))
-	{
-		ESP_LOGI(TAG, "%.*s", event->topic_len, event->topic);
 
-		cJSON *root = cJSON_Parse(event->data);
-		if (root != NULL) {
-			cJSON *chan = cJSON_GetObjectItem(root, "channel");
-			if (chan != NULL) {
-				handleChannelControl(chan);
-			}
-			cJSON_Delete(root);
-			ret = 1;
-		}
-	}
-	return ret;
-}
-*/
-
-
-/*
- * TODO: move function outside off GpioTask
- */
-/*
-void Messager::handleChannelControl(const cJSON *const chan) {
-	for (uint32_t i = 0; i < chanConf.count(); i++) {
-		cJSON *pChanObj = cJSON_GetObjectItem(chan, chanConf.getName(i));
-		if (pChanObj != NULL) {
-
-			gpio_task_mode_t func = mStatus;
-			uint32_t chanTime = chanConf.getTime(i);
-			cJSON *pJsonChanVal = cJSON_GetObjectItem(pChanObj, "val");
-			if (cJSON_IsString(pJsonChanVal)) {
-				const char *pS = pJsonChanVal->valuestring;
-				if (strncmp(pS, "ON", 2) == 0) {
-					func = mOn;
-				} else {
-					func = mOff;
-				}
-			}
-
-			cJSON *pJsonTime = cJSON_GetObjectItem(pChanObj, "time");
-			if (cJSON_IsNumber(pJsonTime)) {
-				chanTime = pJsonTime->valuedouble;
-			}
-
-			ESP_LOGD(TAG, "channel :%d found ->%s, time : %d", i, func == mOn ? "on" : "off", chanTime);
-
-			queueData cdata = { i, func, chanTime };
-			if (!m_subQueue.add(cdata, 10 / portTICK_PERIOD_MS)) {
-				// Failed to post the message, even after 10 ticks.
-				ESP_LOGW(TAG, "subqueue post failure");
-			}
-		}
-	}
-}
-*/
 

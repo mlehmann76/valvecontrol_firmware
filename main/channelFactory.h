@@ -34,9 +34,9 @@ class LedcChan: public AbstractChannel {
 public:
 	LedcChan(const char* _n, const ledc_channel_config_t _c, uint32_t _periodInMs);
 	virtual ~LedcChan();
-	virtual void set(bool);
+	virtual void set(bool, int);
 	virtual bool get() const;
-	virtual void notify() {}
+	virtual void notify();
 private:
 	void onTimer();
 	void half();
@@ -47,13 +47,13 @@ private:
 	uint32_t _period;
 };
 
-class LedcChannelFactory : public ChannelFacory {
+class LedcChannelFactory {
 	static const uint32_t LED_FREQ = (CONFIG_CHANOUT_PWM_FREQ);
 	static const ledc_channel_config_t ledc_channel[];
 public:
 	LedcChannelFactory();
 	~LedcChannelFactory() = default;
-	virtual AbstractChannel *channel(uint32_t index, uint32_t _periodInMs);
-	virtual uint32_t count() const;
+	static AbstractChannel *channel(uint32_t index, uint32_t _periodInMs);
+	static uint32_t count();
 };
 #endif /* MAIN_ABSTRACTCHANNELFACTORY_H_ */
