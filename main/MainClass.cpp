@@ -109,7 +109,7 @@ int MainClass::loop() {
 	ExclusiveAdapter cex; //only one channel should be active
 
 	for (size_t i=0; i< _channels.size();i++) {
-		_channels[i] = LedcChannelFactory::channel(i, 1800);
+		_channels[i] = LedcChannelFactory::channel(i, std::chrono::seconds(chanConf.getTime(i)));
 		_channels[i]->add(&cex);
 		_channels[i]->add(new MqttChannelAdapter(messager,
 				string_format("%schannel%d/control", mqttConf.getDevName(),i),

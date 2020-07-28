@@ -10,6 +10,7 @@
 
 #include <string>
 #include <vector>
+#include <chrono>
 
 class ChannelAdapterBase;
 
@@ -17,7 +18,7 @@ class ChannelBase {
 public:
 	ChannelBase(const char* _n) : m_name(_n) {};
 	virtual ~ChannelBase() = default;
-	virtual void set(bool,int) = 0;
+	virtual void set(bool, std::chrono::seconds) = 0;
 	virtual bool get() const = 0;
 	virtual void notify() = 0;
 	const char *name() const { return m_name.c_str(); }

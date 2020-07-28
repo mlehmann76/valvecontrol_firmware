@@ -7,8 +7,7 @@
 
 #include <stdio.h>
 #include <time.h>
-
-#include "sdkconfig.h"
+#include "config_user.h"
 
 #include "TaskCPP.h"
 #include "freertos/event_groups.h"
@@ -106,11 +105,11 @@ void Sht1x::reset() {
 void Sht1x::readSensor() {
 	//if (m_sem.take(xTicksToWait) == pdTRUE) {
 		if (hasError()) {
-			m_timeout.period(( 30000 / portTICK_PERIOD_MS ));
+			m_timeout.period(std::chrono::duration_cast<portTick>(std::chrono::seconds(60)).count());
 			m_timeout.start();
 			reset();
 		} else {
-			m_timeout.period(( 1000 / portTICK_PERIOD_MS ));
+			m_timeout.period(std::chrono::duration_cast<portTick>(std::chrono::seconds(10)).count());
 			m_timeout.start();
 			m_temp = readSHT1xTemp();
 			m_hum = readSHT1xHum();

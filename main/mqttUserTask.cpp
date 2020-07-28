@@ -83,7 +83,7 @@ void MqttUserTask::send(const mqttMessage &rxData) {
 }
 
 void MqttUserTask::task() {
-	const TickType_t xTicksToWait = 10 / portTICK_PERIOD_MS;
+	const TickType_t xTicksToWait = std::chrono::duration_cast<portTick>(std::chrono::milliseconds(10)).count();
 
 	while (1) {
 

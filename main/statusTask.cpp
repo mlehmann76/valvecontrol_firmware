@@ -109,7 +109,7 @@ void StatusTask::task() {
 
 					cJSON_Delete(pRoot);
 					/* reduce frequency by waiting some time*/
-					vTaskDelay(500 / portTICK_PERIOD_MS);
+					vTaskDelay(std::chrono::duration_cast<portTick>(std::chrono::milliseconds(500)).count());
 				}
 			}
 		}

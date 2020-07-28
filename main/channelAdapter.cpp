@@ -6,7 +6,7 @@
  */
 
 #include <stdio.h>
-#include <time.h>
+#include <chrono>
 #include <cassert>
 #include <memory>
 #include "esp_log.h"
@@ -79,7 +79,7 @@ int MqttJsonChannelAdapter::onMessage(esp_mqtt_event_handle_t event) {
 					if(status == -1) {
 						channel()->notify();
 					} else {
-						channel()->set(status, chanTime);
+						channel()->set(status, std::chrono::seconds(chanTime));
 					}
 					ret = 1;
 				}
@@ -124,7 +124,7 @@ void ExclusiveAdapter::onNotify(const ChannelBase* _c) {
 		for (auto c : m_vchannel) {
 			//check, if another channel is enabled and disable this channel
 			if (c != _c && c->get()) {
-				c->set(false,-1);
+				c->set(false,std::chrono::seconds(-1));
 			}
 		}
 	}

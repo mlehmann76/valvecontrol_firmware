@@ -6,11 +6,10 @@
  */
 
 #include <stdio.h>
-#include <time.h>
+#include <chrono>
 
-#include "sdkconfig.h"
-#include "config.h"
 #include "config_user.h"
+#include "config.h"
 #include "esp_log.h"
 
 #include "TimerCPP.h"
@@ -21,28 +20,28 @@
 
 const ledc_channel_config_t LedcChannelFactory::ledc_channel[] = { { //FIXME chanConfig.count()
 		CONTROL0_PIN, LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, LEDC_INTR_DISABLE, LEDC_TIMER_0, LED_C_OFF, 0, }, { //
-		CONTROL1_PIN, LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1, LEDC_INTR_DISABLE, LEDC_TIMER_0,	LED_C_OFF, 0, }, {
-		CONTROL2_PIN, LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_2, LEDC_INTR_DISABLE, LEDC_TIMER_0,	LED_C_OFF, 0, }, {
-		CONTROL3_PIN, LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_3, LEDC_INTR_DISABLE, LEDC_TIMER_0, LED_C_OFF, 0, } };
+		CONTROL1_PIN, LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1, LEDC_INTR_DISABLE, LEDC_TIMER_0, LED_C_OFF, 0, }, { //
+		CONTROL2_PIN, LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_2, LEDC_INTR_DISABLE, LEDC_TIMER_0, LED_C_OFF, 0, }, { //
+		CONTROL3_PIN, LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_3, LEDC_INTR_DISABLE, LEDC_TIMER_0, LED_C_OFF, 0, } }; //
 
-LedcChan::LedcChan(const char* _n, const ledc_channel_config_t _c, uint32_t _p) : ChannelBase(_n),
-		_config(_c), _mode(eoff), _timer("ledc", this, &LedcChan::onTimer, 0, false), _period(_p) {
+LedcChan::LedcChan(const char *_n, const ledc_channel_config_t _c, std::chrono::seconds _p) :
+		ChannelBase(_n), _config(_c), _mode(eoff), _timer("ledc", this, &LedcChan::onTimer, 0, false), _period(_p) {
 	ledc_channel_config(&_c);
-	set(false,_period);
+	set(false, _period);
 }
 
 LedcChan::~LedcChan() {
-	set(false,_period);
+	set(false, _period);
 }
 
-void LedcChan::set(bool _b, int _time = -1) {
+void LedcChan::set(bool _b, std::chrono::seconds _time = std::chrono::seconds(-1)) {
 	if (_b) {
 		ledc_set_duty(_config.speed_mode, _config.channel, LED_C_ON);
 		ledc_update_duty(_config.speed_mode, _config.channel);
-		_timer.period(LED_C_TIME / portTICK_PERIOD_MS);
+		_timer.period(std::chrono::duration_cast<portTick>(LED_C_TIME).count());
 		_timer.start();
 		_mode = efull;
-		_period = _time != -1 ? _time : _period;
+		_period = _time != std::chrono::seconds(-1) ? _time : _period;
 	} else {
 		ledc_set_duty(_config.speed_mode, _config.channel, LED_C_OFF);
 		ledc_update_duty(_config.speed_mode, _config.channel);
@@ -57,16 +56,16 @@ bool LedcChan::get() const {
 }
 
 void LedcChan::notify() {
-	ESP_LOGD(TAG,"notify %s = %d", name(), get());
-	for(auto m : m_adapter) {
+	ESP_LOGD(TAG, "notify %s = %d", name(), get());
+	for (auto m : m_adapter) {
 		m->onNotify(this);
 	}
 }
 
 void LedcChan::half() {
-	ledc_set_duty(_config.speed_mode, _config.channel,LED_C_HALF);
+	ledc_set_duty(_config.speed_mode, _config.channel, LED_C_HALF);
 	ledc_update_duty(_config.speed_mode, _config.channel);
-	_timer.period(_period);
+	_timer.period(std::chrono::duration_cast<portTick>(_period).count());
 	_timer.start();
 	_mode = ehalf;
 }
@@ -91,11 +90,11 @@ LedcChannelFactory::LedcChannelFactory() {
 	ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
 }
 
-ChannelBase* LedcChannelFactory::channel(uint32_t index, uint32_t _periodInMs) {
+ChannelBase* LedcChannelFactory::channel(uint32_t index, std::chrono::seconds _p) {
 	assert(index < count());
-	return new LedcChan(chanConf.getName(index),ledc_channel[index], _periodInMs);
+	return new LedcChan(chanConf.getName(index), ledc_channel[index], _p);
 }
 
 uint32_t LedcChannelFactory::count() {
-	return sizeof(ledc_channel)/sizeof(*ledc_channel);
+	return sizeof(ledc_channel) / sizeof(*ledc_channel);
 }

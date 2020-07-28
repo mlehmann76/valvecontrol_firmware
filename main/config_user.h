@@ -8,9 +8,9 @@
 #ifndef MAIN_CONFIG_USER_H_
 #define MAIN_CONFIG_USER_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <chrono>
+#include "freertos/FreeRTOS.h"
+#include "sdkconfig.h"
 
 #define LED_GPIO_PIN   /*(GPIO_NUM_27)*/
 #define LED_GPIO_BIT   /*(GPIO_SEL_27)*/
@@ -35,8 +35,6 @@ extern "C" {
 #define WPS_LONG_BIT (1<<4)
 #define SNTP_UPDATED (1u<<5)
 
-#ifdef __cplusplus
-}
-#endif
+using portTick = std::chrono::duration<TickType_t, std::ratio<1, CONFIG_FREERTOS_HZ>>;
 
 #endif /* MAIN_CONFIG_USER_H_ */
