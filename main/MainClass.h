@@ -20,7 +20,7 @@
 
 class MainClass {
 	WifiTask wifitask;
-	Sht1x sht1x = {GPIO_NUM_21, GPIO_NUM_22};
+	//Sht1x sht1x = {GPIO_NUM_21, GPIO_NUM_22};
 	mqtt::MqttOtaWorker mqttOta;
 	mqtt::MqttUserTask mqttUser;
 	StatusTask status = {wifitask.eventGroup(), mqttUser.queue()};

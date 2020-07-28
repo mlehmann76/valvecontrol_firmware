@@ -8,7 +8,7 @@
 #ifndef MAIN_ABSTRACTCHANNELFACTORY_H_
 #define MAIN_ABSTRACTCHANNELFACTORY_H_
 
-#include "abstractchannel.h"
+#include "channelBase.h"
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 
@@ -20,11 +20,11 @@
 class ChannelFacory {
 public:
 	virtual ~ChannelFacory() = default;
-	virtual AbstractChannel *channel(uint32_t index, uint32_t _periodInMs) = 0;
+	virtual ChannelBase *channel(uint32_t index, uint32_t _periodInMs) = 0;
 	virtual uint32_t count() const = 0;
 };
 
-class LedcChan: public AbstractChannel {
+class LedcChan: public ChannelBase {
 	static const uint32_t LED_C_ON = 0;
 	static const uint32_t LED_C_HALF = ((LEDC_MAX * CONFIG_CHANOUT_PWM_DUTY) / 100);
 	static const uint32_t LED_C_TIME = 250;
@@ -53,7 +53,7 @@ class LedcChannelFactory {
 public:
 	LedcChannelFactory();
 	~LedcChannelFactory() = default;
-	static AbstractChannel *channel(uint32_t index, uint32_t _periodInMs);
+	static ChannelBase *channel(uint32_t index, uint32_t _periodInMs);
 	static uint32_t count();
 };
 #endif /* MAIN_ABSTRACTCHANNELFACTORY_H_ */

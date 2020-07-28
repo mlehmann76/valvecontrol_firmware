@@ -6,6 +6,7 @@
  */
 
 #include <time.h>
+#include <memory>
 #include "TaskCPP.h"
 #include "QueueCPP.h"
 #include "freertos/event_groups.h"
@@ -24,6 +25,7 @@
 #include "sht1x.h"
 
 #include "statusTask.h"
+#include "MainClass.h"
 
 #define TAG "status"
 
@@ -102,23 +104,8 @@ void StatusTask::task() {
 						}
 					}
 
-					char *string = cJSON_Print(pRoot);
-					if (string == NULL) {
-						ESP_LOGI(TAG, "Failed to print channel.");
-						return;
-					}
-
-					mqtt::message_t message = {
-							.pTopic = (char*) mqttConf.getPubMsg(),
-							.pData = string,
-							.topic_len = 0,
-							.data_len = strlen(string) };
-
-					if ( queue.push(message, 10) != pdPASS) {
-						// Failed to post the message, even after 10 ticks.
-						ESP_LOGI(TAG, "pubqueue post failure");
-						free(string);
-					}
+					std::unique_ptr<char[]> _s(cJSON_Print(pRoot));
+					MainClass::instance()->mqtt().send({mqttConf.getPubMsg(),_s.get()});
 
 					cJSON_Delete(pRoot);
 					/* reduce frequency by waiting some time*/

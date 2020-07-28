@@ -7,6 +7,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <memory>
 
 #include "sdkconfig.h"
 
@@ -36,6 +37,18 @@
 #include "MainClass.h"
 
 #define TAG "MAIN"
+
+template<typename ... Args>
+std::string string_format(const std::string &format, Args ... args) {
+	size_t size = snprintf(nullptr, 0, format.c_str(), args ...) + 1; // Extra space for '\0'
+	if (size > 0) {
+		std::unique_ptr<char[]> buf(new char[size]);
+		snprintf(buf.get(), size, format.c_str(), args ...);
+		return std::string(buf.get(), buf.get() + size - 1); // We don't want the '\0' inside
+	} else {
+		return std::string("");
+	}
+}
 
 MainClass::MainClass() {
 	// TODO Auto-generated constructor stub
@@ -79,6 +92,7 @@ void MainClass::spiffsInit(void) {
 int MainClass::loop() {
 	esp_log_level_set("phy_init", ESP_LOG_ERROR);
 	esp_log_level_set("wifi", ESP_LOG_ERROR);
+	esp_log_level_set("MQTT_CLIENT", ESP_LOG_ERROR);
 
 	spiffsInit();
 
@@ -91,35 +105,30 @@ int MainClass::loop() {
 	//mqttConf.setNext(&sysConf)->setNext(&chanConf)->setNext(&sensorConf);
 	//messager.addHandler("/config", &mqttConf);
 
-	std::vector<AbstractChannel*> _channels(4);
+	std::vector<ChannelBase*> _channels(4);
+	ExclusiveAdapter cex; //only one channel should be active
 
 	for (size_t i=0; i< _channels.size();i++) {
 		_channels[i] = LedcChannelFactory::channel(i, 1800);
-		_channels[i]->add(new MqttChannelAdapter(messager,std::string(mqttConf.getDevName()) + "channel" + std::to_string(i)));
-		_channels[i]->add(new MqttJsonChannelAdapter(messager,std::string(mqttConf.getDevName()) + "control"));
+		_channels[i]->add(&cex);
+		_channels[i]->add(new MqttChannelAdapter(messager,
+				string_format("%schannel%d/control", mqttConf.getDevName(),i),
+				string_format("%schannel%d/state", mqttConf.getDevName(),i)));
+		_channels[i]->add(new MqttJsonChannelAdapter(messager,
+				string_format("%scontrol", mqttConf.getDevName()),
+				string_format("%sstate", mqttConf.getDevName())));
 	}
 
-	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-
-	ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
-
-	size_t heapFree = esp_get_free_heap_size();
-	time_t now, lastMqttSeen;
-	struct tm timeinfo;
-	time(&lastMqttSeen);
-	int count=0;
+	int count = 0;
+	uint32_t heapFree = 0;
 
 	while (1) {
-		time(&now);
-		localtime_r(&now, &timeinfo);
-		if (timeinfo.tm_year > (2016 - 1900)) {
-			//reboot @0:0:0 if received sntp
-			if ((timeinfo.tm_hour == 0) && (timeinfo.tm_min == 0)) {
-				if ((timeinfo.tm_sec == 0) || (timeinfo.tm_sec == 1)) {
-					esp_restart();
-				}
-			}
+		//check for time update by sntp
+		if (!(xEventGroupGetBits(MainClass::instance()->eventGroup()) & SNTP_UPDATED) && (update_time() != ESP_ERR_NOT_FOUND)) {
+			xEventGroupSetBits(MainClass::instance()->eventGroup(),SNTP_UPDATED);
+			status.setUpdate(true);
 		}
+
 		if (0 == count) {
 			if( esp_get_free_heap_size() != heapFree) {
 				heapFree = esp_get_free_heap_size();

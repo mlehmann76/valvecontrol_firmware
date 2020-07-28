@@ -74,18 +74,12 @@ namespace mqtt {
 	return ESP_OK;
 }
 
-void MqttUserTask::send(const message_t &rxData) {
+void MqttUserTask::send(const mqttMessage &rxData) {
 	if ((client != NULL) && isMqttConnected) {
-		ESP_LOGD(TAG, "publish %.*s : %.*s", strlen(rxData.pTopic), rxData.pTopic, strlen(rxData.pData), rxData.pData);
-		int msg_id = esp_mqtt_client_publish(client, rxData.pTopic, rxData.pData, strlen(rxData.pData) + 1, 1, 0);
+		ESP_LOGD(TAG, "publish %.*s : %.*s", rxData.m_topic.length(), rxData.m_topic.c_str(), rxData.m_data.length(), rxData.m_data.c_str());
+		int msg_id = esp_mqtt_client_publish(client, rxData.m_topic.c_str(), rxData.m_data.c_str(), rxData.m_data.length() + 1, 1, 0);
 		ESP_LOGD(TAG, "sent publish successful, msg_id=%d", msg_id);
 	}
-//	if (rxData.topic_len > 0) {
-//		free(rxData.pTopic);
-//	}
-//	if (rxData.data_len > 0) {
-//		free(rxData.pData);
-//	}
 }
 
 void MqttUserTask::task() {
@@ -100,7 +94,7 @@ void MqttUserTask::task() {
 			disconnect();
 		}
 
-		message_t rxData;
+		mqttMessage rxData;
 
 		if ( (m_pubQueue.pop((rxData), xTicksToWait))) {
 

@@ -9,20 +9,21 @@
 #define MAIN_MQTT_USER_H_
 
 #include "QueueCPP.h"
+#include <string>
 
 class MainClass;
 
 namespace mqtt {
 
 //TODO
-typedef struct {
-	char *pTopic;
-	char *pData;
-	size_t topic_len;
-	size_t data_len;
-} message_t;
+struct mqttMessage{
+	std::string m_topic;
+	std::string m_data;
+	mqttMessage() = default;
+	mqttMessage(const std::string &_topic, const std::string &_data) : m_topic(_topic), m_data(_data) {}
+};
 
-typedef Queue<message_t,10> PubQueue;
+typedef Queue<mqttMessage,10> PubQueue;
 
 bool isTopic(esp_mqtt_event_handle_t event, const char *pCommand);
 
@@ -35,7 +36,7 @@ public:
 	void disconnect(void);
 	PubQueue& queue() { return m_pubQueue; }
 
-	void send(const message_t &rxData);
+	void send(const mqttMessage &rxData);
 
 private:
 	static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event);

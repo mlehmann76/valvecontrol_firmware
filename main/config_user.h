@@ -33,6 +33,7 @@ extern "C" {
 #define MQTT_OTA_BIT (1u<<2)
 #define WPS_SHORT_BIT	(1<<3)
 #define WPS_LONG_BIT (1<<4)
+#define SNTP_UPDATED (1u<<5)
 
 #ifdef __cplusplus
 }

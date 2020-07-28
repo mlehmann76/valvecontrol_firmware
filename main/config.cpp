@@ -6,6 +6,7 @@
  */
 #include <string.h>
 #include <stdlib.h>
+#include <memory>
 
 #include "sdkconfig.h"
 #include "esp_system.h"
@@ -154,9 +155,8 @@ char* configBase::stringify() {
 }
 
 void configBase::debug() {
-	char *out = cJSON_Print(pConfig);
-	ESP_LOGD(TAG, "debug: (%8X) %s ", (uint32_t )pConfig, out != NULL ? out : "error");
-	free(out);
+	std::unique_ptr<char[]> _s(cJSON_Print(getRoot()));
+	ESP_LOGD(TAG, "debug: (%8X) %s ", (uint32_t )pConfig, _s.get() != NULL ? _s.get() : "error");
 }
 
 configBase::~configBase() {

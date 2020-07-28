@@ -25,7 +25,7 @@ const ledc_channel_config_t LedcChannelFactory::ledc_channel[] = { { //FIXME cha
 		CONTROL2_PIN, LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_2, LEDC_INTR_DISABLE, LEDC_TIMER_0,	LED_C_OFF, 0, }, {
 		CONTROL3_PIN, LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_3, LEDC_INTR_DISABLE, LEDC_TIMER_0, LED_C_OFF, 0, } };
 
-LedcChan::LedcChan(const char* _n, const ledc_channel_config_t _c, uint32_t _p) : AbstractChannel(_n),
+LedcChan::LedcChan(const char* _n, const ledc_channel_config_t _c, uint32_t _p) : ChannelBase(_n),
 		_config(_c), _mode(eoff), _timer("ledc", this, &LedcChan::onTimer, 0, false), _period(_p) {
 	ledc_channel_config(&_c);
 	set(false,_period);
@@ -59,7 +59,7 @@ bool LedcChan::get() const {
 void LedcChan::notify() {
 	ESP_LOGD(TAG,"notify %s = %d", name(), get());
 	for(auto m : m_adapter) {
-		m->onNotify();
+		m->onNotify(this);
 	}
 }
 
@@ -91,7 +91,7 @@ LedcChannelFactory::LedcChannelFactory() {
 	ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
 }
 
-AbstractChannel* LedcChannelFactory::channel(uint32_t index, uint32_t _periodInMs) {
+ChannelBase* LedcChannelFactory::channel(uint32_t index, uint32_t _periodInMs) {
 	assert(index < count());
 	return new LedcChan(chanConf.getName(index),ledc_channel[index], _periodInMs);
 }

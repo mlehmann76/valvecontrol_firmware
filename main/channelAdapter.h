@@ -8,38 +8,39 @@
 #ifndef MAIN_ABSTRACTCHANNELADAPTER_H_
 #define MAIN_ABSTRACTCHANNELADAPTER_H_
 
-#include "abstractchannel.h"
+#include "channelBase.h"
 #include "mqtt_client.h"
 #include "messager.h"
 
-class AbstractChannelAdapter {
+class ChannelAdapterBase {
 public:
-	AbstractChannelAdapter() : m_channel(nullptr) {}
-	virtual ~AbstractChannelAdapter() = default;
-	AbstractChannel *channel() {return m_channel;}
-	void setChannel(AbstractChannel *_channel) {m_channel = _channel;}
-	virtual void onNotify() = 0;
+	ChannelAdapterBase() : m_channel(nullptr) {}
+	virtual ~ChannelAdapterBase() = default;
+	virtual ChannelBase *channel() {return m_channel;}
+	virtual void setChannel(ChannelBase *_channel) {m_channel = _channel;}
+	virtual void onNotify(const ChannelBase*) = 0;
 protected:
-	AbstractChannel *m_channel;
+	ChannelBase *m_channel;
 };
 
 /**
  *
  */
 
-class MqttChannelAdapter : public AbstractChannelAdapter {
+class MqttChannelAdapter : public ChannelAdapterBase {
 public:
-	MqttChannelAdapter(Messager &_me, std::string topic) :
-		AbstractChannelAdapter(), m_client(_me), m_topic(topic) {
+	MqttChannelAdapter(Messager &_me, std::string subtopic, std::string pubtopic) :
+		ChannelAdapterBase(), m_client(_me), m_subtopic(subtopic), m_pubtopic(pubtopic) {
 		m_client.addHandle(this);
 	}
 	//
 	virtual int onMessage(esp_mqtt_event_handle_t event);
-	virtual void onNotify();
+	virtual void onNotify(const ChannelBase*);
 	//
 protected:
 	Messager &m_client;
-	std::string m_topic;
+	std::string m_subtopic;
+	std::string m_pubtopic;
 };
 
 /**
@@ -50,12 +51,23 @@ protected:
  */
 class MqttJsonChannelAdapter : public MqttChannelAdapter {
 public:
-	MqttJsonChannelAdapter(Messager &_me, std::string topic) :
-		MqttChannelAdapter(_me, topic) {}
+	MqttJsonChannelAdapter(Messager &_me, std::string subtopic, std::string pubtopic) :
+		MqttChannelAdapter(_me, subtopic, pubtopic) {}
 	//
 	virtual int onMessage(esp_mqtt_event_handle_t event);
-	virtual void onNotify();
+	virtual void onNotify(const ChannelBase*);
 	//
 };
 
+/*
+ *
+ */
+class ExclusiveAdapter : public ChannelAdapterBase {
+public:
+	virtual ChannelBase *channel() ;
+	virtual void setChannel(ChannelBase *_channel);
+	virtual void onNotify(const ChannelBase*);
+private:
+	std::vector<ChannelBase*> m_vchannel;
+};
 #endif /* MAIN_ABSTRACTCHANNELADAPTER_H_ */

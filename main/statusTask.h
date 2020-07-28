@@ -44,11 +44,11 @@ public:
 	void setUpdate(bool _up) { m_update = _up;}
 	StatusProviderBase &status() { return m_status; }
 
-private:
-	void addTimeStamp(cJSON *root);
-	void addFirmwareStatus(cJSON *root);
-	void addHardwareStatus(cJSON *root);
+	static void addTimeStamp(cJSON *root);
+	static void addFirmwareStatus(cJSON *root);
+	static void addHardwareStatus(cJSON *root);
 
+private:
 	StatusProviderBase* m_statusFunc[8];
 	size_t m_statusFuncCount;
 	EventGroupHandle_t *main_event_group;
