@@ -22,7 +22,7 @@
 
 #include "mqtt_client.h"
 #include "messager.h"
-#include "mqtt_user_ota.h"
+#include "otaWorker.h"
 #include "esp_log.h"
 #include "mqttUserTask.h"
 #include "MainClass.h"

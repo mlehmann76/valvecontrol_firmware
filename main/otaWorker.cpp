@@ -25,14 +25,11 @@
 #include "cJSON.h"
 #include "config.h"
 #include "config_user.h"
-#include "mqtt_client.h"
-#include "mqtt_user_ota.h"
-#include "mqtt_config.h"
-#include "mqttUserTask.h"
+#include "otaWorker.h"
 
 #define TAG "OTA"
 
-namespace mqtt {
+namespace Ota {
 
 static void __attribute__((noreturn)) task_fatal_error() {
 	ESP_LOGE(TAG, "Exiting task due to fatal error...");
@@ -77,29 +74,27 @@ int B85decode::decode(const uint8_t *src, size_t len) {
 	return _len;
 }
 
-MqttOtaWorker::MqttOtaWorker() :
-		m_timeout("otaTimer",this,&MqttOtaWorker::task,( 10000 / portTICK_PERIOD_MS ),false),
+OtaWorker::OtaWorker() :
+		m_timeout("otaTimer",this,&OtaWorker::task,( 10000 / portTICK_PERIOD_MS ),false),
 		m_decodeCtx(nullptr) {
 	mbedtls_md5_init(&m_md5ctx);
 }
 
-int MqttOtaWorker::handle(const char *p, esp_mqtt_event_handle_t event) {
+int OtaWorker::handle(const OtaPacket& _p) {
 	int ret = 0;
 	if ((m_ota_state != OTA_IDLE)) {
-		if ((event->topic_len == 0) || (isTopic(event, p))) {
-			int len = m_decodeCtx->decode((uint8_t*) event->data, event->data_len);
-			if (len > 0) {
-				mbedtls_md5_update(&m_md5ctx, m_decodeCtx->data(), len);
-			}
-			task();
-			LED_TOGGLE();
-			ret = 1;
+		int len = m_decodeCtx->decode((uint8_t*) _p.buf(), _p.len());
+		if (len > 0) {
+			mbedtls_md5_update(&m_md5ctx, m_decodeCtx->data(), len);
 		}
+		task();
+		LED_TOGGLE();
+		ret = 1;
 	}
 	return ret;
 }
 
-void MqttOtaWorker::otaFinish() {
+void OtaWorker::otaFinish() {
 	esp_err_t err;
 	unsigned char output[16];
 	mbedtls_md5_finish(&m_md5ctx, output);
@@ -124,7 +119,7 @@ void MqttOtaWorker::otaFinish() {
 	}
 }
 
-void MqttOtaWorker::otaStart() {
+void OtaWorker::otaStart() {
 	const esp_partition_t *configured = esp_ota_get_boot_partition();
 	const esp_partition_t *running = esp_ota_get_running_partition();
 	esp_err_t err;
@@ -151,7 +146,7 @@ void MqttOtaWorker::otaStart() {
 	m_ota_state = OTA_DATA;
 }
 
-void MqttOtaWorker::otaData() {
+void OtaWorker::otaData() {
 	esp_err_t err;
 	m_timeout.start();
 	if (m_decodeCtx->len() > 0) {
@@ -171,7 +166,7 @@ void MqttOtaWorker::otaData() {
 	}
 }
 
-void MqttOtaWorker::start(const md5_update& _d) {
+void OtaWorker::start(const md5_update& _d) {
 	m_decodeCtx = new B85decode(); //TODO make different Decoder possible
 	m_md5Updata = _d;
 	m_ota_state = OTA_START;
@@ -184,8 +179,8 @@ void MqttOtaWorker::start(const md5_update& _d) {
 	task();
 }
 
-void MqttOtaWorker::task() {
-	if (m_timeout.active()) {
+void OtaWorker::task() {
+	if (!m_timeout.active()) {
 		m_ota_state = OTA_ERROR;
 	} else {
 

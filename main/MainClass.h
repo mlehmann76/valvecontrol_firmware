@@ -13,7 +13,7 @@
 #include "WifiTask.h"
 #include "sht1x.h"
 #include "mqttUserTask.h"
-#include "mqtt_user_ota.h"
+#include "otaWorker.h"
 #include "sht1x.h"
 #include "statusTask.h"
 #include "messager.h"
@@ -21,7 +21,7 @@
 class MainClass {
 	WifiTask wifitask;
 	//Sht1x sht1x = {GPIO_NUM_21, GPIO_NUM_22};
-	mqtt::MqttOtaWorker mqttOta;
+	Ota::OtaWorker otaWorker;
 	mqtt::MqttUserTask mqttUser;
 	StatusTask status = {wifitask.eventGroup(), mqttUser.queue()};
 	Messager messager;

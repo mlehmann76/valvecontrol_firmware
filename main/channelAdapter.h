@@ -23,6 +23,14 @@ protected:
 	ChannelBase *m_channel;
 };
 
+class MqttChannelAdapter;
+class ChannelMqttreceiver : public AbstractMqttReceiver {
+public:
+	ChannelMqttreceiver(MqttChannelAdapter* _m) : m_adapter(_m) {}
+	virtual int onMessage(esp_mqtt_event_handle_t event);
+private:
+	MqttChannelAdapter *m_adapter;
+};
 /**
  *
  */
@@ -30,8 +38,8 @@ protected:
 class MqttChannelAdapter : public ChannelAdapterBase {
 public:
 	MqttChannelAdapter(Messager &_me, std::string subtopic, std::string pubtopic) :
-		ChannelAdapterBase(), m_client(_me), m_subtopic(subtopic), m_pubtopic(pubtopic) {
-		m_client.addHandle(this);
+		ChannelAdapterBase(), m_client(_me), m_rec(this), m_subtopic(subtopic), m_pubtopic(pubtopic) {
+		m_client.addHandle(&m_rec);
 	}
 	//
 	virtual int onMessage(esp_mqtt_event_handle_t event);
@@ -39,6 +47,7 @@ public:
 	//
 protected:
 	Messager &m_client;
+	ChannelMqttreceiver m_rec;
 	std::string m_subtopic;
 	std::string m_pubtopic;
 };
@@ -70,4 +79,9 @@ public:
 private:
 	std::vector<ChannelBase*> m_vchannel;
 };
+
+inline int ChannelMqttreceiver::onMessage(esp_mqtt_event_handle_t event) {
+	return m_adapter->onMessage(event);
+}
+
 #endif /* MAIN_ABSTRACTCHANNELADAPTER_H_ */

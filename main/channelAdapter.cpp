@@ -41,7 +41,7 @@ void MqttChannelAdapter::onNotify(const ChannelBase*) {
 
 int MqttJsonChannelAdapter::onMessage(esp_mqtt_event_handle_t event) {
 	int ret = 0;
-	if (isTopic(event, m_subtopic.c_str()))
+	if (event->topic == m_subtopic)
 	{
 		ESP_LOGI(channel()->name(), "%.*s", event->topic_len, event->topic);
 

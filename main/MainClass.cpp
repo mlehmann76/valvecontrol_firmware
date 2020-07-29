@@ -33,6 +33,7 @@
 #include "sntp.h"
 #include "channelFactory.h"
 #include "channelAdapter.h"
+#include "otaHandler.h"
 
 #include "MainClass.h"
 
@@ -104,6 +105,9 @@ int MainClass::loop() {
 	mqttUser.init();
 	//mqttConf.setNext(&sysConf)->setNext(&chanConf)->setNext(&sensorConf);
 	//messager.addHandler("/config", &mqttConf);
+	MqttOtaHandler mqttOta(&otaWorker, &messager,
+			string_format("%ssystem", mqttConf.getDevName()),
+			string_format("%sota/$implementation/binary", mqttConf.getDevName()));
 
 	std::vector<ChannelBase*> _channels(4);
 	ExclusiveAdapter cex; //only one channel should be active
