@@ -31,14 +31,6 @@
 
 namespace Ota {
 
-static void __attribute__((noreturn)) task_fatal_error() {
-	ESP_LOGE(TAG, "Exiting task due to fatal error...");
-	(void) vTaskDelete(NULL);
-	ESP_LOGE(TAG, "restart in 5...");
-	vTaskDelay(5000 / portTICK_PERIOD_MS);
-	esp_restart();
-}
-
 void B85decode::init() {
 	memset(buffer, 0, DECODEBUFSIZE);
 	memset(decoded, 0, DECODEBUFSIZE);
@@ -82,7 +74,7 @@ OtaWorker::OtaWorker() :
 
 int OtaWorker::handle(const OtaPacket& _p) {
 	int ret = 0;
-	if ((m_ota_state != OTA_IDLE)) {
+	if (m_decodeCtx!=nullptr && m_ota_state != OTA_IDLE) {
 		int len = m_decodeCtx->decode((uint8_t*) _p.buf(), _p.len());
 		if (len > 0) {
 			mbedtls_md5_update(&m_md5ctx, m_decodeCtx->data(), len);
@@ -107,14 +99,13 @@ void OtaWorker::otaFinish() {
 	} else {
 		if (esp_ota_end(update_handle) != ESP_OK) {
 			ESP_LOGE(TAG, "esp_ota_end failed!");
-			task_fatal_error();
 		}
 		err = esp_ota_set_boot_partition(update_partition);
 		if (err != ESP_OK) {
 			ESP_LOGE(TAG, "esp_ota_set_boot_partition failed (%s)!", esp_err_to_name(err));
-			task_fatal_error();
 		}
 		ESP_LOGI(TAG, "Prepare to restart system!");
+		cleanUp();
 		esp_restart();
 	}
 }
@@ -139,7 +130,7 @@ void OtaWorker::otaStart() {
 	err = esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &update_handle);
 	if (err != ESP_OK) {
 		ESP_LOGE(TAG, "esp_ota_begin failed (%s)", esp_err_to_name(err));
-		task_fatal_error();
+		cleanUp();
 	}
 	ESP_LOGI(TAG, "esp_ota_begin succeeded");
 
@@ -148,18 +139,19 @@ void OtaWorker::otaStart() {
 
 void OtaWorker::otaData() {
 	esp_err_t err;
-	m_timeout.start();
-	if (m_decodeCtx->len() > 0) {
+	m_timeout.reset();
+	if (m_decodeCtx != nullptr && m_decodeCtx->len() > 0) {
 		sum += m_decodeCtx->len();
 		err = esp_ota_write(update_handle, (const void*) (m_decodeCtx->data()), m_decodeCtx->len());
 		if (err != ESP_OK) {
 			ESP_LOGE(TAG, "esp_ota_write failed (%s)", esp_err_to_name(err));
-			task_fatal_error();
+			cleanUp();
 		} else {
 			ESP_LOGI(TAG, "esp_ota_write %d%%", sum * 100 / m_md5Updata.len);
 		}
 		if (sum == m_md5Updata.len) {
 			m_ota_state = OTA_FINISH;
+			task();
 		}
 	} else {
 		m_ota_state = OTA_ERROR;
@@ -167,6 +159,7 @@ void OtaWorker::otaData() {
 }
 
 void OtaWorker::start(const md5_update& _d) {
+	ESP_LOGI(TAG, "starting ota");
 	m_decodeCtx = new B85decode(); //TODO make different Decoder possible
 	m_md5Updata = _d;
 	m_ota_state = OTA_START;
@@ -175,35 +168,42 @@ void OtaWorker::start(const md5_update& _d) {
 	m_decodeCtx->init();
 	m_isRunning = true;
 	m_timeout.start();
+	while(!m_timeout.active()) {}
 	sum = 0;
 	task();
 }
 
 void OtaWorker::task() {
-	if (!m_timeout.active()) {
+	if (m_ota_state != OTA_IDLE && !m_timeout.active()) {
+		ESP_LOGE(TAG, "timeout in ota task");
 		m_ota_state = OTA_ERROR;
-	} else {
-
-		switch (m_ota_state) {
-		case OTA_IDLE:
-			break;
-
-		case OTA_START:
-			otaStart();
-			break;
-
-		case OTA_DATA:
-			otaData();
-			break;
-
-		case OTA_FINISH:
-			otaFinish();
-			break;
-
-		case OTA_ERROR:
-			break;
-		}
 	}
+
+	switch (m_ota_state) {
+	case OTA_IDLE:
+		break;
+
+	case OTA_START:
+		otaStart();
+		break;
+
+	case OTA_DATA:
+		otaData();
+		break;
+
+	case OTA_FINISH:
+		otaFinish();
+		break;
+
+	case OTA_ERROR:
+		cleanUp();
+		m_ota_state = OTA_IDLE;
+		break;
+	}
+}
+
+void OtaWorker::cleanUp() {
+	delete m_decodeCtx;
 }
 
 }

@@ -27,9 +27,9 @@ public:
 
 class B85decode : public AbstractDecoder{
 	static const size_t DECODEBUFSIZE = (CONFIG_MQTT_BUFFER_SIZE + 5);
-	uint32_t _decodePos;
-	uint32_t _len;
-	uint32_t _sumLen;
+	uint32_t _decodePos = 0;
+	uint32_t _len = 0;
+	uint32_t _sumLen = 0;
 	uint8_t buffer[DECODEBUFSIZE];
 	uint8_t decoded[DECODEBUFSIZE];
 public:
@@ -71,6 +71,7 @@ private:
 	void otaStart();
 	void otaFinish();
 	void otaData();
+	void cleanUp();
 
 	TimerMember<OtaWorker> m_timeout;
 	ota_state_e m_ota_state = OTA_IDLE;

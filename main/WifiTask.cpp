@@ -269,12 +269,12 @@ int WifiTask::checkWPSButton() {
 	if ((gpio_get_level((gpio_num_t) WPS_BUTTON) == 0)) {
 		wps_button_count++;
 		if (wps_button_count > (WPS_LONG_MS / portTICK_PERIOD_MS)) {
-			xEventGroupSetBits(WifiTask::instance()->eventGroup(), WPS_LONG_BIT);
+			xEventGroupSetBits(main_event_group, WPS_LONG_BIT);
 			wps_button_count = 0;
 		}
 	} else {
 		if (wps_button_count > (WPS_SHORT_MS / portTICK_PERIOD_MS)) {
-			xEventGroupSetBits(WifiTask::instance()->eventGroup(), WPS_SHORT_BIT);
+			xEventGroupSetBits(main_event_group, WPS_SHORT_BIT);
 		}
 		wps_button_count = 0;
 	}

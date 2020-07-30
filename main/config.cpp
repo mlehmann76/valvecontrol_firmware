@@ -189,7 +189,7 @@ esp_err_t MqttConfig::init() {
 
 	if ((mqtt_sub_msg != NULL) && (mqtt_pub_msg != NULL)) {
 		snprintf(mqtt_sub_msg, required_size + sizeof("#") + 1, "%s#", mqtt_device_name);
-		snprintf(mqtt_pub_msg, required_size + sizeof("state/") + 1, "%sstate/", mqtt_device_name);
+		snprintf(mqtt_pub_msg, required_size + sizeof("state") + 1, "%sstate", mqtt_device_name);
 	}
 
 	ESP_LOGD(TAG, "sub: (%s) pub (%s)", getSubMsg(), getPubMsg());

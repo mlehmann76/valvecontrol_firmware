@@ -94,6 +94,8 @@ int MainClass::loop() {
 	esp_log_level_set("phy_init", ESP_LOG_ERROR);
 	esp_log_level_set("wifi", ESP_LOG_ERROR);
 	esp_log_level_set("MQTT_CLIENT", ESP_LOG_ERROR);
+	esp_log_level_set("OTA", ESP_LOG_VERBOSE);
+
 
 	spiffsInit();
 

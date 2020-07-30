@@ -44,7 +44,11 @@ int MqttOtaHandler::md5StrToAr(char *pMD5, uint8_t *md5) {
 
 int MqttOtaHandler::onMessage(esp_mqtt_event_handle_t event) {
 	int ret = 0;
-	if (event->topic == m_firmwaretopic) {
+	if (((event->topic_len == 0) && m_ota->isRunning()) || (event->topic && event->topic == m_updatetopic)) {
+		ESP_LOGE(TAG, "OTA update topic %s", event->data_len < 64 ? event->data : "data");
+		Ota::OtaPacket p(event->data, event->data_len);
+		ret = m_ota->handle(p);
+	}else if (event->topic && event->topic == m_firmwaretopic) {
 		ESP_LOGI(TAG, "%.*s", event->topic_len, event->topic);
 		cJSON *root = cJSON_Parse(event->data);
 		cJSON *firmware = cJSON_GetObjectItem(root, "firmware");
@@ -53,9 +57,6 @@ int MqttOtaHandler::onMessage(esp_mqtt_event_handle_t event) {
 		}
 		cJSON_Delete(root);
 		ret = 1;
-	} else if ((event->topic == m_updatetopic) | ((event->topic_len == 0) && m_ota->isRunning())) {
-		Ota::OtaPacket p(event->data, event->data_len);
-		ret = m_ota->handle(p);
 	}
 	return ret;
 }
@@ -95,7 +96,7 @@ void MqttOtaHandler::handleFirmwareMessage(cJSON* firmware) {
 		if (error) {
 			ESP_LOGE(TAG, "handleFirmwareMsg error %d", error);
 		} else {
-			ESP_LOGV(TAG, "fileSize :%d ->md5: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+			ESP_LOGI(TAG, "fileSize :%d ->md5: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
 					md5_update.len, md5_update.md5[0], md5_update.md5[1], md5_update.md5[2], md5_update.md5[3],
 					md5_update.md5[4], md5_update.md5[5], md5_update.md5[6], md5_update.md5[7], md5_update.md5[8],
 					md5_update.md5[9], md5_update.md5[10], md5_update.md5[11], md5_update.md5[12], md5_update.md5[13],
