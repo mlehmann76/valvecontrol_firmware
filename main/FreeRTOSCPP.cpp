@@ -21,11 +21,13 @@ void * operator new[]( size_t size )
 void operator delete( void * ptr )
 {
     vPortFree ( ptr );
+    ptr = nullptr;
 }
 
 void operator delete[]( void * ptr )
 {
     vPortFree ( ptr );
+    ptr = nullptr;
 }
 
 

@@ -12,17 +12,18 @@
 #include <chrono>
 #include <sys/socket.h>
 
-#define SocketSetSize 8
+#define SocketSetSize FD_SETSIZE
 
 class Socket {
 public:
 	typedef std::chrono::microseconds TimeoutValue;
 	enum PollType { newData, errorState, noData };
+	enum SocketType { SOCKET_STREAM = 1, SOCKET_DGRAM = 2};
 
-	Socket(int = -1, bool _tcp = true);
+	Socket(int = -1, SocketType = SOCKET_STREAM);
 	Socket(const Socket&) = delete;
 	Socket(Socket&&) = delete;
-	~Socket() = default;
+	~Socket();
 	Socket& operator =(const Socket&) = delete;
 	Socket& operator =(Socket&&) = delete;
 
@@ -52,15 +53,18 @@ public:
 
 	bool IsConnected();
 
+	int get() { return m_socket;}
+
 private:
 	struct timeval toTimeVal(const TimeoutValue &timeout) {
 		struct timeval _timeout;
+		_timeout.tv_sec = 0;
 		_timeout.tv_usec = timeout.count();
 		return _timeout;
 	}
 
 	int m_socket;
-	bool m_isTCP;
+	SocketType m_socketType;
 	bool m_isConnected;
 };
 

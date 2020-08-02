@@ -37,6 +37,7 @@
 
 #include "MainClass.h"
 
+#include "echoServer.h"
 #define TAG "MAIN"
 
 template<typename ... Args>
@@ -91,10 +92,12 @@ void MainClass::spiffsInit(void) {
 }
 
 int MainClass::loop() {
+	esp_log_level_set("ECHO", ESP_LOG_VERBOSE);
+	esp_log_level_set("SOCKET", ESP_LOG_VERBOSE);
 	esp_log_level_set("phy_init", ESP_LOG_ERROR);
 	esp_log_level_set("wifi", ESP_LOG_ERROR);
 	esp_log_level_set("MQTT_CLIENT", ESP_LOG_ERROR);
-	esp_log_level_set("OTA", ESP_LOG_VERBOSE);
+	esp_log_level_set("OTA", ESP_LOG_ERROR);
 
 
 	spiffsInit();
@@ -127,12 +130,14 @@ int MainClass::loop() {
 
 	int count = 0;
 	uint32_t heapFree = 0;
+	EchoServer echo;
 
 	while (1) {
 		//check for time update by sntp
 		if (!(xEventGroupGetBits(MainClass::instance()->eventGroup()) & SNTP_UPDATED) && (update_time() != ESP_ERR_NOT_FOUND)) {
 			xEventGroupSetBits(MainClass::instance()->eventGroup(),SNTP_UPDATED);
 			status.setUpdate(true);
+			echo.start();
 		}
 
 		if (0 == count) {

@@ -15,9 +15,9 @@
 
 #define TAG "SOCKET"
 
-Socket::Socket(int _s, bool _tcp) : m_socket(_s), m_isTCP(_tcp), m_isConnected(false){
+Socket::Socket(int _s, SocketType _type) : m_socket(_s), m_socketType(_type), m_isConnected(false){
 	if (m_socket == -1) {
-		m_socket = ::socket(AF_INET, m_isTCP ? SOCK_STREAM : SOCK_DGRAM, 0);
+		m_socket = ::socket(AF_INET, m_socketType, 0);
 		if (m_socket == -1) {
 			ESP_LOGE(TAG, "error creating Socket");
 		}
@@ -27,6 +27,8 @@ Socket::Socket(int _s, bool _tcp) : m_socket(_s), m_isTCP(_tcp), m_isConnected(f
 Socket* Socket::accept(const TimeoutValue &timeout) {
 	fd_set set;
 	int newSocketHandle = 0;
+	struct sockaddr_in client;
+	unsigned int len = sizeof(client);
 
 	//  Clear master sockets set
 	FD_ZERO(&set);
@@ -35,14 +37,17 @@ Socket* Socket::accept(const TimeoutValue &timeout) {
 	FD_SET(m_socket, &set);
 	struct timeval _timeout = toTimeVal(timeout);
 
-	if (select( SocketSetSize, &set, 0, &set, &_timeout) > 0) {
-		newSocketHandle = ::accept(m_socket, NULL, NULL);
+	if (::select( SocketSetSize, &set, 0, &set, &_timeout) > 0) {
+		newSocketHandle = ::accept(m_socket, (struct sockaddr*) &client, &len);
 
 		if (newSocketHandle == -1) {
+			ESP_LOGD(TAG, "error on accept(%d) -> %s", m_socket, strerror(errno));
 			return nullptr;
 		}
 
-		return new Socket(newSocketHandle);
+		return new Socket(newSocketHandle, m_socketType);
+	} else {
+		ESP_LOGE(TAG, "error on select %s", strerror(errno));
 	}
 
 	return nullptr;
@@ -92,6 +97,7 @@ bool Socket::connect(std::string hostname, unsigned short remotePort, const Time
 
 	if (::getaddrinfo(hostname.c_str(), service.c_str(), &getaddrinfoHints, &getResults) != 0) {
 		ESP_LOGE(TAG, "error on getaddrinfo %s,%s", hostname.c_str(), service.c_str());
+		freeaddrinfo(getResults);
 		return false;
 	}
     struct sockaddr_in *addrData;
@@ -138,11 +144,12 @@ bool Socket::connect(std::string hostname, unsigned short remotePort, const Time
 		connectSuccess = true;
 		m_isConnected = true;
 	}
-
+	freeaddrinfo(getResults);
 	return connectSuccess;
 }
 
 bool Socket::listen(unsigned short backlog) {
+	ESP_LOGD(TAG, "socket %d listen, backlog %d", m_socket,backlog);
 	if (m_socket == -1) {
 		ESP_LOGE(TAG, "listen: Socket is not initialized.");
 	}
@@ -249,13 +256,26 @@ bool Socket::hasNewConnection(const TimeoutValue &timeout) {
 
 bool Socket::setNonBlocking(bool state) {
 	int ret = -1;
-	unsigned long argp = 1;
+	//https://stackoverflow.com/questions/1150635/unix-nonblocking-i-o-o-nonblock-vs-fionbio
+	int flags = ::fcntl(m_socket, F_GETFL, 0);
 
-	ret = ::ioctl(m_socket, FIONBIO, &argp);
-
-	return (ret == -1) ? false : true;
+	if (state) {
+		flags |= O_NONBLOCK;
+	} else {
+		flags &= ~O_NONBLOCK;
+	}
+	ret = ::fcntl(m_socket, F_SETFL, flags);
+	if (ret == -1){
+		ESP_LOGE(TAG, "::fcntl() failed");
+		return false;
+	}
+	return true;
 }
 
 bool Socket::IsConnected() {
 	return m_isConnected;
+}
+
+Socket::~Socket() {
+	ESP_LOGD(TAG, "~Socket() called %d", m_socket);
 }
