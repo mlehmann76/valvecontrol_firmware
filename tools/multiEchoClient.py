@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+#https://github.com/realpython/materials/blob/master/python-sockets-tutorial/multiconn-client.py
 import sys
 import socket
 import selectors
@@ -29,14 +29,19 @@ def service_connection(key, mask):
     sock = key.fileobj
     data = key.data
     if mask & selectors.EVENT_READ:
-        recv_data = sock.recv(1024)  # Should be ready to read
-        if recv_data:
-            print('received', repr(recv_data), 'from connection', data.connid)
-            data.recv_total += len(recv_data)
-        if not recv_data or data.recv_total == data.msg_total:
-            print('closing connection', data.connid)
+        try:
+            recv_data = sock.recv(1024)  # Should be ready to read
+            if recv_data:
+                print('received', repr(recv_data), 'from connection', data.connid)
+                data.recv_total += len(recv_data)
+            if not recv_data or data.recv_total == data.msg_total:
+                print('closing connection', data.connid)
+                sel.unregister(sock)
+                sock.close()
+        except ConnectionResetError:
             sel.unregister(sock)
             sock.close()
+            
     if mask & selectors.EVENT_WRITE:
         if not data.outb and data.messages:
             data.outb = data.messages.pop(0)

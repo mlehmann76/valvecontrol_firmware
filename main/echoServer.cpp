@@ -40,14 +40,14 @@ void EchoServer::task() {
 			if (m_sockets.front()->hasNewConnection(std::chrono::microseconds(1))) {
 				Socket *_con = m_sockets.front()->accept(std::chrono::microseconds(1));
 				if (_con != nullptr) {
-					ESP_LOGD(TAG, "socket accepted");
+					ESP_LOGD(TAG, "socket(%d) accepted", _con->get());
 					m_sockets.push_back(_con);
 				}
 			}
 			for (size_t i = 1; i < m_sockets.size(); i++) {
 				Socket *_s = m_sockets.at(i);
 				if ((_s != nullptr)) {
-					char buf[128];
+					char buf[1024];
 					switch (_s->pollConnectionState(std::chrono::microseconds(1))) {
 					case Socket::noData:
 						ESP_LOGV(TAG, "Socket(%d)::noData",_s->get());
@@ -61,7 +61,7 @@ void EchoServer::task() {
 						bzero(buf, sizeof(buf));
 						int readSize = _s->read(buf, sizeof(buf));
 						if (readSize >= 0) {
-							ESP_LOGD(TAG, "read: %d , %s", readSize, buf);
+							ESP_LOGD(TAG, "socket(%d) read: %d , %s",_s->get(), readSize, buf);
 							_s->write(buf, readSize);
 						} else {
 							removeSocket(_s);
