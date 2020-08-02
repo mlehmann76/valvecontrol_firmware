@@ -37,8 +37,8 @@ void EchoServer::removeSocket(Socket *_s) {
 void EchoServer::task() {
 	while (1) {
 		if (m_sockets.size() > 0 && m_sockets.back() != nullptr) {
-			if (m_sockets.front()->hasNewConnection(std::chrono::milliseconds(100))) {
-				Socket *_con = m_sockets.front()->accept(std::chrono::milliseconds(100));
+			if (m_sockets.front()->hasNewConnection(std::chrono::microseconds(1))) {
+				Socket *_con = m_sockets.front()->accept(std::chrono::microseconds(1));
 				if (_con != nullptr) {
 					ESP_LOGD(TAG, "socket accepted");
 					m_sockets.push_back(_con);
@@ -50,14 +50,14 @@ void EchoServer::task() {
 					char buf[128];
 					switch (_s->pollConnectionState(std::chrono::microseconds(1))) {
 					case Socket::noData:
-						ESP_LOGD(TAG, "Socket(%d)::noData",_s->get());
+						ESP_LOGV(TAG, "Socket(%d)::noData",_s->get());
 						break;
 					case Socket::errorState:
-						ESP_LOGD(TAG, "Socket(%d)::errorState",_s->get());
+						ESP_LOGV(TAG, "Socket(%d)::errorState",_s->get());
 						removeSocket(_s);
 						break;
 					case Socket::newData:
-						ESP_LOGD(TAG, "Socket(%d)::newData",_s->get());
+						ESP_LOGV(TAG, "Socket(%d)::newData",_s->get());
 						bzero(buf, sizeof(buf));
 						int readSize = _s->read(buf, sizeof(buf));
 						if (readSize >= 0) {
