@@ -43,12 +43,10 @@
 esp_wps_config_t WifiTask::config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
 const char WifiTask::TAG[] = "WifiTask";
 
-WifiTask::WifiTask() : TaskClass("wifi", TaskPrio_HMI, 2048){
-	// TODO Auto-generated constructor stub
+WifiTask::WifiTask() : TaskClass("wifi", TaskPrio_HMI, 3072){
 }
 
 WifiTask::~WifiTask() {
-	// TODO Auto-generated destructor stub
 }
 
 void WifiTask::event_handler_s(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
@@ -59,6 +57,18 @@ void WifiTask::event_handler_s(void *arg, esp_event_base_t event_base, int32_t e
 void WifiTask::got_ip_event_handler_s(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
 	WifiTask* _t = reinterpret_cast<WifiTask*>(arg);
 	_t->got_ip_event_handler(event_base, event_id, event_data);
+}
+
+void WifiTask::notifyConnect() {
+	for (auto _c : m_observer) {
+		_c->onConnect();
+	}
+}
+
+void WifiTask::notifyDisconnect() {
+	for (auto _c : m_observer) {
+		_c->onDisconnect();
+	}
 }
 
 void WifiTask::event_handler(esp_event_base_t event_base, int32_t event_id, void *event_data) {
@@ -104,6 +114,7 @@ void WifiTask::event_handler(esp_event_base_t event_base, int32_t event_id, void
 		 auto-reassociate. */
 		esp_wifi_connect();
 		xEventGroupClearBits(main_event_group, CONNECTED_BIT);
+		notifyDisconnect();
 		break;
 	case WIFI_EVENT_STA_AUTHMODE_CHANGE: /**< the auth mode of AP connected by ESP32 station changed */
 		break;
@@ -149,6 +160,7 @@ void WifiTask::event_handler(esp_event_base_t event_base, int32_t event_id, void
 		break;
 	}
 }
+
 /** Event handler for IP_EVENT_ETH_GOT_IP */
 void WifiTask::got_ip_event_handler(esp_event_base_t event_base, int32_t event_id, void *event_data) {
 	ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
@@ -156,6 +168,7 @@ void WifiTask::got_ip_event_handler(esp_event_base_t event_base, int32_t event_i
 	case IP_EVENT_STA_GOT_IP:
 		ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
 		xEventGroupSetBits(main_event_group, CONNECTED_BIT);
+		notifyConnect();
 		break;
 	case IP_EVENT_STA_LOST_IP:
 		break;
@@ -279,4 +292,18 @@ int WifiTask::checkWPSButton() {
 		wps_button_count = 0;
 	}
 	return wps_button_count;
+}
+
+void WifiTask::addConnectionObserver(ConnectionObserver &_obs) {
+	m_observer.push_back(&_obs);
+}
+
+void WifiTask::remConnectionObserver(ConnectionObserver &_obs) {
+	for (std::vector<ConnectionObserver*>::iterator it = m_observer.begin(); it != m_observer.end(); ++it) {
+		if ((*it) == &_obs) {
+			delete (*it);
+			m_observer.erase(it);
+			break;
+		}
+	}
 }

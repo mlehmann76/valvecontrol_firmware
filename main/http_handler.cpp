@@ -33,7 +33,7 @@ extern "C" {
 #include "mqttUserTask.h"
 #include "statusTask.h"
 
-#include "esp_https_server.h"
+#include "esp_http_server.h"
 
 #include "http_handler.h"
 #include "http_server.h"

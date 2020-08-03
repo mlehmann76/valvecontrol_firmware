@@ -17,10 +17,11 @@ http://openbook.rheinwerk-verlag.de/linux_unix_programmierung/Kap11-013.htm#RxxK
 
 #define TAG "ECHO"
 
-EchoServer::EchoServer() : TaskClass("status", TaskPrio_HMI, 2048), m_sockets() {
+EchoServer::EchoServer() : TaskClass("echo", TaskPrio_Mid, 3072), m_sockets(), m_obs(new EchoConnectionObserver(this)) {
 }
 
 EchoServer::~EchoServer() {
+	delete m_obs;
 }
 
 void EchoServer::removeSocket(Socket *_s) {
@@ -36,7 +37,7 @@ void EchoServer::removeSocket(Socket *_s) {
 
 void EchoServer::task() {
 	while (1) {
-		if (m_sockets.size() > 0 && m_sockets.back() != nullptr) {
+		if (m_sockets.size() > 0 && m_sockets.front() != nullptr) {
 			if (m_sockets.front()->hasNewConnection(std::chrono::microseconds(1))) {
 				Socket *_con = m_sockets.front()->accept(std::chrono::microseconds(1));
 				if (_con != nullptr) {
@@ -71,14 +72,14 @@ void EchoServer::task() {
 				}
 			}
 		}
-		vTaskDelay(1);
+		vTaskDelay(10);
 	}
 }
 
 void EchoServer::start() {
 	Socket *_s = new Socket();
 	if (_s->bind(81)) {
-		if (_s->listen(8)) {
+		if (_s->listen(2)) {
 			_s->setNonBlocking(true);
 			int value = 1;
 			_s->setSocketOption(SO_REUSEADDR, &value, sizeof(value));

@@ -25,7 +25,8 @@ const ledc_channel_config_t LedcChannelFactory::ledc_channel[] = { { //FIXME cha
 		CONTROL3_PIN, LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_3, LEDC_INTR_DISABLE, LEDC_TIMER_0, LED_C_OFF, 0, } }; //
 
 LedcChan::LedcChan(const char *_n, const ledc_channel_config_t _c, std::chrono::seconds _p) :
-		ChannelBase(_n), _config(_c), _mode(eoff), _timer("ledc", this, &LedcChan::onTimer, 0, false), _period(_p) {
+		ChannelBase(_n), _config(_c), _mode(eoff), _timer("ledc", this, &LedcChan::onTimer,
+				std::chrono::duration_cast<portTick>(_p).count(), false), _period(_p) {
 	ledc_channel_config(&_c);
 	set(false, _period);
 }

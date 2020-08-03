@@ -9,6 +9,7 @@
 #define MAIN_MQTT_USER_H_
 
 #include "QueueCPP.h"
+#include "ConnectionObserver.h"
 #include <string>
 
 class MainClass;
@@ -27,25 +28,46 @@ typedef Queue<mqttMessage,10> PubQueue;
 
 bool isTopic(esp_mqtt_event_handle_t event, const char *pCommand);
 
-class MqttUserTask : public TaskClass {
+class MqttUserTask;
+class MqttConnectionObserver : public ConnectionObserver {
 public:
-	MqttUserTask() : TaskClass("mqttuser", TaskPrio_HMI, 2048) {}
+	MqttConnectionObserver(MqttUserTask *_m) : m_mqtt(_m) {}
+	virtual void onConnect();
+	virtual void onDisconnect();
+private:
+	MqttUserTask *m_mqtt;
+};
+
+class MqttUserTask : public TaskClass {
+	friend MqttConnectionObserver;
+public:
+	MqttUserTask() : TaskClass("mqttuser", TaskPrio_HMI, 2048), m_obs(this) {}
 	virtual void task();
 	void init(void);
-	void connect(void);
-	void disconnect(void);
 	PubQueue& queue() { return m_pubQueue; }
+	ConnectionObserver& obs() { return m_obs; }
 
 	void send(const mqttMessage &rxData);
 
 private:
 	static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event);
+	void connect(void);
+	void disconnect(void);
 
+	MqttConnectionObserver m_obs;
 	PubQueue m_pubQueue;
 	esp_mqtt_client_handle_t client = NULL;
 	bool isMqttConnected = false;
 	bool isMqttInit = false;
 };
+
+inline void MqttConnectionObserver::onConnect() {
+	m_mqtt->connect();
+}
+
+inline void MqttConnectionObserver::onDisconnect() {
+	m_mqtt->disconnect();
+}
 
 }
 #endif /* MAIN_MQTT_USER_H_ */

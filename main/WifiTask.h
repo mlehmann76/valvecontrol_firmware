@@ -8,9 +8,11 @@
 #ifndef WIFITASK_H_
 #define WIFITASK_H_
 
+#include <vector>
 #include "TaskCPP.h"
 #include "freertos/event_groups.h"
 #include "esp_wps.h"
+#include "ConnectionObserver.h"
 
 class WifiTask: public TaskClass {
 	static const char TAG[];
@@ -32,6 +34,8 @@ public:
 	bool isConnected();
 	bool isMQTTConnected();
 	void setEnableWps(bool _en = true) {enableWPS = _en;}
+	void addConnectionObserver(ConnectionObserver&);
+	void remConnectionObserver(ConnectionObserver&);
 
 private:
 	static void event_handler_s(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
@@ -41,10 +45,13 @@ private:
 	void got_ip_event_handler(esp_event_base_t event_base, int32_t event_id, void *event_data);
 
 	int checkWPSButton();
+	void notifyConnect();
+	void notifyDisconnect();
 
 	bool enableWPS = false;
 	EventGroupHandle_t main_event_group = nullptr;
 	state_t w_state = w_disconnected;
+	std::vector<ConnectionObserver*> m_observer;
 };
 
 

@@ -37,6 +37,7 @@ void Messager::handle(esp_mqtt_event_handle_t event) {
 	int ret = 0;
 	//provide message to last handler for accelerated test
 	if (m_lastMqttRec != nullptr) {
+		ESP_LOGD(TAG, "Forwarding ...");
 		ret = m_lastMqttRec->onMessage(event);
 	}
 	if (!ret) { //not handled yet

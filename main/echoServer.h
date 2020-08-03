@@ -9,9 +9,20 @@
 #define MAIN_ECHOSERVER_H_
 
 #include "TaskCPP.h"
+#include "MutexCPP.h"
 #include "socket.h"
+#include "ConnectionObserver.h"
 #include <vector>
 
+class EchoServer;
+class EchoConnectionObserver : public ConnectionObserver {
+public:
+	EchoConnectionObserver(EchoServer *_m) : m_obs(_m) {}
+	virtual void onConnect();
+	virtual void onDisconnect() {}
+private:
+	EchoServer *m_obs;
+};
 class EchoServer : public TaskClass{
 public:
 	EchoServer();
@@ -22,10 +33,16 @@ public:
 	EchoServer& operator=(EchoServer &&other) = delete;
 	virtual void task();
 	void start();
+	ConnectionObserver &obs() {return *m_obs;}
 private:
-	std::vector<Socket*> m_sockets;
-
 	void removeSocket(Socket *_s);
+
+	std::vector<Socket*> m_sockets;
+	EchoConnectionObserver *m_obs;
 };
+
+inline void EchoConnectionObserver::onConnect() {
+	m_obs->start();
+}
 
 #endif /* MAIN_ECHOSERVER_H_ */

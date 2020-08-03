@@ -122,7 +122,7 @@ void MqttUserTask::init(void) {
 
 void MqttUserTask::connect(void) {
 	if (client != NULL) {
-		ESP_LOGE(TAG,"starting client");
+		ESP_LOGD(TAG,"starting client");
 		esp_mqtt_client_start(client);
 	} else {
 		ESP_LOGE(TAG,"mqtt connect failed, client not initialized");
@@ -130,7 +130,9 @@ void MqttUserTask::connect(void) {
 }
 
 void MqttUserTask::disconnect(void) {
-	if (client != NULL && isMqttConnected)
+	ESP_LOGE(TAG,"stopping client");
+
+	if (client != NULL)
 		esp_mqtt_client_stop(client);
 }
 

@@ -28,7 +28,7 @@
 #include "mqtt_config.h"
 #include "mqtt_client.h"
 #include "mqttUserTask.h"
-#include "esp_https_server.h"
+#include "esp_http_server.h"
 
 #include "http_handler.h"
 #include "http_server.h"
@@ -69,17 +69,12 @@ httpd_handle_t start_webserver(void)
 {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    httpd_ssl_config_t sslconfig = HTTPD_SSL_CONFIG_DEFAULT();
 
     extern const unsigned char cacert_pem_start[] asm("_binary_cacert_pem_start");
     extern const unsigned char cacert_pem_end[]   asm("_binary_cacert_pem_end");
-    sslconfig.cacert_pem = cacert_pem_start;
-    sslconfig.cacert_len = cacert_pem_end - cacert_pem_start;
 
     extern const unsigned char prvtkey_pem_start[] asm("_binary_prvtkey_pem_start");
     extern const unsigned char prvtkey_pem_end[]   asm("_binary_prvtkey_pem_end");
-    sslconfig.prvtkey_pem = prvtkey_pem_start;
-    sslconfig.prvtkey_len = prvtkey_pem_end - prvtkey_pem_start;
 
     // Start the httpd server
     ESP_LOGI(TAG, "Starting server on port: '%d'", config.server_port);

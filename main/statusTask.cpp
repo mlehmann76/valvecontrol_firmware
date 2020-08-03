@@ -60,7 +60,7 @@ void StatusTask::addTimeStamp(cJSON *root) {
 }
 
 StatusTask::StatusTask(EventGroupHandle_t &main, mqtt::PubQueue &_queue) :
-		TaskClass("status", TaskPrio_HMI, 2048), m_statusFunc(), m_statusFuncCount(0),
+		TaskClass("status", TaskPrio_HMI, 3072), m_statusFunc(), m_statusFuncCount(0),
 		main_event_group(&main), queue(_queue), m_status(this) {
 	addProvider(status());
 }
@@ -108,7 +108,6 @@ void StatusTask::task() {
 					MainClass::instance()->mqtt().send({mqttConf.getPubMsg(),_s.get()});
 
 					cJSON_Delete(pRoot);
-					/* reduce frequency by waiting some time*/
 					vTaskDelay(std::chrono::duration_cast<portTick>(std::chrono::milliseconds(500)).count());
 				}
 			}

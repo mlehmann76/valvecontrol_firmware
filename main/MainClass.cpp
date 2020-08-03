@@ -92,13 +92,10 @@ void MainClass::spiffsInit(void) {
 }
 
 int MainClass::loop() {
+	esp_log_level_set("*", ESP_LOG_VERBOSE);
 	esp_log_level_set("ECHO", ESP_LOG_VERBOSE);
 	esp_log_level_set("SOCKET", ESP_LOG_VERBOSE);
-	esp_log_level_set("phy_init", ESP_LOG_ERROR);
-	esp_log_level_set("wifi", ESP_LOG_ERROR);
-	esp_log_level_set("MQTT_CLIENT", ESP_LOG_ERROR);
-	esp_log_level_set("OTA", ESP_LOG_ERROR);
-
+	esp_log_level_set("MQTTS", ESP_LOG_VERBOSE);
 
 	spiffsInit();
 
@@ -108,6 +105,10 @@ int MainClass::loop() {
 	sntp_support();
 
 	mqttUser.init();
+	wifitask.addConnectionObserver(mqttUser.obs());
+	EchoServer echo;
+	wifitask.addConnectionObserver(echo.obs());
+
 	//mqttConf.setNext(&sysConf)->setNext(&chanConf)->setNext(&sensorConf);
 	//messager.addHandler("/config", &mqttConf);
 	MqttOtaHandler mqttOta(&otaWorker, &messager,
@@ -130,7 +131,7 @@ int MainClass::loop() {
 
 	int count = 0;
 	uint32_t heapFree = 0;
-	EchoServer echo;
+	std::unique_ptr<char[]> pcWriteBuffer(new char[2048]);
 
 	while (1) {
 		//check for time update by sntp
@@ -143,7 +144,8 @@ int MainClass::loop() {
 		if (0 == count) {
 			if( esp_get_free_heap_size() != heapFree) {
 				heapFree = esp_get_free_heap_size();
-				ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
+				vTaskGetRunTimeStats(pcWriteBuffer.get());
+				ESP_LOGI(TAG, "[APP] Free memory: %d bytes\n%s", esp_get_free_heap_size(),pcWriteBuffer.get());
 				count = 500;
 			}
 		} else {
