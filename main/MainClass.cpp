@@ -37,6 +37,7 @@
 #include "MainClass.h"
 
 #include "echoServer.h"
+#include "HttpServer.h"
 #define TAG "MAIN"
 
 template<typename ... Args>
@@ -96,8 +97,10 @@ int MainClass::loop() {
 
 	mqttUser.init();
 	wifitask.addConnectionObserver(mqttUser.obs());
-	EchoServer echo;
+	static EchoServer echo;
 	wifitask.addConnectionObserver(echo.obs());
+	static HttpServer http(80);
+	wifitask.addConnectionObserver(http.obs());
 
 	//mqttConf.setNext(&sysConf)->setNext(&chanConf)->setNext(&sensorConf);
 	MqttOtaHandler mqttOta(otaWorker, mqttUser,
