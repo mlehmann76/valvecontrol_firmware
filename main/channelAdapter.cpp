@@ -106,7 +106,8 @@ void MqttJsonChannelAdapter::onNotify(const ChannelBase*) {
 		//forward
 		std::unique_ptr<char[]> _s(cJSON_Print(root));
 		assert(_s.get() != NULL);//), "Failed to print channel.");
-		MainClass::instance()->mqtt().send({m_pubtopic,_s.get()});
+		mqtt::MqttQueueType message(new mqtt::mqttMessage(m_pubtopic,_s.get()));
+		MainClass::instance()->mqtt().send(std::move(message));
 		cJSON_Delete(root);
 	}
 }

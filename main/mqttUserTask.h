@@ -11,12 +11,12 @@
 #include "QueueCPP.h"
 #include "ConnectionObserver.h"
 #include <string>
+#include <memory>
 
 class MainClass;
 
 namespace mqtt {
 
-//TODO
 struct mqttMessage{
 	std::string m_topic;
 	std::string m_data;
@@ -24,9 +24,8 @@ struct mqttMessage{
 	mqttMessage(const std::string &_topic, const std::string &_data) : m_topic(_topic), m_data(_data) {}
 };
 
-typedef Queue<mqttMessage,10> PubQueue;
-
-bool isTopic(esp_mqtt_event_handle_t event, const char *pCommand);
+using MqttQueueType = std::unique_ptr<mqttMessage>;
+using PubQueue = Queue<MqttQueueType,10>;
 
 class MqttUserTask;
 class MqttConnectionObserver : public ConnectionObserver {
@@ -47,12 +46,13 @@ public:
 	PubQueue& queue() { return m_pubQueue; }
 	ConnectionObserver& obs() { return m_obs; }
 
-	void send(const mqttMessage &rxData);
+	void send(MqttQueueType);
 
 private:
 	static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event);
 	void connect(void);
 	void disconnect(void);
+	void send(mqttMessage*);
 
 	MqttConnectionObserver m_obs;
 	PubQueue m_pubQueue;

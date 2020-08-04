@@ -74,10 +74,17 @@ namespace mqtt {
 	return ESP_OK;
 }
 
-void MqttUserTask::send(const mqttMessage &rxData) {
+void MqttUserTask::send(MqttQueueType rx) {
+	send(rx.get());
+	//m_pubQueue.add((rx), std::chrono::duration_cast<portTick>(std::chrono::milliseconds(10)).count());
+}
+
+void MqttUserTask::send(mqttMessage *rxData) {
 	if ((client != NULL) && isMqttConnected) {
-		ESP_LOGD(TAG, "publish %.*s : %.*s", rxData.m_topic.length(), rxData.m_topic.c_str(), rxData.m_data.length(), rxData.m_data.c_str());
-		int msg_id = esp_mqtt_client_publish(client, rxData.m_topic.c_str(), rxData.m_data.c_str(), rxData.m_data.length() + 1, 1, 0);
+		ESP_LOGD(TAG, "publish %.*s : %.*s", rxData->m_topic.length(), rxData->m_topic.c_str(), rxData->m_data.length(),
+				rxData->m_data.c_str());
+		int msg_id = esp_mqtt_client_publish(client, rxData->m_topic.c_str(), rxData->m_data.c_str(),
+				rxData->m_data.length() + 1, 1, 0);
 		ESP_LOGD(TAG, "sent publish successful, msg_id=%d", msg_id);
 	}
 }
@@ -87,18 +94,11 @@ void MqttUserTask::task() {
 
 	while (1) {
 
-		if ((xEventGroupGetBits(MainClass::instance()->eventGroup()) & CONNECTED_BIT) && !isMqttConnected) {
-			connect();
-		}
-		if (!(xEventGroupGetBits(MainClass::instance()->eventGroup()) & CONNECTED_BIT) && isMqttConnected) {
-			disconnect();
-		}
+		MqttQueueType rxData;
 
-		mqttMessage rxData;
+		if ( (m_pubQueue.pop(rxData, xTicksToWait))) {
 
-		if ( (m_pubQueue.pop((rxData), xTicksToWait))) {
-
-			send(rxData);
+			send(rxData.get());
 		}
 
 		vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -136,8 +136,5 @@ void MqttUserTask::disconnect(void) {
 		esp_mqtt_client_stop(client);
 }
 
-bool isTopic(esp_mqtt_event_handle_t event, const char * pCommand) {
-	const char* psTopic = event->topic_len >= strlen(mqttConf.getSubMsg()) ? &event->topic[strlen(mqttConf.getSubMsg()) - 2] : "";
-	return strncmp(psTopic, pCommand, strlen(pCommand)) == 0;
-}
+
 }

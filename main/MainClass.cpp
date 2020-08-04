@@ -138,7 +138,6 @@ int MainClass::loop() {
 		if (!(xEventGroupGetBits(MainClass::instance()->eventGroup()) & SNTP_UPDATED) && (update_time() != ESP_ERR_NOT_FOUND)) {
 			xEventGroupSetBits(MainClass::instance()->eventGroup(),SNTP_UPDATED);
 			status.setUpdate(true);
-			echo.start();
 		}
 
 		if (0 == count) {

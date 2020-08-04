@@ -105,7 +105,8 @@ void StatusTask::task() {
 					}
 
 					std::unique_ptr<char[]> _s(cJSON_Print(pRoot));
-					MainClass::instance()->mqtt().send({mqttConf.getPubMsg(),_s.get()});
+					mqtt::MqttQueueType message(new mqtt::mqttMessage(mqttConf.getPubMsg(),_s.get()));
+					MainClass::instance()->mqtt().send(std::move(message));
 
 					cJSON_Delete(pRoot);
 					vTaskDelay(std::chrono::duration_cast<portTick>(std::chrono::milliseconds(500)).count());
