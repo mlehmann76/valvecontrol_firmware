@@ -8,7 +8,7 @@
 #ifndef MAIN_STATUSTASK_H_
 #define MAIN_STATUSTASK_H_
 
-#include "mqttUserTask.h"
+#include "mqttWorker.h"
 
 class StatusProviderBase {
 public:

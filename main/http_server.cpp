@@ -27,11 +27,12 @@
 #include "config.h"
 #include "mqtt_config.h"
 #include "mqtt_client.h"
-#include "mqttUserTask.h"
 #include "esp_http_server.h"
 
 #include "http_handler.h"
 #include "http_server.h"
+
+#include "mqttWorker.h"
 #include "statusTask.h"
 
 #define TAG "HTTP"

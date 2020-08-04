@@ -10,7 +10,7 @@
 
 #include "channelBase.h"
 #include "mqtt_client.h"
-#include "messager.h"
+#include "mqttWorker.h"
 
 class ChannelAdapterBase {
 public:
@@ -24,9 +24,10 @@ protected:
 };
 
 class MqttChannelAdapter;
-class ChannelMqttreceiver : public AbstractMqttReceiver {
+class ChannelMqttreceiver : public mqtt::AbstractMqttReceiver {
 public:
 	ChannelMqttreceiver(MqttChannelAdapter* _m) : m_adapter(_m) {}
+	virtual ~ChannelMqttreceiver() = default;
 	virtual int onMessage(esp_mqtt_event_handle_t event);
 private:
 	MqttChannelAdapter *m_adapter;
@@ -37,7 +38,7 @@ private:
 
 class MqttChannelAdapter : public ChannelAdapterBase {
 public:
-	MqttChannelAdapter(Messager &_me, std::string subtopic, std::string pubtopic) :
+	MqttChannelAdapter(mqtt::MqttWorker &_me, std::string subtopic, std::string pubtopic) :
 		ChannelAdapterBase(), m_client(_me), m_rec(this), m_subtopic(subtopic), m_pubtopic(pubtopic) {
 		m_client.addHandle(&m_rec);
 	}
@@ -46,7 +47,7 @@ public:
 	virtual void onNotify(const ChannelBase*);
 	//
 protected:
-	Messager &m_client;
+	mqtt::MqttWorker &m_client;
 	ChannelMqttreceiver m_rec;
 	std::string m_subtopic;
 	std::string m_pubtopic;
@@ -60,7 +61,7 @@ protected:
  */
 class MqttJsonChannelAdapter : public MqttChannelAdapter {
 public:
-	MqttJsonChannelAdapter(Messager &_me, std::string subtopic, std::string pubtopic) :
+	MqttJsonChannelAdapter(mqtt::MqttWorker &_me, std::string subtopic, std::string pubtopic) :
 		MqttChannelAdapter(_me, subtopic, pubtopic) {}
 	//
 	virtual int onMessage(esp_mqtt_event_handle_t event);

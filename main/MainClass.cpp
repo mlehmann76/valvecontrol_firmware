@@ -29,7 +29,6 @@
 
 #include "config.h"
 #include "config_user.h"
-#include "messager.h"
 #include "sntp.h"
 #include "channelFactory.h"
 #include "channelAdapter.h"
@@ -50,15 +49,6 @@ std::string string_format(const std::string &format, Args ... args) {
 	} else {
 		return std::string("");
 	}
-}
-
-MainClass::MainClass() {
-	// TODO Auto-generated constructor stub
-
-}
-
-MainClass::~MainClass() {
-	// TODO Auto-generated destructor stub
 }
 
 void MainClass::spiffsInit(void) {
@@ -110,8 +100,7 @@ int MainClass::loop() {
 	wifitask.addConnectionObserver(echo.obs());
 
 	//mqttConf.setNext(&sysConf)->setNext(&chanConf)->setNext(&sensorConf);
-	//messager.addHandler("/config", &mqttConf);
-	MqttOtaHandler mqttOta(&otaWorker, &messager,
+	MqttOtaHandler mqttOta(otaWorker, mqttUser,
 			string_format("%ssystem", mqttConf.getDevName()),
 			string_format("%sota/$implementation/binary", mqttConf.getDevName()));
 
@@ -121,10 +110,10 @@ int MainClass::loop() {
 	for (size_t i=0; i< _channels.size();i++) {
 		_channels[i] = LedcChannelFactory::channel(i, std::chrono::seconds(chanConf.getTime(i)));
 		_channels[i]->add(&cex);
-		_channels[i]->add(new MqttChannelAdapter(messager,
+		_channels[i]->add(new MqttChannelAdapter(mqttUser,
 				string_format("%schannel%d/control", mqttConf.getDevName(),i),
 				string_format("%schannel%d/state", mqttConf.getDevName(),i)));
-		_channels[i]->add(new MqttJsonChannelAdapter(messager,
+		_channels[i]->add(new MqttJsonChannelAdapter(mqttUser,
 				string_format("%scontrol", mqttConf.getDevName()),
 				string_format("%sstate", mqttConf.getDevName())));
 	}

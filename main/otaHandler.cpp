@@ -12,9 +12,9 @@
 
 #define TAG "MQTTOTA"
 
-MqttOtaHandler::MqttOtaHandler(Ota::OtaWorker *_o, Messager *_m, const std::string &_f, const std::string &_t) :
+MqttOtaHandler::MqttOtaHandler(Ota::OtaWorker &_o, mqtt::MqttWorker &_m, const std::string &_f, const std::string &_t) :
 		m_ota(_o), m_messager(_m), m_firmwaretopic(_f), m_updatetopic(_t) {
-	m_messager->addHandle(this);
+	m_messager.addHandle(this);
 }
 
 int MqttOtaHandler::md5StrToAr(char *pMD5, uint8_t *md5) {
@@ -44,10 +44,10 @@ int MqttOtaHandler::md5StrToAr(char *pMD5, uint8_t *md5) {
 
 int MqttOtaHandler::onMessage(esp_mqtt_event_handle_t event) {
 	int ret = 0;
-	if (((event->topic_len == 0) && m_ota->isRunning()) || (event->topic && event->topic == m_updatetopic)) {
+	if (((event->topic_len == 0) && m_ota.isRunning()) || (event->topic && event->topic == m_updatetopic)) {
 		ESP_LOGE(TAG, "OTA update topic %s", event->data_len < 64 ? event->data : "data");
 		Ota::OtaPacket p(event->data, event->data_len);
-		ret = m_ota->handle(p);
+		ret = m_ota.handle(p);
 	}else if (event->topic && event->topic == m_firmwaretopic) {
 		ESP_LOGI(TAG, "%.*s", event->topic_len, event->topic);
 		cJSON *root = cJSON_Parse(event->data);
@@ -102,7 +102,7 @@ void MqttOtaHandler::handleFirmwareMessage(cJSON* firmware) {
 					md5_update.md5[9], md5_update.md5[10], md5_update.md5[11], md5_update.md5[12], md5_update.md5[13],
 					md5_update.md5[14], md5_update.md5[15]);
 
-			m_ota->start(md5_update);
+			m_ota.start(md5_update);
 		}
 	}
 }

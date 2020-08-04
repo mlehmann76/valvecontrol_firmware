@@ -8,14 +8,22 @@
 #ifndef MAIN_MQTT_USER_H_
 #define MAIN_MQTT_USER_H_
 
-#include "QueueCPP.h"
+#include "TaskCPP.h"
 #include "ConnectionObserver.h"
 #include <string>
+#include <vector>
 #include <memory>
+#include <mqtt_client.h>
 
 class MainClass;
 
 namespace mqtt {
+
+class AbstractMqttReceiver {
+public:
+	virtual ~AbstractMqttReceiver() = default;
+	virtual int onMessage(esp_mqtt_event_handle_t event) = 0;
+};
 
 struct mqttMessage{
 	std::string m_topic;
@@ -28,24 +36,25 @@ using MqttQueueType = std::unique_ptr<mqttMessage>;
 /* this doesnt work, since queue only supports pods
 using PubQueue = Queue<MqttQueueType,10>;
 */
-class MqttUserTask;
+class MqttWorker;
 class MqttConnectionObserver : public ConnectionObserver {
 public:
-	MqttConnectionObserver(MqttUserTask *_m) : m_mqtt(_m) {}
+	MqttConnectionObserver(MqttWorker *_m) : m_mqtt(_m) {}
 	virtual void onConnect();
 	virtual void onDisconnect();
 private:
-	MqttUserTask *m_mqtt;
+	MqttWorker *m_mqtt;
 };
 
-class MqttUserTask : public TaskClass {
+class MqttWorker {
 	friend MqttConnectionObserver;
 public:
-	MqttUserTask() : TaskClass("mqttuser", TaskPrio_HMI, 2048), m_obs(this) {}
-	virtual void task();
+	MqttWorker() : m_obs(this) {}
+	virtual ~MqttWorker() = default;
 	void init(void);
-	//PubQueue& queue() { return m_pubQueue; }
 	ConnectionObserver& obs() { return m_obs; }
+	void handle(esp_mqtt_event_handle_t event);
+	void addHandle(AbstractMqttReceiver *);
 
 	void send(MqttQueueType);
 
@@ -56,7 +65,8 @@ private:
 	void send(mqttMessage*);
 
 	MqttConnectionObserver m_obs;
-	//PubQueue m_pubQueue;
+	std::vector<AbstractMqttReceiver*> m_mqttRec;
+	AbstractMqttReceiver* m_lastMqttRec = nullptr;
 	esp_mqtt_client_handle_t client = NULL;
 	bool isMqttConnected = false;
 	bool isMqttInit = false;
