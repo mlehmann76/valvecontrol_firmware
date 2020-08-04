@@ -9,6 +9,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <algorithm>
 
 #include "sdkconfig.h"
 
@@ -38,8 +39,10 @@ namespace mqtt {
 	case MQTT_EVENT_CONNECTED:
 		ESP_LOGD(TAG, "MQTT_EVENT_CONNECTED");
 		xEventGroupSetBits(MainClass::instance()->eventGroup(), MQTT_CONNECTED_BIT);
-		msg_id = esp_mqtt_client_subscribe(client, mqttConf.getSubMsg(), 1);
-		ESP_LOGD(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+		for (auto _s : mqtt->subTopics()) {
+			msg_id = esp_mqtt_client_subscribe(client, _s.c_str(), 1);
+			ESP_LOGD(TAG, "sent subscribe %s successful, msg_id=%d", _s.c_str(), msg_id);
+		}
 		mqtt->isMqttConnected = true;
 		break;
 	case MQTT_EVENT_DISCONNECTED:
@@ -106,6 +109,16 @@ void MqttWorker::handle(esp_mqtt_event_handle_t event) {
 
 void MqttWorker::addHandle(AbstractMqttReceiver *_a) {
 	m_mqttRec.push_back(_a);
+	if (std::find(m_subtopics.begin(), m_subtopics.end(), _a->topic()) == m_subtopics.end()) {
+		m_subtopics.push_back(_a->topic());
+		ESP_LOGV(TAG, "addHandle, add topic = %s", _a->topic().c_str());
+		if (isMqttConnected) {
+			int msg_id = esp_mqtt_client_subscribe(client, _a->topic().c_str(), 1);
+			ESP_LOGD(TAG, "sent subscribe %s successful, msg_id=%d", _a->topic().c_str(), msg_id);
+		}
+	} else {
+		ESP_LOGV(TAG, "addHandle, topic %s already registered", _a->topic().c_str());
+	}
 }
 
 void MqttWorker::send(mqttMessage *rxData) {

@@ -23,6 +23,7 @@ class AbstractMqttReceiver {
 public:
 	virtual ~AbstractMqttReceiver() = default;
 	virtual int onMessage(esp_mqtt_event_handle_t event) = 0;
+	virtual std::string topic() = 0;
 };
 
 struct mqttMessage{
@@ -53,6 +54,7 @@ public:
 	virtual ~MqttWorker() = default;
 	void init(void);
 	ConnectionObserver& obs() { return m_obs; }
+	std::vector<std::string> subTopics() const  {return m_subtopics; }
 	void handle(esp_mqtt_event_handle_t event);
 	void addHandle(AbstractMqttReceiver *);
 
@@ -67,6 +69,7 @@ private:
 	MqttConnectionObserver m_obs;
 	std::vector<AbstractMqttReceiver*> m_mqttRec;
 	AbstractMqttReceiver* m_lastMqttRec = nullptr;
+	std::vector<std::string> m_subtopics;
 	esp_mqtt_client_handle_t client = NULL;
 	bool isMqttConnected = false;
 	bool isMqttInit = false;

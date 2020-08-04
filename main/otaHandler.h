@@ -21,7 +21,8 @@ class Messager;
 class MqttOtaHandler : public mqtt::AbstractMqttReceiver {
 public:
 	MqttOtaHandler(Ota::OtaWorker &_o, mqtt::MqttWorker &_m, const std::string &_f, const std::string &_t);
-	int onMessage(esp_mqtt_event_handle_t event);
+	virtual int onMessage(esp_mqtt_event_handle_t event);
+	virtual std::string topic() { return m_firmwaretopic; }
 private:
 	static int md5StrToAr(char* pMD5, uint8_t* md5);
 	void handleFirmwareMessage(cJSON* firmware);

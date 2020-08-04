@@ -101,7 +101,7 @@ int MainClass::loop() {
 
 	//mqttConf.setNext(&sysConf)->setNext(&chanConf)->setNext(&sensorConf);
 	MqttOtaHandler mqttOta(otaWorker, mqttUser,
-			string_format("%ssystem", mqttConf.getDevName()),
+			string_format("%sota", mqttConf.getDevName()),
 			string_format("%sota/$implementation/binary", mqttConf.getDevName()));
 
 	std::vector<ChannelBase*> _channels(4);

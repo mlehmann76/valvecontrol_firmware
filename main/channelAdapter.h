@@ -26,11 +26,13 @@ protected:
 class MqttChannelAdapter;
 class ChannelMqttreceiver : public mqtt::AbstractMqttReceiver {
 public:
-	ChannelMqttreceiver(MqttChannelAdapter* _m) : m_adapter(_m) {}
+	ChannelMqttreceiver(MqttChannelAdapter* _m, const std::string& _topic) : m_adapter(_m), m_topic(_topic) {}
 	virtual ~ChannelMqttreceiver() = default;
 	virtual int onMessage(esp_mqtt_event_handle_t event);
+	virtual std::string topic() { return m_topic; }
 private:
 	MqttChannelAdapter *m_adapter;
+	std::string m_topic;
 };
 /**
  *
@@ -38,8 +40,8 @@ private:
 
 class MqttChannelAdapter : public ChannelAdapterBase {
 public:
-	MqttChannelAdapter(mqtt::MqttWorker &_me, std::string subtopic, std::string pubtopic) :
-		ChannelAdapterBase(), m_client(_me), m_rec(this), m_subtopic(subtopic), m_pubtopic(pubtopic) {
+	MqttChannelAdapter(mqtt::MqttWorker &_me, const std::string& subtopic, const std::string& pubtopic) :
+		ChannelAdapterBase(), m_client(_me), m_rec(this, subtopic), m_subtopic(subtopic), m_pubtopic(pubtopic) {
 		m_client.addHandle(&m_rec);
 	}
 	//
