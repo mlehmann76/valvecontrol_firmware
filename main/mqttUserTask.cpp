@@ -90,19 +90,19 @@ void MqttUserTask::send(mqttMessage *rxData) {
 }
 
 void MqttUserTask::task() {
+	/*
 	const TickType_t xTicksToWait = std::chrono::duration_cast<portTick>(std::chrono::milliseconds(10)).count();
-
+*/
 	while (1) {
-
+/*
 		MqttQueueType rxData;
 
 		if ( (m_pubQueue.pop(rxData, xTicksToWait))) {
 
 			send(rxData.get());
 		}
-
+*/
 		vTaskDelay(10 / portTICK_PERIOD_MS);
-		taskYIELD();
 	}
 	vTaskDelete(NULL);
 }

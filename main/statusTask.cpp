@@ -59,9 +59,9 @@ void StatusTask::addTimeStamp(cJSON *root) {
 	return;
 }
 
-StatusTask::StatusTask(EventGroupHandle_t &main, mqtt::PubQueue &_queue) :
+StatusTask::StatusTask(EventGroupHandle_t &main) :
 		TaskClass("status", TaskPrio_HMI, 3072), m_statusFunc(), m_statusFuncCount(0),
-		main_event_group(&main), queue(_queue), m_status(this) {
+		main_event_group(&main), m_status(this) {
 	addProvider(status());
 }
 

@@ -33,7 +33,7 @@ private:
 
 class StatusTask : public TaskClass {
 public:
-	StatusTask(EventGroupHandle_t &main, mqtt::PubQueue &_queue);
+	StatusTask(EventGroupHandle_t &main);
 	virtual void task();
 	void addProvider(StatusProviderBase &);
 	virtual bool hasUpdate() {return m_update;}
@@ -52,7 +52,6 @@ private:
 	StatusProviderBase* m_statusFunc[8];
 	size_t m_statusFuncCount;
 	EventGroupHandle_t *main_event_group;
-	mqtt::PubQueue &queue;
 	StatusProvider<StatusTask> m_status;
 	bool m_update = false;
 	bool m_isConnected = false;

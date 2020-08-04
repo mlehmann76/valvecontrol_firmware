@@ -25,8 +25,9 @@ struct mqttMessage{
 };
 
 using MqttQueueType = std::unique_ptr<mqttMessage>;
+/* this doesnt work, since queue only supports pods
 using PubQueue = Queue<MqttQueueType,10>;
-
+*/
 class MqttUserTask;
 class MqttConnectionObserver : public ConnectionObserver {
 public:
@@ -43,7 +44,7 @@ public:
 	MqttUserTask() : TaskClass("mqttuser", TaskPrio_HMI, 2048), m_obs(this) {}
 	virtual void task();
 	void init(void);
-	PubQueue& queue() { return m_pubQueue; }
+	//PubQueue& queue() { return m_pubQueue; }
 	ConnectionObserver& obs() { return m_obs; }
 
 	void send(MqttQueueType);
@@ -55,7 +56,7 @@ private:
 	void send(mqttMessage*);
 
 	MqttConnectionObserver m_obs;
-	PubQueue m_pubQueue;
+	//PubQueue m_pubQueue;
 	esp_mqtt_client_handle_t client = NULL;
 	bool isMqttConnected = false;
 	bool isMqttInit = false;

@@ -1,3 +1,0 @@
-[submodule "components/FreeRTOScpp"]
-	path = components/FreeRTOScpp
-	url = https://github.com/richard-damon/FreeRTOScpp.git
