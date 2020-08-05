@@ -1,3 +1,6 @@
 [submodule "components/fmt"]
 	path = components/fmt
 	url = https://github.com/fmtlib/fmt.git
+[submodule "components/frozen"]
+	path = components/frozen
+	url = https://github.com/serge-sans-paille/frozen.git
