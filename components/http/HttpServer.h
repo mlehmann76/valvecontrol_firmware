@@ -5,19 +5,24 @@
  *      Author: marco
  */
 
-#ifndef MAIN_HTTPSERVER_H_
-#define MAIN_HTTPSERVER_H_
+#ifndef COMPONENTS_HTTP_HTTPSERVER_H_
+#define COMPONENTS_HTTP_HTTPSERVER_H_
 
+#include <vector>
 #include "TaskCPP.h"
 #include "SemaphoreCPP.h"
 #include "socket.h"
 #include "ConnectionObserver.h"
 
+namespace http {
+
 class HttpServerConnectionObserver;
 class HttpServerTask;
+class RequestHandlerBase;
 
 class HttpServer {
 	friend HttpServerTask;
+
 public:
 	HttpServer(int _port);
 	virtual ~HttpServer();
@@ -41,12 +46,18 @@ public:
 	void start();
 	void stop();
 
+	void addPathHandler(RequestHandlerBase *);
+	void remPathHandler(RequestHandlerBase *);
+
 private:
+	void removeSocket(Socket **_s);
+
 	HttpServerTask *m_task;
 	int m_port;
 	Socket m_socket;
 	Semaphore m_sem;
 	HttpServerConnectionObserver *m_obs;
+	std::vector<RequestHandlerBase*> m_pathhandler;
 };
 
 class HttpServerConnectionObserver: public ConnectionObserver {
@@ -68,4 +79,6 @@ inline ConnectionObserver& HttpServer::obs() {
 	return *m_obs;
 }
 
-#endif /* MAIN_HTTPSERVER_H_ */
+} /* namespace http */
+
+#endif /* COMPONENTS_HTTP_HTTPSERVER_H_ */

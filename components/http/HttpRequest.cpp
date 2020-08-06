@@ -5,11 +5,14 @@
  *      Author: marco
  */
 
+#include "../components/http/HttpRequest.h"
+
 #include <esp_log.h>
 #include "config_user.h"
-#include "HttpRequest.h"
 
 #define TAG "HTTPREQUEST"
+
+namespace http {
 
 HttpRequest::MethodMapType HttpRequest::MethodMap = //
 		{ { "", NONE }, { "GET", GET }, //
@@ -18,8 +21,7 @@ HttpRequest::MethodMapType HttpRequest::MethodMap = //
 				{ "CONNECT", CONNECT }, { "OPTIONS", OPTIONS }, //
 				{ "TRACE", TRACE } };
 
-HttpRequest::HttpRequest(const std::string &_r) :
-		m_request(_r), m_method(NONE) {
+HttpRequest::HttpRequest(const std::string &_r)  {
 	analyze(_r);
 }
 
@@ -28,9 +30,9 @@ HttpRequest::~HttpRequest() {
 
 std::pair<std::string, std::string> HttpRequest::split(const std::string &line) {
 	std::pair<std::string, std::string> token;
-	std::size_t start = 0, end = 0;
-	if ((end = line.find(":", start)) != std::string::npos) {
-		token = { line.substr(0, end), line.substr(end, line.length()) };
+	std::vector<std::string> _l = split(line, ": ");
+	if(_l.size()>1){
+		token = {_l[0], _l[1]};
 	}
 	return token;
 }
@@ -53,16 +55,18 @@ std::vector<std::string> HttpRequest::split(const std::string &text, const std::
 void HttpRequest::analyze(const std::string &r) {
 	std::vector<std::string> lines = split(r, LineEnd);
 	if (lines.size()) {
-		ESP_LOGV(TAG, "request first line %s", lines[0].c_str());
 		std::vector<std::string> first = split(lines[0], " ");
 		if (first.size() == 3) {
-			//test Method
-			m_method = MethodMap[first[0].c_str()];
+			//TODO check if Method valid
+			m_method = first[0];
 			m_path = first[1];
 			m_version = first[2];
 		}
 	}
 	for (size_t i = 1; i < lines.size(); i++) {
-		m_header.push_back(split(lines[i]));
+		ReqPairType p = split(lines[i]);
+		m_header[p.first] = p.second;
 	}
 }
+
+} /* namespace http */

@@ -30,5 +30,17 @@ void operator delete[]( void * ptr )
     ptr = nullptr;
 }
 
+void operator delete( void * ptr, unsigned int )
+{
+    vPortFree ( ptr );
+    ptr = nullptr;
+}
+
+void operator delete[]( void * ptr, unsigned int )
+{
+    vPortFree ( ptr );
+    ptr = nullptr;
+}
+
 
 

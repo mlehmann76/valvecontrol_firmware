@@ -5,20 +5,23 @@
  *      Author: marco
  */
 
-#ifndef MAIN_HTTPREQUEST_H_
-#define MAIN_HTTPREQUEST_H_
+#ifndef COMPONENTS_HTTP_HTTPREQUEST_H_
+#define COMPONENTS_HTTP_HTTPREQUEST_H_
 
 #include <string>
 #include <vector>
 #include <unordered_map>
+
+namespace http {
 
 class HttpRequest {
 public:
 	enum Method {
 		NONE, GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE
 	};
-	using Header = std::vector<std::pair<std::string,std::string>>;
+	using Header = std::unordered_map<std::string,std::string>;
 	using MethodMapType = std::unordered_map<const char*, enum Method>;
+	using ReqPairType = std::pair<std::string, std::string>;
 
 private:
 	static MethodMapType MethodMap;
@@ -32,7 +35,7 @@ public:
 	HttpRequest& operator=(const HttpRequest &other) = delete;
 	HttpRequest& operator=(HttpRequest &&other) = delete;
 
-	Method method() {
+	const std::string& method() const{
 		return m_method;
 	}
 	const std::string& path() const {
@@ -46,16 +49,17 @@ public:
 	}
 
 private:
-	std::pair<std::string, std::string> split(const std::string &line);
+	ReqPairType split(const std::string &line);
 	std::vector<std::string> split(const std::string &s, const std::string &seperator);
 
 	void analyze(const std::string&);
 
-	std::string m_request;
-	Method m_method;
+	//std::string m_request;
+	std::string m_method;
 	std::string m_path;
 	std::string m_version;
 	Header m_header;
 };
 
-#endif /* MAIN_HTTPREQUEST_H_ */
+} /* namespace http */
+#endif /* COMPONENTS_HTTP_HTTPREQUEST_H_ */

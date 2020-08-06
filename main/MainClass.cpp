@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <memory>
 
-#include "sdkconfig.h"
+#include "config_user.h"
 
 #include "TaskCPP.h"
 #include "SemaphoreCPP.h"
@@ -23,12 +23,8 @@
 #include "esp_spiffs.h"
 #include "nvs_flash.h"
 #include "esp_task_wdt.h"
-#include "esp_http_server.h"
-#include "mqtt_client.h"
-#include "cJSON.h"
 
 #include "config.h"
-#include "config_user.h"
 #include "sntp.h"
 #include "channelFactory.h"
 #include "channelAdapter.h"
@@ -36,21 +32,12 @@
 
 #include "MainClass.h"
 
-#include "echoServer.h"
 #include "HttpServer.h"
+#include "echoServer.h"
+#include "utilities.h"
+
 #define TAG "MAIN"
 
-template<typename ... Args>
-std::string string_format(const std::string &format, Args ... args) {
-	size_t size = snprintf(nullptr, 0, format.c_str(), args ...) + 1; // Extra space for '\0'
-	if (size > 0) {
-		std::unique_ptr<char[]> buf(new char[size]);
-		snprintf(buf.get(), size, format.c_str(), args ...);
-		return std::string(buf.get(), buf.get() + size - 1); // We don't want the '\0' inside
-	} else {
-		return std::string("");
-	}
-}
 
 void MainClass::spiffsInit(void) {
 	ESP_LOGI(TAG, "Initializing SPIFFS");
@@ -83,10 +70,12 @@ void MainClass::spiffsInit(void) {
 }
 
 int MainClass::loop() {
-	esp_log_level_set("*", ESP_LOG_VERBOSE);
-	esp_log_level_set("ECHO", ESP_LOG_VERBOSE);
+	esp_log_level_set("*", ESP_LOG_ERROR);
 	esp_log_level_set("SOCKET", ESP_LOG_VERBOSE);
-	esp_log_level_set("MQTTS", ESP_LOG_VERBOSE);
+	esp_log_level_set("HTTPSERVER", ESP_LOG_VERBOSE);
+	esp_log_level_set("HTTPREQUEST", ESP_LOG_VERBOSE);
+
+
 
 	spiffsInit();
 
@@ -99,13 +88,13 @@ int MainClass::loop() {
 	wifitask.addConnectionObserver(mqttUser.obs());
 	static EchoServer echo;
 	wifitask.addConnectionObserver(echo.obs());
-	static HttpServer http(80);
+	static http::HttpServer http(80);
 	wifitask.addConnectionObserver(http.obs());
 
 	//mqttConf.setNext(&sysConf)->setNext(&chanConf)->setNext(&sensorConf);
 	MqttOtaHandler mqttOta(otaWorker, mqttUser,
-			string_format("%sota", mqttConf.getDevName()),
-			string_format("%sota/$implementation/binary", mqttConf.getDevName()));
+			utilities::string_format("%sota", mqttConf.getDevName()),
+			utilities::string_format("%sota/$implementation/binary", mqttConf.getDevName()));
 
 	std::vector<ChannelBase*> _channels(4);
 	ExclusiveAdapter cex; //only one channel should be active
@@ -114,11 +103,11 @@ int MainClass::loop() {
 		_channels[i] = LedcChannelFactory::channel(i, std::chrono::seconds(chanConf.getTime(i)));
 		_channels[i]->add(&cex);
 		_channels[i]->add(new MqttChannelAdapter(mqttUser,
-				string_format("%schannel%d/control", mqttConf.getDevName(),i),
-				string_format("%schannel%d/state", mqttConf.getDevName(),i)));
+				utilities::string_format("%schannel%d/control", mqttConf.getDevName(),i),
+				utilities::string_format("%schannel%d/state", mqttConf.getDevName(),i)));
 		_channels[i]->add(new MqttJsonChannelAdapter(mqttUser,
-				string_format("%scontrol", mqttConf.getDevName()),
-				string_format("%sstate", mqttConf.getDevName())));
+				utilities::string_format("%scontrol", mqttConf.getDevName()),
+				utilities::string_format("%sstate", mqttConf.getDevName())));
 	}
 
 	int count = 0;

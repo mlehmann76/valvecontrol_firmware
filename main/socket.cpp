@@ -180,7 +180,7 @@ int Socket::read(char *buffer, int size) {
 int Socket::read(std::string &buffer, int size) {
 	std::unique_ptr<char[]> _buf(new char[size]);
 	int ret = read(_buf.get(), size);
-	buffer = std::string(_buf.get(), ret);
+	buffer = std::string(ret > 0 ? _buf.get() : "", ret > 0 ? ret : 0);
 	return ret;
 }
 

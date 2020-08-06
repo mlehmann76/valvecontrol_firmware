@@ -8,7 +8,9 @@
 #
 $(eval GIT_BRANCH=$(shell git describe --tags))
 
-COMPONENT_ADD_INCLUDEDIRS := . ../components/fmt/include ../components/FreeRTOScpp ../components/frozen/include
+CXXFLAGS += -std=c++14
+DEFINES += FROZEN_NO_EXCEPTIONS
+COMPONENT_ADD_INCLUDEDIRS := . ../components/fmt/include ../components/FreeRTOScpp ../components/frozen/include ../components/http
 COMPONENT_SRCDIRS := $(COMPONENT_ADD_INCLUDEDIRS)
 CPPFLAGS += -DPROJECT_GIT='"'$(GIT_BRANCH)'"'
 COMPONENT_EMBED_TXTFILES := config.json
