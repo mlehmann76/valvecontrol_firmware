@@ -28,7 +28,7 @@ public:
 	} ;
 
 public:
-	RequestHandlerBase(const std::string &,const std::string &);
+	RequestHandlerBase(const std::string &_method, const std::string &_path);
 	virtual ~RequestHandlerBase() = default;
 	RequestHandlerBase(const RequestHandlerBase &other) = delete;
 	RequestHandlerBase(RequestHandlerBase &&other) = delete;

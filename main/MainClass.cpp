@@ -85,11 +85,11 @@ int MainClass::loop() {
 	sntp_support();
 
 	mqttUser.init();
-	wifitask.addConnectionObserver(mqttUser.obs());
 	static EchoServer echo;
-	wifitask.addConnectionObserver(echo.obs());
 	static http::HttpServer http(80);
 	wifitask.addConnectionObserver(http.obs());
+	wifitask.addConnectionObserver(echo.obs());
+	wifitask.addConnectionObserver(mqttUser.obs());
 
 	//mqttConf.setNext(&sysConf)->setNext(&chanConf)->setNext(&sensorConf);
 	MqttOtaHandler mqttOta(otaWorker, mqttUser,

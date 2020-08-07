@@ -34,74 +34,72 @@ public:
 	~HttpServerTask() {
 	}
 	virtual void task();
+
+	void removeSocket(Socket **_s) {
+		(*_s)->close();
+		delete (*_s);
+		*_s = nullptr;
+	}
+
 private:
 	HttpServer *m_httpServer;
 };
 
 void HttpServerTask::task() {
 	Socket &_s = m_httpServer->socket();
-	if (_s.bind(m_httpServer->port())) {
-		if (_s.listen(2)) {
-			_s.setNonBlocking(true);
-			int value = 1;
-			_s.setSocketOption(SO_REUSEADDR, &value, sizeof(value));
-
-		}
+	while (!_s.bind(m_httpServer->port())) {
+		//if bind failed, get a new socket
+		_s.create();
+		vTaskDelay(10);
 	}
+	if (_s.listen(0)) {
+		_s.setNonBlocking(true);
+	}
+
 	while (1) {
+		if (Socket::errorState == m_httpServer->socket().pollConnectionState(std::chrono::microseconds(1))) {
+			m_httpServer->sem().give();
+			return;
+		}
 		if (m_httpServer->socket().hasNewConnection(std::chrono::microseconds(1))) {
 			Socket *_con = m_httpServer->socket().accept(std::chrono::microseconds(1));
 			if (_con != nullptr) {
 				ESP_LOGD(TAG, "socket(%d) accepted", _con->get());
 
-				HttpRequest req;
-				HttpResponse resp(*_con);
+				HttpRequest req(_con);
+				HttpResponse resp(req);
 
-				while (_con != nullptr) {
-					std::string _buf;
-					switch (_con->pollConnectionState(std::chrono::microseconds(1))) {
-					case Socket::noData:
-						//ESP_LOGV(TAG, "Socket(%d)::noData", _con->get());
-						break;
-					case Socket::errorState:
-						//ESP_LOGD(TAG, "Socket(%d)::errorState", _con->get());
-						m_httpServer->removeSocket(&_con);
-						break;
-					case Socket::newData:
-						int readSize = _con->read(_buf, 1024);
-						ESP_LOGV(TAG, "Socket(%d)::newData (size %d) -> %s", _con->get(), readSize, _buf.c_str());
-						if (readSize > 0) {
-							bool handleRet = false;
-							req.analyze(_buf);
-							ESP_LOGD(TAG,"Req:%s uri:%s vers:%s", req.method().c_str(), req.path().c_str(), req.version().c_str());
+				while (1) {
+					bool handleRet = false;
 
-							for (auto _p : m_httpServer->m_pathhandler) {
-								if (_p->match(req.method(), req.path())) {
-									handleRet = _p->handle(req, resp);
-								}
-							}
-							if (false == handleRet) {
-								m_httpServer->defaultHandler()->handle(req, resp);
-								_con->write(resp.get(), resp.get().length());
-								m_httpServer->removeSocket(&_con);
-							}
+					req.parse();
 
-						} else {
-							m_httpServer->removeSocket(&_con);
-						}
+					if (Socket::errorState == _con->pollConnectionState(std::chrono::microseconds(1))) {
+						removeSocket(&_con);
 						break;
 					}
-					vTaskDelay(1);
-				}
-			}
-			if (Socket::errorState == m_httpServer->socket().pollConnectionState(std::chrono::microseconds(1))) {
-				m_httpServer->sem().give();
-				return;
-			}
-		}
+
+					ESP_LOGD(TAG,"Req:%s uri:%s vers:%s", req.method().c_str(), req.path().c_str(), req.version().c_str());
+
+					for (auto _p : m_httpServer->m_pathhandler) {
+						if (_p->match(req.method(), req.path())) {
+							handleRet = _p->handle(req, resp);
+						}
+					}
+					if (false == handleRet) {
+						m_httpServer->defaultHandler()->handle(req, resp);
+						removeSocket(&_con);
+						break;
+					}
+
+				} //while
+				vTaskDelay(1);
+			} //if
+		} //if
 		vTaskDelay(1);
 	}
 }
+
 
 void HttpServer::start() {
 	if (!m_sem.take(10 / portTICK_PERIOD_MS)) {
@@ -139,10 +137,5 @@ void HttpServer::remPathHandler(RequestHandlerBase *_p) {
 	}
 }
 
-void HttpServer::removeSocket(Socket **_s) {
-	(*_s)->close();
-	delete (*_s);
-	*_s = nullptr;
-}
 
 } /* namespace http */

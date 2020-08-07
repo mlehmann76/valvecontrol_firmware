@@ -52,7 +52,6 @@ public:
 	void remPathHandler(RequestHandlerBase *);
 
 private:
-	void removeSocket(Socket **_s);
 
 	HttpServerTask *m_task;
 	int m_port;

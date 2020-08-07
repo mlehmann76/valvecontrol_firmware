@@ -14,9 +14,10 @@
 #include "frozen/unordered_map.h"
 #include "frozen/string.h"
 
-class Socket;
 
 namespace http {
+
+class HttpRequest;
 
 class HttpResponse {
 	static constexpr const char *HTTP_Ver = "HTTP/1.1";
@@ -31,7 +32,7 @@ public:
 
 	static ResponseMapType respMap;
 
-	HttpResponse(Socket &_s);
+	HttpResponse(HttpRequest &_s);
 	virtual ~HttpResponse();
 	HttpResponse(const HttpResponse &other) = delete;
 	HttpResponse(HttpResponse &&other) = delete;
@@ -43,6 +44,7 @@ public:
 	void endHeader();
 
 	void addContent(const std::string &);
+	void send();
 	const std::string& get() const;
 
 private:
@@ -56,7 +58,7 @@ private:
 	ResponseCode m_respCode;
 	std::string m_header;
 	std::vector<std::string> m_headerEntries;
-	Socket *m_socket;
+	HttpRequest *m_request;
 	bool m_headerFinished = false;
 };
 

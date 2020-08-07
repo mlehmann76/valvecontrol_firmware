@@ -9,6 +9,7 @@
 
 #include <esp_log.h>
 #include "config_user.h"
+#include "socket.h"
 
 #define TAG "HTTPREQUEST"
 
@@ -21,11 +22,29 @@ HttpRequest::MethodMapType HttpRequest::MethodMap = //
 				{ "CONNECT", CONNECT }, { "OPTIONS", OPTIONS }, //
 				{ "TRACE", TRACE } };
 
-HttpRequest::HttpRequest() {
+void HttpRequest::parse() {
+	if (m_socket != nullptr) {
+		std::string _buf;
+		switch (m_socket->pollConnectionState(std::chrono::milliseconds(10))) {
+		case Socket::noData:
+			//ESP_LOGV(TAG, "Socket(%d)::noData", _con->get());
+			break;
+		case Socket::errorState:
+			//ESP_LOGD(TAG, "Socket(%d)::errorState", _con->get());
+			m_socket->close();
+			break;
+		case Socket::newData:
+			int readSize = m_socket->read(_buf, 1024);
+			ESP_LOGD(TAG, "parse (size %d) -> %s", readSize, _buf.c_str());
+			if (readSize > 0) {
+				analyze(_buf);
+			}
+			break;
+		}
+	}
 }
 
-HttpRequest::HttpRequest(const std::string &_r)  {
-	analyze(_r);
+HttpRequest::HttpRequest(Socket *_s) : m_socket(_s){
 }
 
 HttpRequest::~HttpRequest() {

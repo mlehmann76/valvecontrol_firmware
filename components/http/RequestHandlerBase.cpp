@@ -16,7 +16,7 @@ extern "C" {
 #include "../esp-idf/components/wpa_supplicant/src/utils/base64.h"
 }
 
-#define TAG "RESPONSE"
+#define TAG "RequestHandlerBase"
 
 namespace http {
 
@@ -56,6 +56,7 @@ void RequestHandlerBase::requestAuth(HTTPAuthMethod mode, const char *realm, con
 		m_response->setResponse(HttpResponse::HTTP_401);
 		m_response->endHeader();
 		// End response
+		m_response->send();
 	}
 }
 

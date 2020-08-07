@@ -12,6 +12,8 @@
 #include <vector>
 #include <unordered_map>
 
+class Socket;
+
 namespace http {
 
 class HttpRequest {
@@ -28,8 +30,7 @@ private:
 	static constexpr const char *LineEnd = "\r\n";
 
 public:
-	HttpRequest();
-	HttpRequest(const std::string&);
+	HttpRequest(Socket *_s);
 	virtual ~HttpRequest();
 	HttpRequest(const HttpRequest &other) = delete;
 	HttpRequest(HttpRequest &&other) = delete;
@@ -48,18 +49,22 @@ public:
 	const Header& header() const {
 		return m_header;
 	}
+	Socket *socket() {return m_socket;}
 
 	static ReqPairType split(const std::string &line);
 	static std::vector<std::string> split(const std::string &s, const std::string &seperator);
 
-	void analyze(const std::string&);
+	void parse();
 
 private:
+	void analyze(const std::string&);
 
+	Socket *m_socket;
 	std::string m_method;
 	std::string m_path;
 	std::string m_version;
 	Header m_header;
+
 };
 
 } /* namespace http */

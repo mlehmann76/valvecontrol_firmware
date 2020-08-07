@@ -15,12 +15,17 @@
 
 #define TAG "SOCKET"
 
+
 Socket::Socket(int _s, SocketType _type) : m_socket(_s), m_socketType(_type), m_isConnected(false){
 	if (m_socket == -1) {
-		m_socket = ::socket(AF_INET, m_socketType, 0);
-		if (m_socket == -1) {
-			ESP_LOGE(TAG, "error creating Socket");
-		}
+		create();
+	}
+}
+
+void Socket::create() {
+	m_socket = ::socket(AF_INET, m_socketType, 0);
+	if (m_socket == -1) {
+		ESP_LOGE(TAG, "error creating Socket");
 	}
 }
 

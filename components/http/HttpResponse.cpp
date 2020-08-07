@@ -6,6 +6,7 @@
  */
 
 #include "socket.h"
+#include "HttpRequest.h"
 #include "HttpResponse.h"
 
 namespace http {
@@ -21,7 +22,7 @@ HttpResponse::ResponseMapType HttpResponse::respMap = {
 		{HTTP_511, "511 Network Authentication Required"}
 };
 
-HttpResponse::HttpResponse(Socket &_s) : m_respCode(HTTP_500), m_socket(&_s){
+HttpResponse::HttpResponse(HttpRequest &_s) : m_respCode(HTTP_500), m_request(&_s){
 }
 
 HttpResponse::~HttpResponse() {
@@ -64,6 +65,10 @@ void HttpResponse::addContent(const std::string &_c) {
 
 const std::string& HttpResponse::get() const{
 	return m_header;
+}
+
+void HttpResponse::send() {
+	m_request->socket()->write(m_header, m_header.size());
 }
 
 void HttpResponse::headerAddStatusLine() {

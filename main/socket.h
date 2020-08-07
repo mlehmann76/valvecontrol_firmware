@@ -55,6 +55,8 @@ public:
 
 	int get() { return m_socket;}
 
+	void create();
+
 private:
 	struct timeval toTimeVal(const TimeoutValue &timeout) {
 		struct timeval _timeout;
