@@ -10,8 +10,11 @@
 
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include "frozen/unordered_map.h"
 #include "frozen/string.h"
+
+class Socket;
 
 namespace http {
 
@@ -24,20 +27,11 @@ public:
 		HTTP_200, HTTP_204, HTTP_400, HTTP_401, HTTP_404, HTTP_500, HTTP_503, HTTP_511
 	};
 
-	using ResponseMapType = frozen::unordered_map<ResponseCode, const char*, 8>;
+	using ResponseMapType = std::unordered_map<ResponseCode, const char*>;
 
-	static constexpr ResponseMapType respMap = {
-			{HTTP_200, "200 OK"},
-			{HTTP_204, "No Content"},
-			{HTTP_400, "Bad Request"},
-			{HTTP_401, "Unauthorized"},
-			{HTTP_404, "Not Found"},
-			{HTTP_500, "Internal Server Error"},
-			{HTTP_503, "Service Unavailable"},
-			{HTTP_511, "Network Authentication Required"}
-	};
+	static ResponseMapType respMap;
 
-	HttpResponse();
+	HttpResponse(Socket &_s);
 	virtual ~HttpResponse();
 	HttpResponse(const HttpResponse &other) = delete;
 	HttpResponse(HttpResponse &&other) = delete;
@@ -48,12 +42,22 @@ public:
 	void setHeader(const std::string &, const std::string &);
 	void endHeader();
 
-	void send(const std::string &);
+	void addContent(const std::string &);
+	const std::string& get() const;
 
 private:
+
+	std::string getTime();
+	void headerAddDate();
+	void headerAddServer();
+	void headerAddEntries();
+	void headerAddStatusLine();
+
 	ResponseCode m_respCode;
 	std::string m_header;
 	std::vector<std::string> m_headerEntries;
+	Socket *m_socket;
+	bool m_headerFinished = false;
 };
 
 } /* namespace http */

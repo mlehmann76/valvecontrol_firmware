@@ -28,6 +28,7 @@ private:
 	static constexpr const char *LineEnd = "\r\n";
 
 public:
+	HttpRequest();
 	HttpRequest(const std::string&);
 	virtual ~HttpRequest();
 	HttpRequest(const HttpRequest &other) = delete;
@@ -48,13 +49,13 @@ public:
 		return m_header;
 	}
 
-private:
-	ReqPairType split(const std::string &line);
-	std::vector<std::string> split(const std::string &s, const std::string &seperator);
+	static ReqPairType split(const std::string &line);
+	static std::vector<std::string> split(const std::string &s, const std::string &seperator);
 
 	void analyze(const std::string&);
 
-	//std::string m_request;
+private:
+
 	std::string m_method;
 	std::string m_path;
 	std::string m_version;

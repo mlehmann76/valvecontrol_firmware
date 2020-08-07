@@ -21,6 +21,9 @@ HttpRequest::MethodMapType HttpRequest::MethodMap = //
 				{ "CONNECT", CONNECT }, { "OPTIONS", OPTIONS }, //
 				{ "TRACE", TRACE } };
 
+HttpRequest::HttpRequest() {
+}
+
 HttpRequest::HttpRequest(const std::string &_r)  {
 	analyze(_r);
 }

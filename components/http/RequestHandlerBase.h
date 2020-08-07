@@ -35,23 +35,25 @@ public:
 	RequestHandlerBase& operator=(const RequestHandlerBase &other) = delete;
 	RequestHandlerBase& operator=(RequestHandlerBase &&other) = delete;
 
-	virtual bool match(const std::string &,const std::string &) = 0;
-	virtual void handle(const HttpRequest &, HttpResponse &) = 0;
+	virtual bool match(const std::string &_method, const std::string &_path) = 0;
+	virtual bool handle(const HttpRequest &, HttpResponse &) = 0;
 
 protected:
+	void setResponse(HttpResponse &resp) {m_response = &resp;}
+	HttpResponse *getResponse() {return m_response; }
 	void requestAuth(HTTPAuthMethod mode, const char *realm, const char *failMsg);
 	bool authenticate(char *buf, size_t buf_len, const char* pUser, const char* pPass);
 
 private:
 	static int _pos(const char* s, size_t s_len, const char p);
-	static void _getRandomHexString(char *buf, size_t len);
+	static std::string _getRandomHexString();
 
 	HttpResponse *m_response;
 	std::string m_method;
 	std::string m_path;
-	char nonce[33];
-	char opaque[33];
-	char pbrealm[256];
+	std::string nonce;
+	std::string opaque;
+	std::string pbrealm;
 };
 
 } /* namespace http */

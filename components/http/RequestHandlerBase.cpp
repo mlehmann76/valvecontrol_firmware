@@ -10,6 +10,7 @@
 #include "config_user.h"
 #include "esp_log.h"
 #include "RequestHandlerBase.h"
+#include "fmt/printf.h"
 
 extern "C" {
 #include "../esp-idf/components/wpa_supplicant/src/utils/base64.h"
@@ -34,11 +35,8 @@ int RequestHandlerBase::_pos(const char *s, size_t s_len, const char p) {
 	return ret;
 }
 
-void RequestHandlerBase::_getRandomHexString(char *buf, size_t len) {
-	for (int i = 0; i < 4; i++) {
-		snprintf(buf + (i * 8), len, "%08x", (uint32_t)rand());
-		len -= 8;
-	}
+std::string RequestHandlerBase::_getRandomHexString() {
+	return fmt::sprintf("%08x%08x%08x%08x", (uint32_t)rand(), (uint32_t)rand(), (uint32_t)rand(), (uint32_t)rand());
 }
 
 void RequestHandlerBase::requestAuth(HTTPAuthMethod mode, const char *realm, const char *failMsg) {
@@ -46,11 +44,11 @@ void RequestHandlerBase::requestAuth(HTTPAuthMethod mode, const char *realm, con
 		realm = "Login Required";
 	}
 	if (mode == BASIC_AUTH) {
-		snprintf(pbrealm, sizeof(pbrealm), "%s%s\"", basicRealm, realm);
+		pbrealm = fmt::sprintf("%s%s\"", basicRealm, realm);
 	} else {
-		_getRandomHexString(nonce, sizeof(nonce));
-		_getRandomHexString(opaque, sizeof(opaque));
-		snprintf(pbrealm, sizeof(pbrealm), "%s%s\", qop=\"auth\", nonce=\"%s\", opaque=\"%s\"", digestRealm, realm,
+		nonce = _getRandomHexString();
+		opaque = _getRandomHexString();
+		pbrealm = fmt::sprintf("%s%s\", qop=\"auth\", nonce=\"%s\", opaque=\"%s\"", digestRealm, realm,
 				nonce, opaque);
 	}
 	if (m_response != nullptr) {
@@ -58,34 +56,24 @@ void RequestHandlerBase::requestAuth(HTTPAuthMethod mode, const char *realm, con
 		m_response->setResponse(HttpResponse::HTTP_401);
 		m_response->endHeader();
 		// End response
-		m_response->send("");
 	}
 }
 
 bool RequestHandlerBase::authenticate(char *buf, size_t buf_len, const char *pUser, const char *pPass) {
 	char mode[32];
 	char encoded[128];
-	unsigned char *pdecode;
+	char *pdecode;
 	bool ret = false;
 	size_t outlen = 0;
 	sscanf(buf, "%32s %128s", mode, encoded);
 	ESP_LOGI(TAG, "Found header => Authorization: mode %s pass %s", mode, encoded);
 	//BASIC Mode
 	if (0 == ::strncmp(mode, BASIC, sizeof(BASIC))) {
-		pdecode = ::base64_decode(encoded, ::strnlen(encoded, sizeof(encoded)), &outlen);
+		pdecode = (char*)::base64_decode(encoded, ::strnlen(encoded, sizeof(encoded)), &outlen);
+		HttpRequest::ReqPairType _p = HttpRequest::split(std::string(const_cast<char*>(pdecode)));
 		if (outlen && pUser != NULL && pPass != NULL) {
-			char user[128];
-			char passw[128];
-			int posc = _pos((char*) pdecode, outlen, ':');
-			if (posc != -1) {
-				::memcpy(user, pdecode, posc);
-				user[posc] = 0;
-				::memcpy(passw, &pdecode[posc + 1], outlen - posc);
-				passw[outlen - posc] = 0;
-			}
-			ESP_LOGI(TAG, "Basic Authorization: %s,%s", user, passw);
-			if ((0 == ::strncmp(user, pUser, std::max(strlen(user), strlen(pUser))))
-					&& (0 == ::strncmp(passw, pPass, std::max(strlen(passw), strlen(pPass))))) {
+			ESP_LOGI(TAG, "Basic Authorization: %s,%s", _p.first.c_str(), _p.second.c_str());
+			if (_p.first == std::string(pUser) && _p.second == std::string(pPass)) {
 				ESP_LOGI(TAG, "Basic Authorization OK");
 				ret = true;
 			}

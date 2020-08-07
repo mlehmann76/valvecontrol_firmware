@@ -199,6 +199,8 @@ int Socket::write(const char *buffer, int size) {
 		} else {
 			ESP_LOGE(TAG, "write: %s", strerror(errno));
 		}
+	} else {
+		ESP_LOGD(TAG, "written: %s", buffer);
 	}
 	return writeReturn;
 }

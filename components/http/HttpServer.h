@@ -19,6 +19,7 @@ namespace http {
 class HttpServerConnectionObserver;
 class HttpServerTask;
 class RequestHandlerBase;
+class DefaultHandler;
 
 class HttpServer {
 	friend HttpServerTask;
@@ -42,6 +43,7 @@ public:
 	}
 
 	Semaphore &sem() { return m_sem;}
+	DefaultHandler *defaultHandler() {return m_defaultHandler; }
 
 	void start();
 	void stop();
@@ -58,6 +60,7 @@ private:
 	Semaphore m_sem;
 	HttpServerConnectionObserver *m_obs;
 	std::vector<RequestHandlerBase*> m_pathhandler;
+	DefaultHandler *m_defaultHandler;
 };
 
 class HttpServerConnectionObserver: public ConnectionObserver {

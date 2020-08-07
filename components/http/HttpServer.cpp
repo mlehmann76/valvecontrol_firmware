@@ -11,7 +11,7 @@
 #include "HttpRequest.h"
 #include "HttpResponse.h"
 #include "HttpServer.h"
-#include "RequestHandlerBase.h"
+#include "DefaultHandler.h"
 
 #define TAG "HTTPSERVER"
 
@@ -19,7 +19,7 @@ namespace http {
 
 HttpServer::HttpServer(int _port) :
 		m_task(nullptr), m_port(_port), m_socket(), m_sem("http server sem"), m_obs(
-				new HttpServerConnectionObserver(this)) {
+				new HttpServerConnectionObserver(this)), m_defaultHandler(new DefaultHandler()) {
 }
 
 HttpServer::~HttpServer() {
@@ -54,30 +54,36 @@ void HttpServerTask::task() {
 			if (_con != nullptr) {
 				ESP_LOGD(TAG, "socket(%d) accepted", _con->get());
 
+				HttpRequest req;
+				HttpResponse resp(*_con);
+
 				while (_con != nullptr) {
 					std::string _buf;
 					switch (_con->pollConnectionState(std::chrono::microseconds(1))) {
 					case Socket::noData:
-						ESP_LOGV(TAG, "Socket(%d)::noData", _con->get());
+						//ESP_LOGV(TAG, "Socket(%d)::noData", _con->get());
 						break;
 					case Socket::errorState:
-						ESP_LOGD(TAG, "Socket(%d)::errorState", _con->get());
+						//ESP_LOGD(TAG, "Socket(%d)::errorState", _con->get());
 						m_httpServer->removeSocket(&_con);
 						break;
 					case Socket::newData:
 						int readSize = _con->read(_buf, 1024);
 						ESP_LOGV(TAG, "Socket(%d)::newData (size %d) -> %s", _con->get(), readSize, _buf.c_str());
-						if (readSize >= 0) {
-							HttpRequest req(_buf);
-							HttpResponse resp;
+						if (readSize > 0) {
+							bool handleRet = false;
+							req.analyze(_buf);
 							ESP_LOGD(TAG,"Req:%s uri:%s vers:%s", req.method().c_str(), req.path().c_str(), req.version().c_str());
-							for(auto &h : req.header()) {
-								ESP_LOGD(TAG,"Header %s : %s", h.first.c_str(), h.second.c_str());
-							}
+
 							for (auto _p : m_httpServer->m_pathhandler) {
 								if (_p->match(req.method(), req.path())) {
-									_p->handle(req, resp);
+									handleRet = _p->handle(req, resp);
 								}
+							}
+							if (false == handleRet) {
+								m_httpServer->defaultHandler()->handle(req, resp);
+								_con->write(resp.get(), resp.get().length());
+								m_httpServer->removeSocket(&_con);
 							}
 
 						} else {
