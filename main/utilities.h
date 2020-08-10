@@ -9,6 +9,7 @@
 #define MAIN_UTILITIES_H_
 
 #include <string>
+#include <memory>
 
 namespace utilities {
 

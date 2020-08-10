@@ -21,6 +21,9 @@ public:
 	enum Method {
 		NONE, GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE
 	};
+
+	enum ParseResult {PARSE_OK, PARSE_NODATA, PARSE_ERROR};
+
 	using Header = std::unordered_map<std::string,std::string>;
 	using MethodMapType = std::unordered_map<const char*, enum Method>;
 	using ReqPairType = std::pair<std::string, std::string>;
@@ -49,12 +52,12 @@ public:
 	const Header& header() const {
 		return m_header;
 	}
-	Socket *socket() {return m_socket;}
+	Socket *socket() const {return m_socket;}
 
 	static ReqPairType split(const std::string &line);
 	static std::vector<std::string> split(const std::string &s, const std::string &seperator);
 
-	void parse();
+	ParseResult parse();
 
 private:
 	void analyze(const std::string&);

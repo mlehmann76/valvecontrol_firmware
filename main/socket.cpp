@@ -167,7 +167,7 @@ bool Socket::listen(unsigned short backlog) {
 	}
 }
 
-int Socket::read(char *buffer, int size) {
+int Socket::read(char *buffer, size_t size) {
 	if (m_socket == -1) {
 		ESP_LOGE(TAG, "read: Socket is not initialized.");
 	}
@@ -182,18 +182,18 @@ int Socket::read(char *buffer, int size) {
 	return recReturn;
 }
 
-int Socket::read(std::string &buffer, int size) {
+int Socket::read(std::string &buffer, size_t size) {
 	std::unique_ptr<char[]> _buf(new char[size]);
 	int ret = read(_buf.get(), size);
 	buffer = std::string(ret > 0 ? _buf.get() : "", ret > 0 ? ret : 0);
 	return ret;
 }
 
-int Socket::write(const std::string &buffer, int size) {
+int Socket::write(const std::string &buffer, size_t size) {
 	return write(buffer.c_str(), size);
 }
 
-int Socket::write(const char *buffer, int size) {
+int Socket::write(const char *buffer, size_t size) {
 	if (m_socket == -1) {
 		ESP_LOGE(TAG, "write: Socket is not initialized.");
 	}

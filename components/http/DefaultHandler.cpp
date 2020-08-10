@@ -5,6 +5,7 @@
  *      Author: marco
  */
 
+#include "socket.h"
 #include "DefaultHandler.h"
 
 namespace http {
@@ -33,8 +34,8 @@ bool DefaultHandler::handle(const HttpRequest &_req, HttpResponse &_res) {
 		_res.setHeader("Connection","Close");
 		_res.endHeader();
 	}
-	_res.send();
-	return true;
+	_res.send("");
+	return false;
 }
 
 } /* namespace http */

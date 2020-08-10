@@ -10,7 +10,7 @@
 #include "config_user.h"
 #include "esp_log.h"
 #include "RequestHandlerBase.h"
-#include "fmt/printf.h"
+#include "utilities.h"
 
 extern "C" {
 #include "../esp-idf/components/wpa_supplicant/src/utils/base64.h"
@@ -36,7 +36,7 @@ int RequestHandlerBase::_pos(const char *s, size_t s_len, const char p) {
 }
 
 std::string RequestHandlerBase::_getRandomHexString() {
-	return fmt::sprintf("%08x%08x%08x%08x", (uint32_t)rand(), (uint32_t)rand(), (uint32_t)rand(), (uint32_t)rand());
+	return utilities::string_format("%08x%08x%08x%08x", (uint32_t)rand(), (uint32_t)rand(), (uint32_t)rand(), (uint32_t)rand());
 }
 
 void RequestHandlerBase::requestAuth(HTTPAuthMethod mode, const char *realm, const char *failMsg) {
@@ -44,11 +44,11 @@ void RequestHandlerBase::requestAuth(HTTPAuthMethod mode, const char *realm, con
 		realm = "Login Required";
 	}
 	if (mode == BASIC_AUTH) {
-		pbrealm = fmt::sprintf("%s%s\"", basicRealm, realm);
+		pbrealm = utilities::string_format("%s%s\"", basicRealm, realm);
 	} else {
 		nonce = _getRandomHexString();
 		opaque = _getRandomHexString();
-		pbrealm = fmt::sprintf("%s%s\", qop=\"auth\", nonce=\"%s\", opaque=\"%s\"", digestRealm, realm,
+		pbrealm = utilities::string_format("%s%s\", qop=\"auth\", nonce=\"%s\", opaque=\"%s\"", digestRealm, realm,
 				nonce, opaque);
 	}
 	if (m_response != nullptr) {
@@ -56,7 +56,7 @@ void RequestHandlerBase::requestAuth(HTTPAuthMethod mode, const char *realm, con
 		m_response->setResponse(HttpResponse::HTTP_401);
 		m_response->endHeader();
 		// End response
-		m_response->send();
+		m_response->send("");
 	}
 }
 

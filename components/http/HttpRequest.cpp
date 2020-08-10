@@ -5,7 +5,7 @@
  *      Author: marco
  */
 
-#include "../components/http/HttpRequest.h"
+#include "HttpRequest.h"
 
 #include <esp_log.h>
 #include "config_user.h"
@@ -22,15 +22,18 @@ HttpRequest::MethodMapType HttpRequest::MethodMap = //
 				{ "CONNECT", CONNECT }, { "OPTIONS", OPTIONS }, //
 				{ "TRACE", TRACE } };
 
-void HttpRequest::parse() {
+HttpRequest::ParseResult HttpRequest::parse() {
+	ParseResult ret = PARSE_NODATA;
 	if (m_socket != nullptr) {
 		std::string _buf;
 		switch (m_socket->pollConnectionState(std::chrono::milliseconds(10))) {
 		case Socket::noData:
 			//ESP_LOGV(TAG, "Socket(%d)::noData", _con->get());
+			ret = PARSE_NODATA;
 			break;
 		case Socket::errorState:
 			//ESP_LOGD(TAG, "Socket(%d)::errorState", _con->get());
+			ret = PARSE_ERROR;
 			m_socket->close();
 			break;
 		case Socket::newData:
@@ -38,10 +41,12 @@ void HttpRequest::parse() {
 			ESP_LOGD(TAG, "parse (size %d) -> %s", readSize, _buf.c_str());
 			if (readSize > 0) {
 				analyze(_buf);
+				ret = PARSE_OK;
 			}
 			break;
 		}
 	}
+	return ret;
 }
 
 HttpRequest::HttpRequest(Socket *_s) : m_socket(_s){
@@ -89,6 +94,7 @@ void HttpRequest::analyze(const std::string &r) {
 		ReqPairType p = split(lines[i]);
 		m_header[p.first] = p.second;
 	}
+	ESP_LOGD(TAG, "Req:%s uri:%s vers:%s", method().c_str(), path().c_str(),version().c_str());
 }
 
 } /* namespace http */

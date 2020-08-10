@@ -37,11 +37,11 @@ public:
 
 	bool listen(unsigned short backlog);
 
-	int read(char *buffer, int size);
-	int read(std::string &buffer, int size);
+	int read(char *buffer, size_t size);
+	int read(std::string &buffer, size_t size);
 
-	int write(const std::string &buffer, int size);
-	int write(const char *buffer, int size);
+	int write(const std::string &buffer, size_t size);
+	int write(const char *buffer, size_t size);
 
 	PollType pollConnectionState(const TimeoutValue &timeout);
 

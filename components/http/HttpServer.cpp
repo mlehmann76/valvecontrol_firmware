@@ -19,7 +19,9 @@ namespace http {
 
 HttpServer::HttpServer(int _port) :
 		m_task(nullptr), m_port(_port), m_socket(), m_sem("http server sem"), m_obs(
-				new HttpServerConnectionObserver(this)), m_defaultHandler(new DefaultHandler()) {
+				new HttpServerConnectionObserver(this)) {
+	//always have the defaultHandler in line
+	m_pathhandler.push_back(new DefaultHandler);
 }
 
 HttpServer::~HttpServer() {
@@ -69,31 +71,26 @@ void HttpServerTask::task() {
 				HttpRequest req(_con);
 				HttpResponse resp(req);
 
-				while (1) {
-					bool handleRet = false;
-
-					req.parse();
-
-					if (Socket::errorState == _con->pollConnectionState(std::chrono::microseconds(1))) {
-						removeSocket(&_con);
+				bool exit = false;
+				while (!exit) {
+					switch (req.parse()) {
+					case HttpRequest::PARSE_ERROR:
+						exit = true;
 						break;
-					}
-
-					ESP_LOGD(TAG,"Req:%s uri:%s vers:%s", req.method().c_str(), req.path().c_str(), req.version().c_str());
-
-					for (auto _p : m_httpServer->m_pathhandler) {
-						if (_p->match(req.method(), req.path())) {
-							handleRet = _p->handle(req, resp);
+					case HttpRequest::PARSE_NODATA:
+						break;
+					case HttpRequest::PARSE_OK:
+						for (auto _p : m_httpServer->m_pathhandler) {
+							if (_p->match(req.method(), req.path())) {
+								exit = !(_p->handle(req, resp));
+								break;
+							}
 						}
-					}
-					if (false == handleRet) {
-						m_httpServer->defaultHandler()->handle(req, resp);
-						removeSocket(&_con);
 						break;
 					}
-
+					vTaskDelay(1);
 				} //while
-				vTaskDelay(1);
+				removeSocket(&_con);
 			} //if
 		} //if
 		vTaskDelay(1);
@@ -125,11 +122,11 @@ void HttpServer::stop() {
 }
 
 void HttpServer::addPathHandler(RequestHandlerBase *_p) {
-	m_pathhandler.push_back(_p);
+	m_pathhandler.push_front(_p);
 }
 
 void HttpServer::remPathHandler(RequestHandlerBase *_p) {
-	for (std::vector<RequestHandlerBase*>::iterator it = m_pathhandler.begin(); it != m_pathhandler.end(); ++it) {
+	for (PathHandlerType::iterator it = m_pathhandler.begin(); it != m_pathhandler.end(); ++it) {
 		if (*it == _p) {
 			m_pathhandler.erase(it);
 			break;

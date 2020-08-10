@@ -11,9 +11,6 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include "frozen/unordered_map.h"
-#include "frozen/string.h"
-
 
 namespace http {
 
@@ -28,9 +25,15 @@ public:
 		HTTP_200, HTTP_204, HTTP_400, HTTP_401, HTTP_404, HTTP_500, HTTP_503, HTTP_511
 	};
 
+	enum ContentType {
+		CT_APP_JSON, CT_APP_OCSTREAM, CT_TEXT_JAVASCRIPT, CT_TEXT_HTML, CT_TEXT_PLAIN,
+	};
+
 	using ResponseMapType = std::unordered_map<ResponseCode, const char*>;
+	using ContentTypeMapType = std::unordered_map<ContentType, const char*>;
 
 	static ResponseMapType respMap;
+	static ContentTypeMapType ctMap;
 
 	HttpResponse(HttpRequest &_s);
 	virtual ~HttpResponse();
@@ -40,26 +43,30 @@ public:
 	HttpResponse& operator=(HttpResponse &&other) = delete;
 
 	void setResponse(ResponseCode _c);
-	void setHeader(const std::string &, const std::string &);
+	void setHeader(const std::string&, const std::string&);
+	void setContentType(ContentType _c);
 	void endHeader();
 
-	void addContent(const std::string &);
-	void send();
-	const std::string& get() const;
+	void send(const std::string&);
+	void send_chunk(const std::string&);
+
+	void send(const char *_buf, size_t _s);
+	void send_chunk(const char *_buf, size_t _s);
 
 private:
 
-	std::string getTime();
 	void headerAddDate();
 	void headerAddServer();
 	void headerAddEntries();
 	void headerAddStatusLine();
+	std::string getTime();
 
 	ResponseCode m_respCode;
 	std::string m_header;
 	std::vector<std::string> m_headerEntries;
 	HttpRequest *m_request;
-	bool m_headerFinished = false;
+	bool m_headerFinished;
+	bool m_firstChunkSent;
 };
 
 } /* namespace http */

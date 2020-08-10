@@ -75,8 +75,6 @@ int MainClass::loop() {
 	esp_log_level_set("HTTPSERVER", ESP_LOG_VERBOSE);
 	esp_log_level_set("HTTPREQUEST", ESP_LOG_VERBOSE);
 
-
-
 	spiffsInit();
 
 	mqttConf.init();

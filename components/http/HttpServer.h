@@ -8,7 +8,7 @@
 #ifndef COMPONENTS_HTTP_HTTPSERVER_H_
 #define COMPONENTS_HTTP_HTTPSERVER_H_
 
-#include <vector>
+#include <list>
 #include "TaskCPP.h"
 #include "SemaphoreCPP.h"
 #include "socket.h"
@@ -23,6 +23,7 @@ class DefaultHandler;
 
 class HttpServer {
 	friend HttpServerTask;
+	using PathHandlerType = std::list<RequestHandlerBase*>;
 
 public:
 	HttpServer(int _port);
@@ -43,7 +44,6 @@ public:
 	}
 
 	Semaphore &sem() { return m_sem;}
-	DefaultHandler *defaultHandler() {return m_defaultHandler; }
 
 	void start();
 	void stop();
@@ -58,8 +58,7 @@ private:
 	Socket m_socket;
 	Semaphore m_sem;
 	HttpServerConnectionObserver *m_obs;
-	std::vector<RequestHandlerBase*> m_pathhandler;
-	DefaultHandler *m_defaultHandler;
+	PathHandlerType m_pathhandler;
 };
 
 class HttpServerConnectionObserver: public ConnectionObserver {

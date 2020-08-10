@@ -8,9 +8,10 @@
 #include "socket.h"
 #include "HttpRequest.h"
 #include "HttpResponse.h"
+#include "utilities.h"
 
 namespace http {
-
+//@formatter:off
 HttpResponse::ResponseMapType HttpResponse::respMap = {
 		{HTTP_200, "200 OK"},
 		{HTTP_204, "204 No Content"},
@@ -22,7 +23,15 @@ HttpResponse::ResponseMapType HttpResponse::respMap = {
 		{HTTP_511, "511 Network Authentication Required"}
 };
 
-HttpResponse::HttpResponse(HttpRequest &_s) : m_respCode(HTTP_500), m_request(&_s){
+HttpResponse::ContentTypeMapType HttpResponse::ctMap = {
+		{CT_APP_JSON, 			"application/json" },
+		{CT_APP_OCSTREAM, 		"application/octet-stream"},
+		{CT_TEXT_JAVASCRIPT, 	"text/javascript" },
+		{CT_TEXT_HTML, 			"text/html" },
+		{CT_TEXT_PLAIN, 		"text/plain" },
+};
+//@formatter:on
+HttpResponse::HttpResponse(HttpRequest &_s) : m_respCode(HTTP_500), m_request(&_s), m_headerFinished(false), m_firstChunkSent(false){
 }
 
 HttpResponse::~HttpResponse() {
@@ -44,7 +53,8 @@ void HttpResponse::headerAddDate() {
 }
 
 void HttpResponse::headerAddServer() {
-	m_header.append(std::string("server: valveControl-") + std::string(PROJECT_GIT));
+	m_header.append("server: valveControl-");
+	m_header.append(PROJECT_GIT);
 	m_header.append(LineEnd);
 }
 
@@ -55,21 +65,10 @@ void HttpResponse::headerAddEntries() {
 	}
 }
 
-void HttpResponse::addContent(const std::string &_c) {
-	if(!m_headerFinished) {
-		//TODO add content length
-		endHeader();
-	}
-	m_header.append(_c);
+void HttpResponse::setContentType(ContentType _c) {
+	m_headerEntries.push_back(utilities::string_format("Content-Type: %s", ctMap[_c]));
 }
 
-const std::string& HttpResponse::get() const{
-	return m_header;
-}
-
-void HttpResponse::send() {
-	m_request->socket()->write(m_header, m_header.size());
-}
 
 void HttpResponse::headerAddStatusLine() {
 	m_header.append(HTTP_Ver);
@@ -84,13 +83,49 @@ void HttpResponse::endHeader() {
 	headerAddEntries();
 	headerAddServer();
 	headerAddDate();
+	m_header.append(LineEnd);
+
 	m_headerFinished = true;
+}
+
+void HttpResponse::send(const std::string &_a) {
+	send(_a.data(),_a.length());
+}
+
+void HttpResponse::send_chunk(const std::string &_chunk) {
+	send_chunk(_chunk.data(), _chunk.length());
+}
+
+void HttpResponse::send(const char *_buf, size_t _s) {
+	if (_buf != nullptr) {
+		if (!m_headerFinished) {
+			m_headerEntries.push_back(utilities::string_format("Content-Length: %d", _s));
+			endHeader();
+		}
+		m_request->socket()->write(m_header, m_header.length());
+		m_request->socket()->write(_buf, _s);
+	}
+}
+
+void HttpResponse::send_chunk(const char *_buf, size_t _s) {
+	if (_buf != nullptr) {
+		if (!m_firstChunkSent) {
+			m_headerEntries.push_back("Transfer-Encoding: chunked");
+			endHeader();
+			m_request->socket()->write(m_header, m_header.length());
+			m_firstChunkSent = true;
+		} else {
+			std::string _chunkLen = utilities::string_format("%x\r\n", _s);
+			m_request->socket()->write(_chunkLen, _chunkLen.length());
+			m_request->socket()->write(_buf, _s);
+			m_request->socket()->write(LineEnd, strlen(LineEnd));
+		}
+	}
 }
 
 std::string HttpResponse::getTime()
 {
     timeval curTime;
-
     gettimeofday(&curTime, NULL);
     char buf[sizeof "Wed, 21 Oct 2015 07:28:00 GMT"];
     strftime(buf, sizeof buf, "%a, %d %b %Y %T %Z", gmtime(&curTime.tv_sec));
