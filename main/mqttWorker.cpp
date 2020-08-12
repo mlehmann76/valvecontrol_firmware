@@ -13,7 +13,6 @@
 
 #include "sdkconfig.h"
 
-#include "TaskCPP.h"
 #include "SemaphoreCPP.h"
 #include "QueueCPP.h"
 #include "TimerCPP.h"

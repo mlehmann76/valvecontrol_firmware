@@ -13,11 +13,13 @@ http://openbook.rheinwerk-verlag.de/linux_unix_programmierung/Kap11-013.htm#RxxK
 #include <memory>
 #include <netdb.h>
 #include <esp_log.h>
+#include <esp_pthread.h>
+
 #include "echoServer.h"
 
 #define TAG "ECHO"
 
-EchoServer::EchoServer() : TaskClass("echo", TaskPrio_Mid, 3072), m_sockets(), m_obs(new EchoConnectionObserver(this)) {
+EchoServer::EchoServer() : m_sockets(), m_obs(new EchoConnectionObserver(this)) {
 }
 
 EchoServer::~EchoServer() {
@@ -72,7 +74,7 @@ void EchoServer::task() {
 				}
 			}
 		}
-		vTaskDelay(10);
+		std::this_thread::sleep_for(std::chrono::milliseconds(15));
 	}
 }
 
@@ -84,6 +86,10 @@ void EchoServer::start() {
 			int value = 1;
 			_s->setSocketOption(SO_REUSEADDR, &value, sizeof(value));
 			m_sockets.push_back(_s);
+			auto cfg = esp_pthread_get_default_config();
+				cfg.thread_name = "echo task";
+				esp_pthread_set_cfg(&cfg);
+				m_thread = std::thread([this](){this->task();});
 		}
 	}
 }

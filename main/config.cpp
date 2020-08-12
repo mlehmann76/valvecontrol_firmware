@@ -184,15 +184,13 @@ esp_err_t MqttConfig::init() {
 		required_size = strlen(def_mqtt_device);
 	}
 
-	mqtt_sub_msg = (char*) malloc(required_size + sizeof("#") + 1);
 	mqtt_pub_msg = (char*) malloc(required_size + sizeof("state/") + 1);
 
-	if ((mqtt_sub_msg != NULL) && (mqtt_pub_msg != NULL)) {
-		snprintf(mqtt_sub_msg, required_size + sizeof("#") + 1, "%s#", mqtt_device_name);
+	if ((mqtt_pub_msg != NULL)) {
 		snprintf(mqtt_pub_msg, required_size + sizeof("state") + 1, "%sstate", mqtt_device_name);
 	}
 
-	ESP_LOGD(TAG, "sub: (%s) pub (%s)", getSubMsg(), getPubMsg());
+	ESP_LOGD(TAG, "pub (%s)", getPubMsg());
 
 	return ESP_OK;
 }
@@ -310,9 +308,9 @@ int SensorConfig::parse(const char* value) {
 	return ret;
 }
 
-bool SensorConfig::isSHT1xEnabled() {
-	const cJSON *item = getItem("sht1x", "enabled");
-	ESP_LOGD(TAG, "sht1x: 0x%08X : %s", (unsigned int )item, cJSON_IsTrue(item) ? "true" : "false");
+bool SensorConfig::isEnabled(const char* _s) {
+	const cJSON *item = getItem(_s, "enabled");
+	ESP_LOGD(TAG, "%s: 0x%08X : %s", _s, (unsigned int )item, cJSON_IsTrue(item) ? "true" : "false");
 	return cJSON_IsTrue(item);
 }
 

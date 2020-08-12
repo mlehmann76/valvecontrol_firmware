@@ -10,7 +10,7 @@
 #include "sdkconfig.h"
 #include "config_user.h"
 
-#include "TaskCPP.h"
+#include <esp_pthread.h>
 #include "SemaphoreCPP.h"
 #include "QueueCPP.h"
 #include "TimerCPP.h"
@@ -43,7 +43,13 @@
 esp_wps_config_t WifiTask::config = WPS_CONFIG_INIT_DEFAULT(WPS_TEST_MODE);
 const char WifiTask::TAG[] = "WifiTask";
 
-WifiTask::WifiTask() : TaskClass("wifi", TaskPrio_HMI, 3072){
+WifiTask::WifiTask() {
+	auto cfg = esp_pthread_get_default_config();
+	cfg.thread_name = "wifi task";
+	esp_pthread_set_cfg(&cfg);
+	m_thread = std::thread([this]() {
+		this->task();
+	});
 }
 
 WifiTask::~WifiTask() {
@@ -265,7 +271,7 @@ void WifiTask::task() {
 			break;
 		}
 
-		vTaskDelay(100 / portTICK_PERIOD_MS);
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
 }
 

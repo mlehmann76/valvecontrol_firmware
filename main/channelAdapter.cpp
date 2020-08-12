@@ -32,11 +32,12 @@ int MqttChannelAdapter::onMessage(esp_mqtt_event_handle_t event) {
 	} else {
 		ESP_LOGV(TAG, "Topic received!: (%d) %.*s", event->topic_len, event->topic_len, event->topic);
 	}
-	//check message and set channel or notify
+	//TODO check message and set channel or notify
 	return 0;
 }
 
 void MqttChannelAdapter::onNotify(const ChannelBase*) {
+	//TODO check message and notify
 }
 
 int MqttJsonChannelAdapter::onMessage(esp_mqtt_event_handle_t event) {
@@ -91,16 +92,16 @@ int MqttJsonChannelAdapter::onMessage(esp_mqtt_event_handle_t event) {
 	return ret;
 }
 
-void MqttJsonChannelAdapter::onNotify(const ChannelBase*) {
+void MqttJsonChannelAdapter::onNotify(const ChannelBase* _b) {
 	cJSON *root = cJSON_CreateObject();
 	if (root != NULL) {
 		//add time and date
 		StatusTask::addTimeStamp(root);
 		cJSON *pChan = cJSON_AddObjectToObject(root, "channel");
 		if (pChan != NULL) {
-			cJSON *pChanv = cJSON_AddObjectToObject(pChan, channel()->name());
+			cJSON *pChanv = cJSON_AddObjectToObject(pChan, _b->name());
 			if (pChanv != NULL) {
-				cJSON_AddStringToObject(pChanv, "val", channel()->get() ? "ON" : "OFF");
+				cJSON_AddStringToObject(pChanv, "val", _b->get() ? "ON" : "OFF");
 			}
 		}
 		//forward

@@ -8,6 +8,8 @@
 #ifndef MAIN_STATUSTASK_H_
 #define MAIN_STATUSTASK_H_
 
+#include <vector>
+#include <thread>
 #include "mqttWorker.h"
 
 class StatusProviderBase {
@@ -23,15 +25,15 @@ class StatusProvider : public StatusProviderBase {
 	friend T;
 public:
 	StatusProvider<T>(T *_c) : _client(_c) {}
-	virtual bool hasUpdate() { return _client->hasUpdate(); }
-	virtual void setUpdate(bool _b) { _client->setUpdate(_b);}
-	virtual void addStatus(cJSON * _c) { _client->addStatus(_c);}
+	bool hasUpdate() { return _client->hasUpdate(); }
+	void setUpdate(bool _b) { _client->setUpdate(_b);}
+	void addStatus(cJSON * _c) { _client->addStatus(_c);}
 private:
 	T *_client;
 };
 
 
-class StatusTask : public TaskClass {
+class StatusTask {
 public:
 	StatusTask(EventGroupHandle_t &main);
 	virtual void task();
@@ -49,8 +51,8 @@ public:
 	static void addHardwareStatus(cJSON *root);
 
 private:
-	StatusProviderBase* m_statusFunc[8];
-	size_t m_statusFuncCount;
+	std::thread m_thread;
+	std::vector<StatusProviderBase*> m_statusFunc;
 	EventGroupHandle_t *main_event_group;
 	StatusProvider<StatusTask> m_status;
 	bool m_update = false;

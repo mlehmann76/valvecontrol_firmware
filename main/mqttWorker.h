@@ -8,7 +8,6 @@
 #ifndef MAIN_MQTT_USER_H_
 #define MAIN_MQTT_USER_H_
 
-#include "TaskCPP.h"
 #include "ConnectionObserver.h"
 #include <string>
 #include <vector>

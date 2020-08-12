@@ -9,7 +9,6 @@
 #include <time.h>
 #include "config_user.h"
 
-#include "TaskCPP.h"
 #include "freertos/event_groups.h"
 #include "QueueCPP.h"
 #include "SemaphoreCPP.h"

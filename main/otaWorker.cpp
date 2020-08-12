@@ -15,7 +15,6 @@
 #include "esp_flash_partitions.h"
 #include "esp_partition.h"
 
-#include "TaskCPP.h"
 #include "SemaphoreCPP.h"
 #include "QueueCPP.h"
 #include "TimerCPP.h"

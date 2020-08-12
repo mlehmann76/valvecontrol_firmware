@@ -7,7 +7,7 @@
 
 #include <time.h>
 #include <memory>
-#include "TaskCPP.h"
+#include <chrono>
 #include "QueueCPP.h"
 #include "freertos/event_groups.h"
 #include "SemaphoreCPP.h"
@@ -17,6 +17,8 @@
 #include "esp_log.h"
 #include "esp_image_format.h"
 #include "esp_ota_ops.h"
+#include <esp_pthread.h>
+
 #include "cJSON.h"
 
 #include "config.h"
@@ -60,9 +62,14 @@ void StatusTask::addTimeStamp(cJSON *root) {
 }
 
 StatusTask::StatusTask(EventGroupHandle_t &main) :
-		TaskClass("status", TaskPrio_HMI, 3072), m_statusFunc(), m_statusFuncCount(0),
-		main_event_group(&main), m_status(this) {
+		m_statusFunc(), main_event_group(&main), m_status(this) {
 	addProvider(status());
+	auto cfg = esp_pthread_get_default_config();
+	cfg.thread_name = "status task";
+	esp_pthread_set_cfg(&cfg);
+	m_thread = std::thread([this]() {
+		this->task();
+	});
 }
 
 void StatusTask::task() {
@@ -79,76 +86,71 @@ void StatusTask::task() {
 				m_isConnected = false;
 			}
 
-			for (size_t i = 0; i < (m_statusFuncCount); i++) {
-				if (m_statusFunc[i]->hasUpdate()) {
+			for (auto _s : m_statusFunc) {
+				if (_s->hasUpdate()) {
 					needUpdate = true;
 					break;
 				}
 			}
 
 			if (((xEventGroupGetBits(*main_event_group) & (CONNECTED_BIT | MQTT_CONNECTED_BIT | MQTT_OTA_BIT))
-					== (CONNECTED_BIT | MQTT_CONNECTED_BIT))
-					&& needUpdate) {
-
+					== (CONNECTED_BIT | MQTT_CONNECTED_BIT)) && needUpdate) {
 
 				cJSON *pRoot = cJSON_CreateObject();
 				if (pRoot != NULL) {
 					//
 					addTimeStamp(pRoot);
 					//
-					for (size_t i = 0; i < (m_statusFuncCount); i++) {
+					for (auto _s : m_statusFunc) {
 						//at least one is set, so send all status
-						if (m_statusFunc[i]->hasUpdate()) {
-							m_statusFunc[i]->addStatus(pRoot);
-							m_statusFunc[i]->setUpdate(false);
+						if (_s->hasUpdate()) {
+							_s->addStatus(pRoot);
+							_s->setUpdate(false);
 						}
 					}
 
 					std::unique_ptr<char[]> _s(cJSON_Print(pRoot));
-					mqtt::MqttQueueType message(new mqtt::mqttMessage(mqttConf.getPubMsg(),_s.get()));
+					mqtt::MqttQueueType message(new mqtt::mqttMessage(mqttConf.getPubMsg(), _s.get()));
 					MainClass::instance()->mqtt().send(std::move(message));
 
 					cJSON_Delete(pRoot);
-					vTaskDelay(std::chrono::duration_cast<portTick>(std::chrono::milliseconds(500)).count());
+					std::this_thread::sleep_for(std::chrono::milliseconds(500));
 				}
 			}
 		}
-		vTaskDelay(10 / portTICK_PERIOD_MS);
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}
 }
 
-void StatusTask::addProvider(StatusProviderBase& _stat) {
-	if (m_statusFuncCount < (sizeof(m_statusFunc)/sizeof(*m_statusFunc))) {
-		m_statusFunc[m_statusFuncCount] = &_stat;
-		m_statusFuncCount++;
-	}
+void StatusTask::addProvider(StatusProviderBase &_stat) {
+	m_statusFunc.push_back(&_stat);
 }
 
 void StatusTask::addFirmwareStatus(cJSON *root) {
 	if (root == NULL) {
-			return;
-		}
+		return;
+	}
 
-		cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "firmware");
-		if (pcjsonfirm == NULL) {
-			return;
-		}
-	#if (1)
-		if (cJSON_AddStringToObject(pcjsonfirm, "date", __DATE__) == NULL) {
-			return;
-		}
+	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "firmware");
+	if (pcjsonfirm == NULL) {
+		return;
+	}
+#if (1)
+	if (cJSON_AddStringToObject(pcjsonfirm, "date", __DATE__) == NULL) {
+		return;
+	}
 
-		if (cJSON_AddStringToObject(pcjsonfirm, "time", __TIME__) == NULL) {
-			return;
-		}
-		if (cJSON_AddStringToObject(pcjsonfirm, "version", PROJECT_GIT) == NULL) {
-			return;
-		}
-		if (cJSON_AddStringToObject(pcjsonfirm, "idf", esp_get_idf_version()) == NULL) {
-			return;
-		}
+	if (cJSON_AddStringToObject(pcjsonfirm, "time", __TIME__) == NULL) {
+		return;
+	}
+	if (cJSON_AddStringToObject(pcjsonfirm, "version", PROJECT_GIT) == NULL) {
+		return;
+	}
+	if (cJSON_AddStringToObject(pcjsonfirm, "idf", esp_get_idf_version()) == NULL) {
+		return;
+	}
 
-	#else
+#else
 			if (cJSON_AddStringToObject(pcjsonfirm, "name", esp_ota_get_app_description()->project_name) == NULL) {
 				return;
 			}
@@ -170,21 +172,21 @@ void StatusTask::addFirmwareStatus(cJSON *root) {
 
 void StatusTask::addHardwareStatus(cJSON *root) {
 	if (root == NULL) {
-			return;
-		}
+		return;
+	}
 
-		esp_chip_info_t chip_info;
-		esp_chip_info(&chip_info);
+	esp_chip_info_t chip_info;
+	esp_chip_info(&chip_info);
 
-		cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "hardware");
-		if (pcjsonfirm == NULL) {
-			return;
-		}
-		if (cJSON_AddNumberToObject(pcjsonfirm, "cores", chip_info.cores) == NULL) {
-			return;
-		}
+	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "hardware");
+	if (pcjsonfirm == NULL) {
+		return;
+	}
+	if (cJSON_AddNumberToObject(pcjsonfirm, "cores", chip_info.cores) == NULL) {
+		return;
+	}
 
-		if (cJSON_AddNumberToObject(pcjsonfirm, "rev", chip_info.revision) == NULL) {
-			return;
-		}
+	if (cJSON_AddNumberToObject(pcjsonfirm, "rev", chip_info.revision) == NULL) {
+		return;
+	}
 }

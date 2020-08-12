@@ -7,7 +7,10 @@
 
 
 #include "config_user.h"
+#include <thread>
 #include <esp_log.h>
+#include <esp_pthread.h>
+#include <freertos/task.h>
 #include "HttpRequest.h"
 #include "HttpResponse.h"
 #include "HttpServer.h"
@@ -18,7 +21,7 @@
 namespace http {
 
 HttpServer::HttpServer(int _port) :
-		m_task(nullptr), m_port(_port), m_socket(), m_sem("http server sem"), m_obs(
+		m_port(_port), m_socket(), m_sem("http server sem"), m_obs(
 				new HttpServerConnectionObserver(this)) {
 	//always have the defaultHandler in line
 	m_pathhandler.push_back(new DefaultHandler);
@@ -28,28 +31,9 @@ HttpServer::~HttpServer() {
 	delete m_obs;
 }
 
-class HttpServerTask: public TaskClass {
-public:
-	HttpServerTask(HttpServer *_s) :
-			TaskClass("http task", TaskPrio_HMI, 3072), m_httpServer(_s) {
-	}
-	~HttpServerTask() {
-	}
-	virtual void task();
-
-	void removeSocket(Socket **_s) {
-		(*_s)->close();
-		delete (*_s);
-		*_s = nullptr;
-	}
-
-private:
-	HttpServer *m_httpServer;
-};
-
-void HttpServerTask::task() {
-	Socket &_s = m_httpServer->socket();
-	while (!_s.bind(m_httpServer->port())) {
+void HttpServer::task() {
+	Socket &_s = socket();
+	while (!_s.bind(port())) {
 		//if bind failed, get a new socket
 		_s.create();
 		vTaskDelay(10);
@@ -59,12 +43,12 @@ void HttpServerTask::task() {
 	}
 
 	while (1) {
-		if (Socket::errorState == m_httpServer->socket().pollConnectionState(std::chrono::microseconds(1))) {
-			m_httpServer->sem().give();
+		if (Socket::errorState == socket().pollConnectionState(std::chrono::microseconds(1))) {
+			sem().give();
 			return;
 		}
-		if (m_httpServer->socket().hasNewConnection(std::chrono::microseconds(1))) {
-			Socket *_con = m_httpServer->socket().accept(std::chrono::microseconds(1));
+		if (socket().hasNewConnection(std::chrono::microseconds(1))) {
+			Socket *_con = socket().accept(std::chrono::microseconds(1));
 			if (_con != nullptr) {
 				ESP_LOGD(TAG, "socket(%d) accepted", _con->get());
 
@@ -80,7 +64,7 @@ void HttpServerTask::task() {
 					case HttpRequest::PARSE_NODATA:
 						break;
 					case HttpRequest::PARSE_OK:
-						for (auto _p : m_httpServer->m_pathhandler) {
+						for (auto _p : m_pathhandler) {
 							if (_p->match(req.method(), req.path())) {
 								exit = !(_p->handle(req, resp));
 								break;
@@ -93,7 +77,7 @@ void HttpServerTask::task() {
 				removeSocket(&_con);
 			} //if
 		} //if
-		vTaskDelay(1);
+		std::this_thread::sleep_for(std::chrono::milliseconds(15));
 	}
 }
 
@@ -103,9 +87,11 @@ void HttpServer::start() {
 		ESP_LOGD(TAG, "server already running on start");
 		return;
 	}
-	if (m_task == nullptr) {
-		m_task = new HttpServerTask(this);
-	}
+	auto cfg = esp_pthread_get_default_config();
+	cfg.thread_name = "http task";
+	esp_pthread_set_cfg(&cfg);
+	m_thread = std::thread([this](){this->task();});
+
 }
 
 void HttpServer::stop() {
@@ -115,10 +101,7 @@ void HttpServer::stop() {
 	m_sem.take(-1);
 	m_sem.give();
 
-	if (m_task != nullptr) {
-		delete m_task;
-		m_task = nullptr;
-	}
+	m_thread.join();
 }
 
 void HttpServer::addPathHandler(RequestHandlerBase *_p) {

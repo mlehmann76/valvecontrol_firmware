@@ -9,12 +9,12 @@
 #define WIFITASK_H_
 
 #include <vector>
-#include "TaskCPP.h"
+#include <thread>
 #include "freertos/event_groups.h"
 #include "esp_wps.h"
 #include "ConnectionObserver.h"
 
-class WifiTask: public TaskClass {
+class WifiTask {
 	static const char TAG[];
 	static esp_wps_config_t config;
 	enum state_t {
@@ -48,6 +48,7 @@ private:
 	void notifyConnect();
 	void notifyDisconnect();
 
+	std::thread m_thread;
 	bool enableWPS = false;
 	EventGroupHandle_t main_event_group = nullptr;
 	state_t w_state = w_disconnected;

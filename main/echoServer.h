@@ -8,7 +8,7 @@
 #ifndef MAIN_ECHOSERVER_H_
 #define MAIN_ECHOSERVER_H_
 
-#include "TaskCPP.h"
+#include <thread>
 #include "MutexCPP.h"
 #include "socket.h"
 #include "ConnectionObserver.h"
@@ -23,7 +23,7 @@ public:
 private:
 	EchoServer *m_obs;
 };
-class EchoServer : public TaskClass{
+class EchoServer {
 public:
 	EchoServer();
 	virtual ~EchoServer();
@@ -37,6 +37,7 @@ public:
 private:
 	void removeSocket(Socket *_s);
 
+	std::thread m_thread;
 	std::vector<Socket*> m_sockets;
 	EchoConnectionObserver *m_obs;
 };

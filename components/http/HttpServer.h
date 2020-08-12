@@ -9,7 +9,7 @@
 #define COMPONENTS_HTTP_HTTPSERVER_H_
 
 #include <list>
-#include "TaskCPP.h"
+#include <thread>
 #include "SemaphoreCPP.h"
 #include "socket.h"
 #include "ConnectionObserver.h"
@@ -17,12 +17,10 @@
 namespace http {
 
 class HttpServerConnectionObserver;
-class HttpServerTask;
 class RequestHandlerBase;
 class DefaultHandler;
 
 class HttpServer {
-	friend HttpServerTask;
 	using PathHandlerType = std::list<RequestHandlerBase*>;
 
 public:
@@ -53,7 +51,15 @@ public:
 
 private:
 
-	HttpServerTask *m_task;
+	virtual void task();
+
+	void removeSocket(Socket **_s) {
+		(*_s)->close();
+		delete (*_s);
+		*_s = nullptr;
+	}
+
+	std::thread m_thread;
 	int m_port;
 	Socket m_socket;
 	Semaphore m_sem;

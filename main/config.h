@@ -17,7 +17,14 @@ class ParseHandler {
 public:
 	ParseHandler(const char *_name) : m_name(_name), m_next() {}
 	virtual ~ParseHandler() {	}
+	ParseHandler(const ParseHandler &other) = delete;
+	ParseHandler(ParseHandler &&other) = delete;
+	ParseHandler& operator=(const ParseHandler &other) = delete;
+	ParseHandler& operator=(ParseHandler &&other) = delete;
+	//
 	virtual int parse(const char*) = 0;
+	virtual char* stringify() = 0;
+	//
 	const char* name() const {
 		return m_name;
 	}
@@ -100,10 +107,6 @@ public:
 
 	virtual int parse(const char*);
 
-	const char* getSubMsg() {
-		return mqtt_sub_msg;
-	}
-
 	const char* getPubMsg() {
 		return mqtt_pub_msg;
 	}
@@ -126,7 +129,6 @@ public:
 
 private:
 	char def_mqtt_device[64] = { 0 }; //TODO
-	char *mqtt_sub_msg = NULL;
 	char *mqtt_pub_msg = NULL;
 	char *mqtt_device_name = NULL;
 	char *MQTT_DEVICE = (char*) "esp32/";
@@ -154,7 +156,7 @@ public:
 	SensorConfig();
 	virtual esp_err_t init();
 	virtual int parse(const char*);
-	bool isSHT1xEnabled();
+	bool isEnabled(const char*);
 private:
 	const cJSON* getItem(const char *name, const char *item);
 	unsigned m_sensorCount;
