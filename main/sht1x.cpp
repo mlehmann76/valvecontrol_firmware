@@ -17,7 +17,7 @@
 #include "driver/i2c.h"
 #include "esp_log.h"
 
-#include "cJSON.h"
+#include "Json.h"
 
 #include "config.h"
 #include "mqtt_client.h"
@@ -122,19 +122,16 @@ bool Sht1x::hasUpdate() {
 	return m_update;
 }
 
-void Sht1x::addStatus(cJSON *root) {
+void Sht1x::addStatus(Json *root) {
 	if (root != NULL && m_sem.take(10)) {
 		char buf[16];
-		cJSON *channel = cJSON_AddObjectToObject(root, "sensors");
-		if (channel != NULL) {
-			cJSON *channelv = cJSON_AddObjectToObject(channel, "sht1x");
+		Json channel = root->addObject("sensors").addObject("sht1x");
+		if (channel.valid()) {
 			snprintf(buf, sizeof(buf), "%3.2f", m_temp);
-			if (channelv != NULL) {
-				cJSON_AddStringToObject(channelv, "temp", buf);
-				snprintf(buf, sizeof(buf), "%3.2f", m_hum);
-				cJSON_AddStringToObject(channelv, "hum", buf);
-				cJSON_AddStringToObject(channelv, "status", hasError() ? "err" : "ok");
-			}
+			channel.addItem("temp", Json(buf));
+			snprintf(buf, sizeof(buf), "%3.2f", m_hum);
+			channel.addItem("hum", Json(buf));
+			channel.addItem("status", Json(hasError() ? "err" : "ok"));
 		}
 		m_sem.give();
 	}

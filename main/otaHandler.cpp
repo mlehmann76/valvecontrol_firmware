@@ -9,6 +9,7 @@
 #include "esp_log.h"
 #include "otaWorker.h"
 #include "otaHandler.h"
+#include "Json.h"
 
 #define TAG "MQTTOTA"
 
@@ -17,7 +18,7 @@ MqttOtaHandler::MqttOtaHandler(Ota::OtaWorker &_o, mqtt::MqttWorker &_m, const s
 	m_messager.addHandle(this);
 }
 
-int MqttOtaHandler::md5StrToAr(char *pMD5, uint8_t *md5) {
+int MqttOtaHandler::md5StrToAr(const char *pMD5, uint8_t *md5) {
 	int error = 0;
 	for (int i = 0; i < 32; i++) {
 		int temp = 0;
@@ -48,35 +49,35 @@ int MqttOtaHandler::onMessage(esp_mqtt_event_handle_t event) {
 		ESP_LOGE(TAG, "OTA update topic %s", event->data_len < 64 ? event->data : "data");
 		Ota::OtaPacket p(event->data, event->data_len);
 		ret = m_ota.handle(p);
-	}else if (event->topic && event->topic == m_firmwaretopic) {
+	}else if (event->topic && event->topic == m_firmwaretopic.substr(0, m_firmwaretopic.length()-2)) {
 		ESP_LOGI(TAG, "%.*s", event->topic_len, event->topic);
-		cJSON *root = cJSON_Parse(event->data);
-		cJSON *firmware = cJSON_GetObjectItem(root, "firmware");
-		if (firmware != NULL) {
-			handleFirmwareMessage(firmware);
+		Json root;
+
+		Json firmware = root.parse(event->data)["firmware"];
+		if (firmware.valid()) {
+			handleFirmwareMessage(&firmware);
 		}
-		cJSON_Delete(root);
+
 		ret = 1;
 	}
 	return ret;
 }
 
-void MqttOtaHandler::handleFirmwareMessage(cJSON* firmware) {
+void MqttOtaHandler::handleFirmwareMessage(const Json* firmware) {
 	int error = 0;
 	Ota::OtaWorker::md5_update md5_update;
-	char* pMD5 = NULL;
-	cJSON* pfirmware = cJSON_GetObjectItem(firmware, "update");
+	const char* pMD5 = NULL;
 
-	if (pfirmware != NULL) {
-		char* pUpdate = cJSON_GetStringValue(cJSON_GetObjectItem(firmware, "update"));
+	if (firmware != nullptr && firmware->valid()) {
+		const char* pUpdate = (*firmware)["update"].string();
 		if (strcmp(pUpdate, "ota") != 0) {
 			error = 1;
 		}
 
-		if (!error && cJSON_GetObjectItem(firmware, "md5") == NULL) {
+		if (!error && (*firmware)["md5"].valid()) {
 			error = 2;
 		} else {
-			pMD5 = cJSON_GetStringValue(cJSON_GetObjectItem(firmware, "md5"));
+			pMD5 = (*firmware)["md5"].string();
 		}
 
 		if (!error && (strlen(pMD5) != 32)) {
@@ -87,10 +88,10 @@ void MqttOtaHandler::handleFirmwareMessage(cJSON* firmware) {
 			error = 4;
 		}
 
-		if (!error && cJSON_GetObjectItem(firmware, "len") == NULL) {
+		if (!error && (*firmware)["len"].valid()) {
 			error = 5;
 		} else {
-			md5_update.len = cJSON_GetObjectItem(firmware, "len")->valueint;
+			md5_update.len = (*firmware)["len"].number();
 		}
 
 		if (error) {

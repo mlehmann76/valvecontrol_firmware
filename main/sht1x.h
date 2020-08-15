@@ -27,6 +27,7 @@
 #define ACK_VAL 0x1                 /*!< I2C ack value */
 #define NACK_VAL 0x0                /*!< I2C nack value */
 
+class Json;
 
 class Sht1x {
 public:
@@ -35,8 +36,8 @@ public:
 	virtual ~Sht1x() = default;
 	void reset();
 	//
-	virtual bool hasUpdate();
-	virtual void addStatus(cJSON *);
+	bool hasUpdate();
+	void addStatus(Json *);
 	void setUpdate(bool _up) { m_sem.take(); m_update = _up; m_sem.give();}
 	StatusProviderBase &status() { return m_status; }
 	//

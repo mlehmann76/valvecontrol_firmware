@@ -12,12 +12,14 @@
 #include <thread>
 #include "mqttWorker.h"
 
+class Json;
+
 class StatusProviderBase {
 public:
 	virtual ~StatusProviderBase() {}
 	virtual bool hasUpdate() = 0;
 	virtual void setUpdate(bool) = 0;
-	virtual void addStatus(cJSON *) = 0;
+	virtual void addStatus(Json *) = 0;
 };
 
 template<class T>
@@ -27,7 +29,7 @@ public:
 	StatusProvider<T>(T *_c) : _client(_c) {}
 	bool hasUpdate() { return _client->hasUpdate(); }
 	void setUpdate(bool _b) { _client->setUpdate(_b);}
-	void addStatus(cJSON * _c) { _client->addStatus(_c);}
+	void addStatus(Json * _c) { _client->addStatus(_c);}
 private:
 	T *_client;
 };
@@ -36,19 +38,19 @@ private:
 class StatusTask {
 public:
 	StatusTask(EventGroupHandle_t &main);
-	virtual void task();
+	void task();
 	void addProvider(StatusProviderBase &);
-	virtual bool hasUpdate() {return m_update;}
-	virtual void addStatus(cJSON *root) {
+	bool hasUpdate() {return m_update;}
+	void addStatus(Json *root) {
 		addFirmwareStatus(root);
 		addHardwareStatus(root);
 	}
 	void setUpdate(bool _up) { m_update = _up;}
 	StatusProviderBase &status() { return m_status; }
 
-	static void addTimeStamp(cJSON *root);
-	static void addFirmwareStatus(cJSON *root);
-	static void addHardwareStatus(cJSON *root);
+	static void addTimeStamp(Json *root);
+	static void addFirmwareStatus(Json *root);
+	static void addHardwareStatus(Json *root);
 
 private:
 	std::thread m_thread;

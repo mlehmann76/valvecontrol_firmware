@@ -72,12 +72,12 @@ void HttpServer::task() {
 						}
 						break;
 					}
-					vTaskDelay(1);
+					std::this_thread::sleep_for(std::chrono::milliseconds(20));
 				} //while
 				removeSocket(&_con);
 			} //if
 		} //if
-		std::this_thread::sleep_for(std::chrono::milliseconds(15));
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
 }
 
@@ -89,8 +89,9 @@ void HttpServer::start() {
 	}
 	auto cfg = esp_pthread_get_default_config();
 	cfg.thread_name = "http task";
+	cfg.prio = 6;
 	esp_pthread_set_cfg(&cfg);
-	m_thread = std::thread([this](){this->task();});
+	m_thread = std::thread([this]{task();});
 
 }
 
@@ -101,7 +102,9 @@ void HttpServer::stop() {
 	m_sem.take(-1);
 	m_sem.give();
 
-	m_thread.join();
+	if (m_thread.joinable()) {
+		m_thread.join();
+	}
 }
 
 void HttpServer::addPathHandler(RequestHandlerBase *_p) {

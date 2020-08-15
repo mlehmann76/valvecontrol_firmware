@@ -19,7 +19,7 @@
 #include "esp_ota_ops.h"
 #include <esp_pthread.h>
 
-#include "cJSON.h"
+#include "Json.h"
 
 #include "config.h"
 #include "mqtt_client.h"
@@ -31,7 +31,7 @@
 
 #define TAG "status"
 
-void StatusTask::addTimeStamp(cJSON *root) {
+void StatusTask::addTimeStamp(Json *root) {
 	if (root == NULL) {
 		return;
 	}
@@ -43,20 +43,12 @@ void StatusTask::addTimeStamp(cJSON *root) {
 	char strftime_buf[64];
 	localtime_r(&now, &timeinfo);
 
-	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "datetime");
-	if (pcjsonfirm == NULL) {
-		return;
-	}
-
+	Json pcjsonfirm = root->addObject("datetime");
 	strftime(strftime_buf, sizeof(strftime_buf), "%F", &timeinfo);
-	if (cJSON_AddStringToObject(pcjsonfirm, "date", strftime_buf) == NULL) {
-		return;
-	}
+	pcjsonfirm.addItem("date", Json(strftime_buf));
 
 	strftime(strftime_buf, sizeof(strftime_buf), "%T", &timeinfo);
-	if (cJSON_AddStringToObject(pcjsonfirm, "time", strftime_buf) == NULL) {
-		return;
-	}
+	pcjsonfirm.addItem("time", Json(strftime_buf));
 
 	return;
 }
@@ -96,26 +88,22 @@ void StatusTask::task() {
 			if (((xEventGroupGetBits(*main_event_group) & (CONNECTED_BIT | MQTT_CONNECTED_BIT | MQTT_OTA_BIT))
 					== (CONNECTED_BIT | MQTT_CONNECTED_BIT)) && needUpdate) {
 
-				cJSON *pRoot = cJSON_CreateObject();
-				if (pRoot != NULL) {
-					//
-					addTimeStamp(pRoot);
-					//
-					for (auto _s : m_statusFunc) {
-						//at least one is set, so send all status
-						if (_s->hasUpdate()) {
-							_s->addStatus(pRoot);
-							_s->setUpdate(false);
-						}
+				Json root;									//
+				addTimeStamp(&root);
+				//
+				for (auto _s : m_statusFunc) {
+					//at least one is set, so send all status
+					if (_s->hasUpdate()) {
+						_s->addStatus(&root);
+						_s->setUpdate(false);
 					}
-
-					std::unique_ptr<char[]> _s(cJSON_Print(pRoot));
-					mqtt::MqttQueueType message(new mqtt::mqttMessage(mqttConf.getPubMsg(), _s.get()));
-					MainClass::instance()->mqtt().send(std::move(message));
-
-					cJSON_Delete(pRoot);
-					std::this_thread::sleep_for(std::chrono::milliseconds(500));
 				}
+
+				mqtt::MqttQueueType message(new mqtt::mqttMessage(mqttConf.getPubMsg(), root.dump()));
+				MainClass::instance()->mqtt().send(std::move(message));
+
+				std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
 			}
 		}
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -126,51 +114,20 @@ void StatusTask::addProvider(StatusProviderBase &_stat) {
 	m_statusFunc.push_back(&_stat);
 }
 
-void StatusTask::addFirmwareStatus(cJSON *root) {
+void StatusTask::addFirmwareStatus(Json *root) {
 	if (root == NULL) {
 		return;
 	}
 
-	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "firmware");
-	if (pcjsonfirm == NULL) {
-		return;
-	}
-#if (1)
-	if (cJSON_AddStringToObject(pcjsonfirm, "date", __DATE__) == NULL) {
-		return;
-	}
+	Json pcjsonfirm = root->addObject("firmware");
 
-	if (cJSON_AddStringToObject(pcjsonfirm, "time", __TIME__) == NULL) {
-		return;
-	}
-	if (cJSON_AddStringToObject(pcjsonfirm, "version", PROJECT_GIT) == NULL) {
-		return;
-	}
-	if (cJSON_AddStringToObject(pcjsonfirm, "idf", esp_get_idf_version()) == NULL) {
-		return;
-	}
-
-#else
-			if (cJSON_AddStringToObject(pcjsonfirm, "name", esp_ota_get_app_description()->project_name) == NULL) {
-				return;
-			}
-
-			if (cJSON_AddStringToObject(pcjsonfirm, "version", esp_ota_get_app_description()->version) == NULL) {
-				return;
-			}
-
-			if (cJSON_AddStringToObject(pcjsonfirm, "date", esp_ota_get_app_description()->date) == NULL) {
-				return;
-			}
-
-			if (cJSON_AddStringToObject(pcjsonfirm, "time", esp_ota_get_app_description()->time) == NULL) {
-				return;
-			}
-		#endif
-
+	pcjsonfirm.addItem("date", Json(__DATE__));
+	pcjsonfirm.addItem("time", Json(__TIME__));
+	pcjsonfirm.addItem("version", Json(PROJECT_GIT));
+	pcjsonfirm.addItem("idf", Json(esp_get_idf_version()));
 }
 
-void StatusTask::addHardwareStatus(cJSON *root) {
+void StatusTask::addHardwareStatus(Json *root) {
 	if (root == NULL) {
 		return;
 	}
@@ -178,15 +135,8 @@ void StatusTask::addHardwareStatus(cJSON *root) {
 	esp_chip_info_t chip_info;
 	esp_chip_info(&chip_info);
 
-	cJSON *pcjsonfirm = cJSON_AddObjectToObject(root, "hardware");
-	if (pcjsonfirm == NULL) {
-		return;
-	}
-	if (cJSON_AddNumberToObject(pcjsonfirm, "cores", chip_info.cores) == NULL) {
-		return;
-	}
+	Json pcjsonfirm = root->addObject("hardware");
+	pcjsonfirm.addItem("cores", Json((double)chip_info.cores));
+	pcjsonfirm.addItem("rev", Json((double)chip_info.revision));
 
-	if (cJSON_AddNumberToObject(pcjsonfirm, "rev", chip_info.revision) == NULL) {
-		return;
-	}
 }

@@ -15,6 +15,7 @@
 #include "config.h"
 #include "config_user.h"
 #include "channelAdapter.h"
+#include "Json.h"
 
 #include "MainClass.h"
 
@@ -43,74 +44,47 @@ void MqttChannelAdapter::onNotify(const ChannelBase*) {
 int MqttJsonChannelAdapter::onMessage(esp_mqtt_event_handle_t event) {
 	int ret = 0;
 	ESP_LOGV(TAG, "comparing %s == %s", event->topic, m_subtopic.c_str());
-	if (event->topic == m_subtopic)	{
+	if (event->topic != nullptr && event->topic == m_subtopic)	{
 		ESP_LOGI(channel()->name(), "%.*s", event->topic_len, event->topic);
 
-		cJSON *root = cJSON_Parse(event->data);
-		if (root != NULL) {
-			cJSON *chan = cJSON_GetObjectItem(root, "channel");
-			if (chan != NULL) {
-				cJSON *pChanObj = cJSON_GetObjectItem(chan, channel()->name());
-				if (pChanObj != NULL) {
-					int chanTime = -1;
-					int status = -1;
-					cJSON *pJsonChanVal = cJSON_GetObjectItem(pChanObj, "val");
-					if (cJSON_IsString(pJsonChanVal)) {
-						const char *pS = pJsonChanVal->valuestring;
-						if ((strncmp(pS, "ON", 2) == 0) | (strncmp(pS, "on", 2) == 0)) {
-							status = 1;
-						} else {
-							status = 0;
-						}
-					} else if (cJSON_IsNumber(pJsonChanVal)) {
-						if(pJsonChanVal->valuedouble != 0) {
-							status = 1;
-						} else {
-							status = 0;
-						}
-					}
+		int chanTime = -1;
+		int status = -1;
+		Json root;
+		Json _chan = root.parse(event->data)["channel"][channel()->name()];
+		ESP_LOGV(TAG, "_chan :%s", _chan.dump().c_str());
+		if (_chan.valid()) {
+			Json _val = _chan["val"];
+			ESP_LOGV(TAG, "val :%s", _val.dump().c_str());
 
-					cJSON *pJsonTime = cJSON_GetObjectItem(pChanObj, "time");
-					if (cJSON_IsNumber(pJsonTime)) {
-						chanTime = pJsonTime->valuedouble;
-					}
-
-					ESP_LOGD(TAG, "channel :%s found ->%s, time : %d", channel()->name(), status ==1 ? "on" : "off", chanTime);
-
-					if(status == -1) {
-						channel()->notify();
-					} else {
-						channel()->set(status, std::chrono::seconds(chanTime));
-					}
-					ret = 1;
-				}
-
+			if (_val.IsString()) {
+				const char *pS = _val.string();
+				status = ((strncmp(pS, "ON", 2) == 0) | (strncmp(pS, "on", 2) == 0)) ? 1 : 0;
+			} else if (_val.IsNumber()) {
+				status = (_val.number() != 0) ? 1 : 0;
 			}
-			cJSON_Delete(root);
+			Json timeObj = _chan["time"];
+			if (timeObj.IsNumber()) {
+				chanTime = timeObj.number();
+			}
+
+			ESP_LOGD(TAG, "channel :%s found ->%s, time : %d", channel()->name(), status == 1 ? "on" : "off", chanTime);
+
+			if (status == -1) {
+				channel()->notify();
+			} else {
+				channel()->set(status, std::chrono::seconds(chanTime));
+			}
+			ret = 1;
 		}
 	}
 	return ret;
 }
 
 void MqttJsonChannelAdapter::onNotify(const ChannelBase* _b) {
-	cJSON *root = cJSON_CreateObject();
-	if (root != NULL) {
-		//add time and date
-		StatusTask::addTimeStamp(root);
-		cJSON *pChan = cJSON_AddObjectToObject(root, "channel");
-		if (pChan != NULL) {
-			cJSON *pChanv = cJSON_AddObjectToObject(pChan, _b->name());
-			if (pChanv != NULL) {
-				cJSON_AddStringToObject(pChanv, "val", _b->get() ? "ON" : "OFF");
-			}
-		}
-		//forward
-		std::unique_ptr<char[]> _s(cJSON_Print(root));
-		assert(_s.get() != NULL);//), "Failed to print channel.");
-		mqtt::MqttQueueType message(new mqtt::mqttMessage(m_pubtopic,_s.get()));
+		Json root; //keep link to root
+		Json root1 = root.addObject("channel").addObject(_b->name()).addItem("val", Json(_b->get() ? "ON" : "OFF"));
+		mqtt::MqttQueueType message(new mqtt::mqttMessage(m_pubtopic,root.dump()));
 		MainClass::instance()->mqtt().send(std::move(message));
-		cJSON_Delete(root);
-	}
 }
 
 ChannelBase* ExclusiveAdapter::channel() {

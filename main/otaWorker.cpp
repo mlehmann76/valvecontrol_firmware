@@ -21,7 +21,6 @@
 #include "freertos/event_groups.h"
 
 #include "base85.h"
-#include "cJSON.h"
 #include "config.h"
 #include "config_user.h"
 #include "otaWorker.h"
@@ -66,8 +65,7 @@ int B85decode::decode(const uint8_t *src, size_t len) {
 }
 
 OtaWorker::OtaWorker() :
-		m_timeout("otaTimer",this,&OtaWorker::task,( 10000 / portTICK_PERIOD_MS ),false),
-		m_decodeCtx(nullptr) {
+		m_timeout("otaTimer", this, &OtaWorker::task, (10000 / portTICK_PERIOD_MS), false), m_decodeCtx(nullptr) {
 	mbedtls_md5_init(&m_md5ctx);
 }
 
@@ -167,16 +165,18 @@ void OtaWorker::start(const md5_update& _d) {
 	m_decodeCtx->init();
 	m_isRunning = true;
 	m_timeout.start();
-	while(!m_timeout.active()) {}
+	//while(!m_timeout.active()) {}
 	sum = 0;
 	task();
 }
 
 void OtaWorker::task() {
+	/*
 	if (m_ota_state != OTA_IDLE && !m_timeout.active()) {
 		ESP_LOGE(TAG, "timeout in ota task");
 		m_ota_state = OTA_ERROR;
 	}
+	*/
 
 	switch (m_ota_state) {
 	case OTA_IDLE:

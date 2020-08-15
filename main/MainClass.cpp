@@ -71,9 +71,11 @@ void MainClass::spiffsInit(void) {
 
 int MainClass::loop() {
 	esp_log_level_set("*", ESP_LOG_ERROR);
-	esp_log_level_set("SOCKET", ESP_LOG_VERBOSE);
+	esp_log_level_set("MQTTS", ESP_LOG_VERBOSE);
 	esp_log_level_set("HTTPSERVER", ESP_LOG_VERBOSE);
 	esp_log_level_set("HTTPREQUEST", ESP_LOG_VERBOSE);
+	esp_log_level_set("CHANNEL", ESP_LOG_VERBOSE);
+	esp_log_level_set("channelAdapter", ESP_LOG_VERBOSE);
 	esp_log_level_set("MAIN", ESP_LOG_VERBOSE);
 
 	spiffsInit();
@@ -92,7 +94,7 @@ int MainClass::loop() {
 
 	//mqttConf.setNext(&sysConf)->setNext(&chanConf)->setNext(&sensorConf);
 	MqttOtaHandler mqttOta(otaWorker, mqttUser,
-			utilities::string_format("%sota", mqttConf.getDevName()),
+			utilities::string_format("%sota/#", mqttConf.getDevName()),
 			utilities::string_format("%sota/$implementation/binary", mqttConf.getDevName()));
 
 	std::vector<ChannelBase*> _channels(4);
@@ -124,7 +126,7 @@ int MainClass::loop() {
 			if( esp_get_free_heap_size() != heapFree) {
 				heapFree = esp_get_free_heap_size();
 				vTaskGetRunTimeStats(pcWriteBuffer.get());
-				ESP_LOGI(TAG, "[APP] Free memory: %d bytes\n%s", esp_get_free_heap_size(),pcWriteBuffer.get());
+				ESP_LOGI(TAG, "[APP] Free memory: %d bytes\n", esp_get_free_heap_size());
 				count = 500;
 			}
 		} else {

@@ -42,7 +42,7 @@ class deviceControl():
         data = json.loads(json_string)
         #print(data)
     
-        ret = self.client.publish(self.device + "/system", json_string, qos=1, retain=False)
+        ret = self.client.publish(self.device + "/ota", json_string, qos=1, retain=False)
         while not ret.is_published():
             self.client.loop()
             

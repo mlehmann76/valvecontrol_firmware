@@ -9,9 +9,10 @@
 #define MAIN_OTAHANDLER_H_
 
 #include <string>
-#include "cJSON.h"
 #include "mqtt_client.h"
 #include "mqttWorker.h"
+
+class Json;
 
 namespace Ota {
 class OtaWorker;
@@ -24,8 +25,8 @@ public:
 	virtual int onMessage(esp_mqtt_event_handle_t event);
 	virtual std::string topic() { return m_firmwaretopic; }
 private:
-	static int md5StrToAr(char* pMD5, uint8_t* md5);
-	void handleFirmwareMessage(cJSON* firmware);
+	static int md5StrToAr(const char* pMD5, uint8_t* md5);
+	void handleFirmwareMessage(const Json* firmware);
 	Ota::OtaWorker &m_ota;
 	mqtt::MqttWorker &m_messager;
 	std::string m_firmwaretopic;

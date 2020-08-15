@@ -11,6 +11,7 @@
 #include "ConnectionObserver.h"
 #include <string>
 #include <vector>
+#include <set>
 #include <memory>
 #include <mqtt_client.h>
 
@@ -53,7 +54,7 @@ public:
 	virtual ~MqttWorker() = default;
 	void init(void);
 	ConnectionObserver& obs() { return m_obs; }
-	std::vector<std::string> subTopics() const  {return m_subtopics; }
+	std::set<std::string> subTopics() const  {return m_subtopics; }
 	void handle(esp_mqtt_event_handle_t event);
 	void addHandle(AbstractMqttReceiver *);
 
@@ -68,7 +69,7 @@ private:
 	MqttConnectionObserver m_obs;
 	std::vector<AbstractMqttReceiver*> m_mqttRec;
 	AbstractMqttReceiver* m_lastMqttRec = nullptr;
-	std::vector<std::string> m_subtopics;
+	std::set<std::string> m_subtopics;
 	esp_mqtt_client_handle_t client = NULL;
 	bool isMqttConnected = false;
 	bool isMqttInit = false;

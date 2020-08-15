@@ -18,7 +18,6 @@
 #include "TimerCPP.h"
 #include "freertos/event_groups.h"
 
-#include "cJSON.h"
 #include "config.h"
 #include "config_user.h"
 
@@ -108,8 +107,9 @@ void MqttWorker::handle(esp_mqtt_event_handle_t event) {
 
 void MqttWorker::addHandle(AbstractMqttReceiver *_a) {
 	m_mqttRec.push_back(_a);
-	if (std::find(m_subtopics.begin(), m_subtopics.end(), _a->topic()) == m_subtopics.end()) {
-		m_subtopics.push_back(_a->topic());
+	auto search = m_subtopics.find(_a->topic());
+	if (search == m_subtopics.end()) {
+		m_subtopics.insert(_a->topic());
 		ESP_LOGV(TAG, "addHandle, add topic = %s", _a->topic().c_str());
 		if (isMqttConnected) {
 			int msg_id = esp_mqtt_client_subscribe(client, _a->topic().c_str(), 1);
