@@ -7,3 +7,6 @@
 [submodule "components/json"]
 	path = components/json
 	url = https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent.git
+[submodule "components/json11"]
+	path = components/json11
+	url = https://github.com/dropbox/json11.git
