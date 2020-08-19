@@ -1,12 +1,6 @@
-[submodule "components/fmt"]
-	path = components/fmt
-	url = https://github.com/fmtlib/fmt.git
-[submodule "components/frozen"]
-	path = components/frozen
-	url = https://github.com/serge-sans-paille/frozen.git
 [submodule "components/json"]
 	path = components/json
 	url = https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent.git
-[submodule "components/json11"]
-	path = components/json11
-	url = https://github.com/dropbox/json11.git
+[submodule "components/variant"]
+	path = components/variant
+	url = https://github.com/mapbox/variant.git
