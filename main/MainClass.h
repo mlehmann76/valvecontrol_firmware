@@ -8,14 +8,22 @@
 #ifndef MAIN_MAINCLASS_H_
 #define MAIN_MAINCLASS_H_
 
+#include <vector>
 #include "mqttWorker.h"
 #include "TimerCPP.h"
 #include "SemaphoreCPP.h"
 #include "WifiTask.h"
 #include "sht1x.h"
 #include "otaWorker.h"
-#include "sht1x.h"
 #include "statusTask.h"
+#include "HttpServer.h"
+
+class repository;
+class MqttOtaHandler;
+class MqttRepAdapter;
+class ExclusiveAdapter;
+class ChannelBase;
+class RepositoryNotifier;
 
 class MainClass {
 	WifiTask wifitask;
@@ -23,8 +31,20 @@ class MainClass {
 	Ota::OtaWorker otaWorker;
 	mqtt::MqttWorker mqttUser;
 	StatusTask status = {wifitask.eventGroup()};
+	std::shared_ptr<SntpSupport> sntp;
+	std::shared_ptr<repository> _stateRepository;
+	std::shared_ptr<repository> _controlRepository;
+	std::shared_ptr<http::HttpServer> _http;
+	std::shared_ptr<MqttOtaHandler> _mqttOtaHandler;
+	std::shared_ptr<MqttRepAdapter> _controlRepAdapter;
+	std::shared_ptr<MqttRepAdapter> _configRepAdapter;
+	std::vector<std::shared_ptr<ChannelBase>> _channels;
+	std::vector<std::shared_ptr<RepositoryNotifier>> _notifiers;
+	std::shared_ptr<ExclusiveAdapter> _cex; //only one channel should be active
+
 
 public:
+	void setup();
 	int loop();
 	static MainClass *instance() {
 		static MainClass _inst;
@@ -33,7 +53,7 @@ public:
 	EventGroupHandle_t& eventGroup() {return (wifitask.eventGroup());}
 	mqtt::MqttWorker& mqtt() {return mqttUser;}
 private:
-	MainClass() = default;
+	MainClass();
 	virtual ~MainClass() = default;
 	void spiffsInit(void);
 };

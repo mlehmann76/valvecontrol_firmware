@@ -132,12 +132,16 @@ void MqttWorker::send(mqttMessage *rxData) {
 
 void MqttWorker::init(void) {
 
+	m_server = Config::repo().get<std::string>("mqtt","server");
+	m_user = Config::repo().get<std::string>("mqtt","user");
+	m_pass = Config::repo().get<std::string>("mqtt","pass");
+
 	esp_mqtt_client_config_t mqtt_cfg;
 	memset(&mqtt_cfg,0,sizeof(mqtt_cfg));
-	mqtt_cfg.uri = mqttConf.getMqttServer();
+	mqtt_cfg.uri = m_server.c_str();
 	mqtt_cfg.event_handle = mqtt_event_handler;
-	mqtt_cfg.username = mqttConf.getMqttUser();
-	mqtt_cfg.password = mqttConf.getMqttPass();
+	mqtt_cfg.username = m_user.c_str();
+	mqtt_cfg.password = m_pass.c_str();
 	mqtt_cfg.user_context = this;
 
 	client = esp_mqtt_client_init(&mqtt_cfg);

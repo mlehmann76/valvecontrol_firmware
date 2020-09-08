@@ -22,12 +22,11 @@ public:
 	virtual bool get() const = 0;
 	virtual void notify() = 0;
 	const char *name() const { return m_name.c_str(); }
+
 	void add(ChannelAdapterBase *_a);
 protected:
 	std::string m_name;
 	std::vector<ChannelAdapterBase*> m_adapter;
 };
-
-
 
 #endif /* MAIN_CHANNELBASE_H_ */

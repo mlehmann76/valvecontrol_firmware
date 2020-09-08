@@ -12,7 +12,7 @@
 #include <thread>
 #include "freertos/event_groups.h"
 #include "esp_wps.h"
-#include "ConnectionObserver.h"
+#include "iConnectionObserver.h"
 
 class WifiTask {
 	static const char TAG[];
@@ -34,8 +34,8 @@ public:
 	bool isConnected();
 	bool isMQTTConnected();
 	void setEnableWps(bool _en = true) {enableWPS = _en;}
-	void addConnectionObserver(ConnectionObserver&);
-	void remConnectionObserver(ConnectionObserver&);
+	void addConnectionObserver(iConnectionObserver&);
+	void remConnectionObserver(iConnectionObserver&);
 
 private:
 	static void event_handler_s(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
@@ -52,7 +52,7 @@ private:
 	bool enableWPS = false;
 	EventGroupHandle_t main_event_group = nullptr;
 	state_t w_state = w_disconnected;
-	std::vector<ConnectionObserver*> m_observer;
+	std::vector<iConnectionObserver*> m_observer;
 };
 
 

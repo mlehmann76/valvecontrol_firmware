@@ -19,7 +19,7 @@
 #include "esp_ota_ops.h"
 #include <esp_pthread.h>
 
-#include "Json.h"
+#include "json.hpp"
 
 #include "config.h"
 #include "mqtt_client.h"
@@ -31,7 +31,7 @@
 
 #define TAG "status"
 
-void StatusTask::addTimeStamp(Json *root) {
+void StatusTask::addTimeStamp(nlohmann::json *root) {
 	if (root == NULL) {
 		return;
 	}
@@ -43,12 +43,10 @@ void StatusTask::addTimeStamp(Json *root) {
 	char strftime_buf[64];
 	localtime_r(&now, &timeinfo);
 
-	Json pcjsonfirm = root->addObject("datetime");
 	strftime(strftime_buf, sizeof(strftime_buf), "%F", &timeinfo);
-	pcjsonfirm.addItem("date", Json(strftime_buf));
-
+	(*root)["datetime"]["date"] = strftime_buf;
 	strftime(strftime_buf, sizeof(strftime_buf), "%T", &timeinfo);
-	pcjsonfirm.addItem("time", Json(strftime_buf));
+	(*root)["datetime"]["time"] = strftime_buf;
 
 	return;
 }
@@ -88,7 +86,7 @@ void StatusTask::task() {
 			if (((xEventGroupGetBits(*main_event_group) & (CONNECTED_BIT | MQTT_CONNECTED_BIT | MQTT_OTA_BIT))
 					== (CONNECTED_BIT | MQTT_CONNECTED_BIT)) && needUpdate) {
 
-				Json root;									//
+				nlohmann::json root;									//
 				addTimeStamp(&root);
 				//
 				for (auto _s : m_statusFunc) {
@@ -99,7 +97,7 @@ void StatusTask::task() {
 					}
 				}
 
-				mqtt::MqttQueueType message(new mqtt::mqttMessage(mqttConf.getPubMsg(), root.dump()));
+				mqtt::MqttQueueType message(new mqtt::mqttMessage(mqttConf.getPubMsg(), root.dump(4)));
 				MainClass::instance()->mqtt().send(std::move(message));
 
 				std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -114,20 +112,17 @@ void StatusTask::addProvider(StatusProviderBase &_stat) {
 	m_statusFunc.push_back(&_stat);
 }
 
-void StatusTask::addFirmwareStatus(Json *root) {
+void StatusTask::addFirmwareStatus(nlohmann::json *root) {
 	if (root == NULL) {
 		return;
 	}
-
-	Json pcjsonfirm = root->addObject("firmware");
-
-	pcjsonfirm.addItem("date", Json(__DATE__));
-	pcjsonfirm.addItem("time", Json(__TIME__));
-	pcjsonfirm.addItem("version", Json(PROJECT_GIT));
-	pcjsonfirm.addItem("idf", Json(esp_get_idf_version()));
+	(*root)["firmware"]["date"] = nlohmann::json(__DATE__);
+	(*root)["firmware"]["time"] = nlohmann::json(__TIME__);
+	(*root)["firmware"]["version"] = nlohmann::json(PROJECT_GIT);
+	(*root)["firmware"]["idf"] = nlohmann::json(esp_get_idf_version());
 }
 
-void StatusTask::addHardwareStatus(Json *root) {
+void StatusTask::addHardwareStatus(nlohmann::json *root) {
 	if (root == NULL) {
 		return;
 	}
@@ -135,8 +130,7 @@ void StatusTask::addHardwareStatus(Json *root) {
 	esp_chip_info_t chip_info;
 	esp_chip_info(&chip_info);
 
-	Json pcjsonfirm = root->addObject("hardware");
-	pcjsonfirm.addItem("cores", Json((double)chip_info.cores));
-	pcjsonfirm.addItem("rev", Json((double)chip_info.revision));
+	(*root)["hardware"]["cores"] = nlohmann::json((double)chip_info.cores);
+	(*root)["hardware"]["revision"] = nlohmann::json((double)chip_info.revision);
 
 }

@@ -10,8 +10,10 @@
 
 #include <string>
 #include <memory>
-
+#include <vector>
 namespace utilities {
+
+std::vector<std::string> split(const std::string &text, const std::string &delims);
 
 template<typename ... Args>
 std::string string_format(const std::string &format, Args ... args) {

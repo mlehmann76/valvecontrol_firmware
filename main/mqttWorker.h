@@ -8,12 +8,12 @@
 #ifndef MAIN_MQTT_USER_H_
 #define MAIN_MQTT_USER_H_
 
-#include "ConnectionObserver.h"
 #include <string>
 #include <vector>
 #include <set>
 #include <memory>
 #include <mqtt_client.h>
+#include "iConnectionObserver.h"
 
 class MainClass;
 
@@ -38,7 +38,7 @@ using MqttQueueType = std::unique_ptr<mqttMessage>;
 using PubQueue = Queue<MqttQueueType,10>;
 */
 class MqttWorker;
-class MqttConnectionObserver : public ConnectionObserver {
+class MqttConnectionObserver : public iConnectionObserver {
 public:
 	MqttConnectionObserver(MqttWorker *_m) : m_mqtt(_m) {}
 	virtual void onConnect();
@@ -53,7 +53,7 @@ public:
 	MqttWorker() : m_obs(this) {}
 	virtual ~MqttWorker() = default;
 	void init(void);
-	ConnectionObserver& obs() { return m_obs; }
+	iConnectionObserver& obs() { return m_obs; }
 	std::set<std::string> subTopics() const  {return m_subtopics; }
 	void handle(esp_mqtt_event_handle_t event);
 	void addHandle(AbstractMqttReceiver *);
@@ -73,6 +73,9 @@ private:
 	esp_mqtt_client_handle_t client = NULL;
 	bool isMqttConnected = false;
 	bool isMqttInit = false;
+	std::string m_server;
+	std::string m_user;
+	std::string m_pass;
 };
 
 inline void MqttConnectionObserver::onConnect() {

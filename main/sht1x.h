@@ -27,19 +27,12 @@
 #define ACK_VAL 0x1                 /*!< I2C ack value */
 #define NACK_VAL 0x0                /*!< I2C nack value */
 
-class Json;
-
 class Sht1x {
 public:
 
 	Sht1x(gpio_num_t _sda, gpio_num_t _scl);
 	virtual ~Sht1x() = default;
 	void reset();
-	//
-	bool hasUpdate();
-	void addStatus(Json *);
-	void setUpdate(bool _up) { m_sem.take(); m_update = _up; m_sem.give();}
-	StatusProviderBase &status() { return m_status; }
 	//
 private:
 	float readSHT1xTemp();
@@ -68,7 +61,6 @@ private:
 	bool m_error;
 	bool m_update;
 	Semaphore m_sem;
-	StatusProvider<Sht1x> m_status;
 };
 
 #endif /* MAIN_SHT1X_H_ */

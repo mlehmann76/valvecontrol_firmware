@@ -12,37 +12,28 @@
     	"user" : "admin",
     	"password" : "admin"
     },
-    "sensors": [
-    	{ 
-    		"sht1x": {
-    			"enabled" : false
-    		}
-    	} 
-    ],
-    "channels": [
-    	{ 
-    		"name" : "channel1",
-    		"alt" : "channel1",
-    		"enabled" : true,
-    		"maxTime" : 1800
-    	},
-    	{ 
-    		"name" : "channel2",
-    		"alt" : "channel2",
-    		"enabled" : true,
-    		"maxTime" : 1800
-    	},
-    	{ 
-    		"name" : "channel3",
-    		"alt" : "channel3",
-    		"enabled" : true,
-    		"maxTime" : 1800
-    	},
-    	{ 
-    		"name" : "channel4",
-    		"alt" : "channel4",
-    		"enabled" : true,
-    		"maxTime" : 1800
-    	}
-    ] 
+    "channel1": { 
+		"name" : "Channel1",
+		"alt" : "channel1",
+		"enabled" : true,
+		"maxTime" : 1800
+    },
+    "channel2":	{ 
+		"name" : "Channel2",
+		"alt" : "channel2",
+		"enabled" : true,
+		"maxTime" : 1800
+	},
+    "channel3": { 
+		"name" : "Channel3",
+		"alt" : "channel3",
+		"enabled" : true,
+		"maxTime" : 1800
+    },
+    "channel4":	{ 
+		"name" : "Channel4",
+		"alt" : "channel4",
+		"enabled" : true,
+		"maxTime" : 1800
+    }
 }

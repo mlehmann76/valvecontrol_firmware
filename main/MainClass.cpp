@@ -5,7 +5,7 @@
  *      Author: marco
  */
 
-#include <string.h>
+#include <string>
 #include <stdlib.h>
 #include <memory>
 
@@ -35,9 +35,68 @@
 #include "HttpServer.h"
 #include "echoServer.h"
 #include "utilities.h"
+#include "repository.h"
+#include "statusrepository.h"
+#include "MqttRepAdapter.h"
 
 #define TAG "MAIN"
 
+MainClass::MainClass() :
+		sntp(std::make_shared<SntpSupport>()), _stateRepository(), _controlRepository(), _http(),
+		_mqttOtaHandler(), _controlRepAdapter(), _configRepAdapter(),
+		_channels(4), _notifiers(4), _cex(std::make_shared<ExclusiveAdapter>())
+
+{
+	mqttConf.init();
+	_stateRepository = (std::make_shared<StatusRepository>("state", mqttUser,
+			utilities::string_format("%sstate", mqttConf.getDevName().c_str()), tag<DefaultLinkPolicy> { }));
+
+	_controlRepository = (std::make_shared<repository>("control", tag<DefaultLinkPolicy> { }));
+
+	_http = (std::make_shared<http::HttpServer>(80));
+
+	_mqttOtaHandler = (std::make_shared<MqttOtaHandler>(otaWorker, mqttUser,
+			utilities::string_format("%sota/#", mqttConf.getDevName().c_str()),
+			utilities::string_format("%sota/$implementation/binary", mqttConf.getDevName().c_str())));
+
+	_controlRepAdapter = (std::make_shared<MqttRepAdapter>(*_controlRepository.get(), mqttUser,
+			utilities::string_format("%scontrol", mqttConf.getDevName().c_str())));
+
+	_configRepAdapter = (std::make_shared<MqttRepAdapter>(Config::repo(), mqttUser,
+			utilities::string_format("%sconfig", mqttConf.getDevName().c_str())));
+
+}
+
+void MainClass::setup() {
+	esp_log_level_set("*", ESP_LOG_ERROR);
+	esp_log_level_set("MQTTS", ESP_LOG_VERBOSE);
+	esp_log_level_set("MAIN", ESP_LOG_VERBOSE);
+	esp_log_level_set("CHANNEL", ESP_LOG_VERBOSE);
+	esp_log_level_set("channelAdapter", ESP_LOG_VERBOSE);
+	esp_log_level_set("CONFIG", ESP_LOG_VERBOSE);
+
+	spiffsInit();
+
+	sntp->init();
+	mqttUser.init();
+	wifitask.addConnectionObserver(_http->obs());
+	wifitask.addConnectionObserver(mqttUser.obs());
+
+	for (size_t i=0; i< _channels.size();i++) {
+		_channels[i] = std::shared_ptr<ChannelBase>(LedcChannelFactory::channel(i, chanConf.getTime(i)));
+		_channels[i]->add(&(*_cex));
+		_notifiers[i] = std::make_shared<RepositoryNotifier>(*_stateRepository, _channels[i]->name());
+		_channels[i]->add(&(*_notifiers[i]));
+
+		_controlRepository->reg(_channels[i]->name(), {{"value","OFF"}}, [=](const property &p) {
+			auto it = p.find("value");
+			if (it != p.end() && it->second.valid() && it->second.is<std::string>()) {
+				std::string s = it->second.get<std::string>();
+				_channels[i]->set(s == "on" || s == "ON" || s == "On", chanConf.getTime(i));
+			}
+		});
+	}
+}
 
 void MainClass::spiffsInit(void) {
 	ESP_LOGI(TAG, "Initializing SPIFFS");
@@ -70,46 +129,6 @@ void MainClass::spiffsInit(void) {
 }
 
 int MainClass::loop() {
-	esp_log_level_set("*", ESP_LOG_ERROR);
-	esp_log_level_set("MQTTS", ESP_LOG_VERBOSE);
-	esp_log_level_set("HTTPSERVER", ESP_LOG_VERBOSE);
-	esp_log_level_set("HTTPREQUEST", ESP_LOG_VERBOSE);
-	esp_log_level_set("CHANNEL", ESP_LOG_VERBOSE);
-	esp_log_level_set("channelAdapter", ESP_LOG_VERBOSE);
-	esp_log_level_set("MAIN", ESP_LOG_VERBOSE);
-
-	spiffsInit();
-
-	mqttConf.init();
-	chanConf.init();
-	sensorConf.init();
-	sntp_support();
-
-	mqttUser.init();
-	static EchoServer echo;
-	static http::HttpServer http(80);
-	wifitask.addConnectionObserver(http.obs());
-	wifitask.addConnectionObserver(echo.obs());
-	wifitask.addConnectionObserver(mqttUser.obs());
-
-	//mqttConf.setNext(&sysConf)->setNext(&chanConf)->setNext(&sensorConf);
-	MqttOtaHandler mqttOta(otaWorker, mqttUser,
-			utilities::string_format("%sota/#", mqttConf.getDevName()),
-			utilities::string_format("%sota/$implementation/binary", mqttConf.getDevName()));
-
-	std::vector<ChannelBase*> _channels(4);
-	ExclusiveAdapter cex; //only one channel should be active
-
-	for (size_t i=0; i< _channels.size();i++) {
-		_channels[i] = LedcChannelFactory::channel(i, std::chrono::seconds(chanConf.getTime(i)));
-		_channels[i]->add(&cex);
-		_channels[i]->add(new MqttChannelAdapter(mqttUser,
-				utilities::string_format("%schannel%d/control", mqttConf.getDevName(),i),
-				utilities::string_format("%schannel%d/state", mqttConf.getDevName(),i)));
-		_channels[i]->add(new MqttJsonChannelAdapter(mqttUser,
-				utilities::string_format("%scontrol", mqttConf.getDevName()),
-				utilities::string_format("%sstate", mqttConf.getDevName())));
-	}
 
 	int count = 0;
 	uint32_t heapFree = 0;
@@ -117,7 +136,7 @@ int MainClass::loop() {
 
 	while (1) {
 		//check for time update by sntp
-		if (!(xEventGroupGetBits(MainClass::instance()->eventGroup()) & SNTP_UPDATED) && (update_time() != ESP_ERR_NOT_FOUND)) {
+		if (!(xEventGroupGetBits(MainClass::instance()->eventGroup()) & SNTP_UPDATED) && sntp->update()) {
 			xEventGroupSetBits(MainClass::instance()->eventGroup(),SNTP_UPDATED);
 			status.setUpdate(true);
 		}
@@ -127,6 +146,8 @@ int MainClass::loop() {
 				heapFree = esp_get_free_heap_size();
 				vTaskGetRunTimeStats(pcWriteBuffer.get());
 				ESP_LOGI(TAG, "[APP] Free memory: %d bytes\n", esp_get_free_heap_size());
+//				ESP_LOGI(TAG, "%s\n", _controlRepository->debug().c_str());
+//				ESP_LOGI(TAG, "%s\n", _stateRepository->stringify().c_str());
 				count = 500;
 			}
 		} else {

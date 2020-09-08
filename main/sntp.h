@@ -8,15 +8,14 @@
 #ifndef MAIN_SNTP_H_
 #define MAIN_SNTP_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <string>
 
-extern void sntp_support(void);
-extern esp_err_t update_time(void);
-
-#ifdef __cplusplus
-}
-#endif
-
+class SntpSupport {
+public:
+	void init();
+	bool update();
+private:
+	std::string server;
+	std::string timeZone;
+};
 #endif /* MAIN_SNTP_H_ */

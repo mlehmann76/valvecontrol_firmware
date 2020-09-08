@@ -10,9 +10,10 @@
 
 #include <list>
 #include <thread>
+
+#include "../../main/iConnectionObserver.h"
 #include "SemaphoreCPP.h"
 #include "socket.h"
-#include "ConnectionObserver.h"
 
 namespace http {
 
@@ -31,7 +32,7 @@ public:
 	HttpServer& operator=(const HttpServer &other) = delete;
 	HttpServer& operator=(HttpServer &&other) = delete;
 
-	ConnectionObserver& obs();
+	iConnectionObserver& obs();
 
 	int port() {
 		return m_port;
@@ -67,7 +68,7 @@ private:
 	PathHandlerType m_pathhandler;
 };
 
-class HttpServerConnectionObserver: public ConnectionObserver {
+class HttpServerConnectionObserver: public iConnectionObserver {
 public:
 	HttpServerConnectionObserver(HttpServer *_m) :
 			m_obs(_m) {
@@ -82,7 +83,7 @@ private:
 	HttpServer *m_obs;
 };
 
-inline ConnectionObserver& HttpServer::obs() {
+inline iConnectionObserver& HttpServer::obs() {
 	return *m_obs;
 }
 

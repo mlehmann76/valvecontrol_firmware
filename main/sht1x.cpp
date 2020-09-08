@@ -17,8 +17,6 @@
 #include "driver/i2c.h"
 #include "esp_log.h"
 
-#include "Json.h"
-
 #include "config.h"
 #include "mqtt_client.h"
 #include "sht1x.h"
@@ -30,7 +28,7 @@ static const int _us = 20;
 Sht1x::Sht1x(gpio_num_t _sda, gpio_num_t _scl) :
 		m_timeout("otaTimer",this,&Sht1x::readSensor,( 1000 / portTICK_PERIOD_MS ),false),
 	 i2c_gpio_sda(_sda), i2c_gpio_scl(_scl), m_hum(0), m_temp(0), m_error(false), m_update(false), m_sem(
-				"sht1x"), m_status(this) {
+				"sht1x") {
 	gpio_config_t io_conf;
 	io_conf.intr_type = GPIO_INTR_DISABLE;
 	io_conf.mode = GPIO_MODE_INPUT_OUTPUT_OD;
@@ -116,25 +114,6 @@ void Sht1x::readSensor() {
 		}
 	//	m_sem.give();
 	//}
-}
-
-bool Sht1x::hasUpdate() {
-	return m_update;
-}
-
-void Sht1x::addStatus(Json *root) {
-	if (root != NULL && m_sem.take(10)) {
-		char buf[16];
-		Json channel = root->addObject("sensors").addObject("sht1x");
-		if (channel.valid()) {
-			snprintf(buf, sizeof(buf), "%3.2f", m_temp);
-			channel.addItem("temp", Json(buf));
-			snprintf(buf, sizeof(buf), "%3.2f", m_hum);
-			channel.addItem("hum", Json(buf));
-			channel.addItem("status", Json(hasError() ? "err" : "ok"));
-		}
-		m_sem.give();
-	}
 }
 
 void Sht1x::_sda_(int lvl) {

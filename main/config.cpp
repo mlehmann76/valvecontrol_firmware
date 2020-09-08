@@ -4,7 +4,8 @@
  *  Created on: 19.06.2020
  *      Author: marco
  */
-#include <string.h>
+#include <string>
+#include <sstream>
 #include <stdlib.h>
 #include <memory>
 
@@ -19,6 +20,8 @@
 #include "cJSON_Utils.h"
 
 #include "config.h"
+#include "repository.h"
+#include "utilities.h"
 
 static const char *TAG = "CONFIG";
 
@@ -27,11 +30,10 @@ extern const char config_json_start[] asm("_binary_config_json_start");
 namespace Config {
 
 bool configBase::m_isInitialized = false;
-cJSON *configBase::pConfig = NULL;
 const char MqttConfig::MQTT_PUB_MESSAGE_FORMAT[] = "%s%02X%02X%02X%02X%02X%02X%s";
 
 configBase::configBase(const char *_name) :
-		ParseHandler(_name), m_string(), my_handle() {
+		my_handle() {
 	m_isInitialized = false;
 }
 
@@ -39,6 +41,10 @@ esp_err_t configBase::init() {
 
 	char *nvs_json_config;
 	esp_err_t ret = ESP_OK;
+
+	repo().reg("system", {{"user","admin"},{"password","admin"}});
+	repo().reg("sntp", {{"zone",""},{"server",""}});
+	repo().reg("mqtt", {{"server",""},{"user",""},{"pass",""},{"device",""}});
 
 	esp_err_t err = nvs_flash_init();
 	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -54,21 +60,26 @@ esp_err_t configBase::init() {
 	if (err != ESP_OK) {
 		ESP_LOGE(TAG, "nvs_open storage failed (%s)", esp_err_to_name(err));
 	}
-
+#if 0
 	//try opening saved json config
 	err = readStr(&my_handle, "config_json", &nvs_json_config);
 	if (ESP_OK != err) {
 		ESP_LOGE(TAG, "config_json read failed (%s)", esp_err_to_name(err));
-		pConfig = cJSON_Parse(config_json_start);
+//		pConfig = cJSON_Parse(config_json_start);
+		repo().parse(config_json_start);
 	} else {
-		pConfig = cJSON_Parse(config_json_start);
-		cJSON *patch = NULL;
-		patch = cJSON_Parse(nvs_json_config);
-		pConfig = cJSONUtils_MergePatch(pConfig, patch);
-		cJSON_Delete(patch);
+//		pConfig = cJSON_Parse(config_json_start);
+//		cJSON *patch = NULL;
+//		patch = cJSON_Parse(nvs_json_config);
+//		pConfig = cJSONUtils_MergePatch(pConfig, patch);
+//		cJSON_Delete(patch);
+		repo().parse(nvs_json_config);
 	}
-	//
+#else
+	repo().parse(config_json_start);
+#endif
 	m_isInitialized = true;
+	ESP_LOGV(TAG, "repo (%s)", repo().debug().c_str());
 
 	return ret;
 }
@@ -89,125 +100,39 @@ esp_err_t configBase::readStr(nvs_handle *pHandle, const char *pName, char **des
 	return err;
 }
 
+repository& repo() {
+	static repository s_repository("config", tag<ReplaceLinkPolicy>{});
+	return s_repository;
+}
+
 esp_err_t configBase::writeStr(nvs_handle *pHandle, const char *pName, const char *str) {
 	return nvs_set_str(*pHandle, pName, str);
 }
 
-esp_err_t configBase::readConfig(const char *section, const char *name, char **dest) {
-	char *ret = NULL;
-	if (!m_isInitialized) {
-		init();
-	}
-	ret = readJsonConfigStr(pConfig, "default", section, name);
-
-	*dest = ret;
-	return ret != NULL ? ESP_OK : !ESP_OK;
-}
-
-char* configBase::readString(const char *section, const char *name) {
-	char *ret;
-	readConfig(section, name, &ret);
-	return ret;
-}
-
-char* configBase::readJsonConfigStr(const cJSON *pRoot, const char *cfg, const char *section, const char *name) {
-	char *ret = NULL;
-
-	cJSON *pSection = cJSON_GetObjectItem(pRoot, section);
-	if (pSection != NULL) {
-		cJSON *pName = cJSON_GetObjectItem(pSection, name);
-
-		if (cJSON_IsString(pName) && (pName->valuestring != NULL)) {
-			ret = (char*) malloc(strlen(pName->valuestring));
-			strcpy(ret, pName->valuestring);
-			ESP_LOGD(TAG, "section (%s), name (%s) in (%s) found (%s)", section, name, cfg, ret);
-		} else {
-			ESP_LOGE(TAG, "name in (%s) not found (%s)", cfg, name);
-		}
-	} else {
-		ESP_LOGE(TAG, "section in (%s) not found (%s)", cfg, section);
-	}
-	return ret;
-}
-
-int configBase::parse(const char *value) {
-	if (next() != NULL) {
-		return next()->parse(value);
-	} else {
-		return 0;
-	}
-}
-
-void configBase::merge(const cJSON *patch) {
-	pConfig = cJSONUtils_MergePatch(pConfig, patch);
-}
-
-char* configBase::stringify() {
-	if (m_string != NULL) {
-		free(m_string);
-		m_string = NULL;
-	}
-
-	cJSON *mqtt = cJSON_GetObjectItem(getRoot(), name());
-	m_string = cJSON_PrintUnformatted(mqtt);
-
-	return m_string;
-}
-
-void configBase::debug() {
-	std::unique_ptr<char[]> _s(cJSON_Print(getRoot()));
-	ESP_LOGD(TAG, "debug: (%8X) %s ", (uint32_t )pConfig, _s.get() != NULL ? _s.get() : "error");
-}
-
-configBase::~configBase() {
-	// TODO Auto-generated destructor stub
-}
-
 esp_err_t MqttConfig::init() {
+
+	static char *MQTT_DEVICE = (char*) "esp32/";
 
 	if (!isInitialized()) {
 		configBase::init();
 	}
-	size_t required_size = 0;
 	/* read mqtt device name */
-	mqtt_device_name = readString("mqtt", "device");
+	/* set default device name */
+	uint8_t mac[6] = { 0 };
+	char def_mqtt_device[64] = { 0 };
+	esp_efuse_mac_get_default(mac);
+	snprintf(def_mqtt_device, sizeof(def_mqtt_device), MQTT_PUB_MESSAGE_FORMAT, //
+			MQTT_DEVICE, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], "/");
 
-	if (NULL != mqtt_device_name) {
-		required_size = strnlen(mqtt_device_name, MAX_DEVICE_NAME);
-	} else {
-		/* set default device name */
-		uint8_t mac[6] = { 0 };
-		esp_efuse_mac_get_default(mac);
-		snprintf(def_mqtt_device, sizeof(def_mqtt_device), MQTT_PUB_MESSAGE_FORMAT, MQTT_DEVICE, mac[0], mac[1], mac[2],
-				mac[3], mac[4], mac[5], "/");
-		mqtt_device_name = def_mqtt_device;
-		required_size = strlen(def_mqtt_device);
+	mqtt_device_name = Config::repo().get<std::string>("mqtt", "device", def_mqtt_device);
+
+	if (mqtt_device_name == "") {
+		mqtt_device_name = std::string(def_mqtt_device);
 	}
 
-	mqtt_pub_msg = (char*) malloc(required_size + sizeof("state/") + 1);
-
-	if ((mqtt_pub_msg != NULL)) {
-		snprintf(mqtt_pub_msg, required_size + sizeof("state") + 1, "%sstate", mqtt_device_name);
-	}
-
-	ESP_LOGD(TAG, "pub (%s)", getPubMsg());
+	mqtt_pub_msg = utilities::string_format("%sstate", mqtt_device_name.c_str());
 
 	return ESP_OK;
-}
-
-int MqttConfig::parse(const char* value) {
-	int ret = 0;
-	cJSON *patch = cJSON_Parse(value);
-
-	if (patch != NULL && cJSON_GetObjectItem(patch, name())) {
-		/* test config */
-		merge(patch);
-		ret = 1;
-		cJSON_Delete(patch);
-	} else {
-		ret = configBase::parse(value);
-	}
-	return ret;
 }
 
 ChannelConfig::ChannelConfig() :
@@ -219,132 +144,53 @@ esp_err_t ChannelConfig::init() {
 	if (!isInitialized()) {
 		ret = configBase::init();
 	}
-	cJSON *pChan = cJSON_GetObjectItem(getRoot(), "channels");
-	ESP_LOGD(TAG, "channels 0x%8X : isArray %d , Size %d", (unsigned int )pChan,
-			pChan != NULL ? cJSON_IsArray(pChan) : false, pChan != NULL ? cJSON_GetArraySize(pChan) : 0);
-	if (pChan != NULL && cJSON_IsArray(pChan)) {
-		m_channelCount = cJSON_GetArraySize(pChan);
-		ret = ESP_OK;
+	for (unsigned i=0;i<4;i++) {
+		repo().reg(channelName(i).str(), {
+				{"name","no name"},
+				{"alt","alt name"},
+				{"enabled",BoolType(false)},
+				{"maxTime",0}
+		});
 	}
 	return ret;
 }
 
-int ChannelConfig::parse(const char* value) {
-	int ret = 0;
-	cJSON *patch = cJSON_Parse(value);
-
-	if (patch != NULL && cJSON_GetObjectItem(patch, name())) {
-		/* test config */
-		merge(patch);
-		ret = 1;
-		cJSON_Delete(patch);
-	} else {
-		ret = configBase::parse(value);
-	}
-	return ret;
+std::stringstream ChannelConfig::channelName(unsigned ch) {
+	std::stringstream _name;
+	_name << "config/channel" << ch+1 ;
+	return _name;
 }
 
-const char* ChannelConfig::getName(unsigned ch) {
-	char *ret = cJSON_GetStringValue(const_cast<cJSON*>(getItem(ch, "name")));
-	return ret != NULL ? ret : "no name";
+std::string ChannelConfig::getName(unsigned ch) {
+	return repo().get<std::string>(channelName(ch).str(),"name");
 }
 
-const char* ChannelConfig::getAlt(unsigned ch) {
-	char *ret = cJSON_GetStringValue(const_cast<cJSON*>(getItem(ch, "alt")));
-	return ret != NULL ? ret : "no alt. name";
+std::string ChannelConfig::getAlt(unsigned ch) {
+	return repo().get<std::string>(channelName(ch).str(), "alt");
 }
 
 bool ChannelConfig::isEnabled(unsigned ch) {
-	return cJSON_IsTrue(const_cast<cJSON*>(getItem(ch, "enabled")));
+	return repo().get<BoolType>(channelName(ch).str(), "enabled").value;
 }
 
-unsigned ChannelConfig::getTime(unsigned ch) {
-	cJSON *pItem = const_cast<cJSON*>(getItem(ch, "maxTime"));
-	return cJSON_IsNumber(pItem) ? pItem->valueint : 0;
+std::chrono::seconds ChannelConfig::getTime(unsigned ch) {
+	return std::chrono::seconds(repo().get<int>(channelName(ch).str(), "maxTime"));
 }
 
-
-const cJSON* ChannelConfig::getItem(unsigned ch, const char *item) {
-	cJSON *ret = NULL;
-	if (isInitialized() && ch < m_channelCount) {
-		cJSON *pChan = cJSON_GetObjectItem(getRoot(), "channels");
-		cJSON *pItem = cJSON_GetArrayItem(pChan, ch);
-		ret = cJSON_GetObjectItem(pItem, item);
-	}
-	return ret;
+std::string SysConfig::getTimeServer() {
+	return repo().get<std::string>("sntp","server");
 }
 
-SensorConfig::SensorConfig() :
-		configBase("sensors"), m_sensorCount(0) {
+std::string SysConfig::getTimeZone() {
+	return repo().get<std::string>("sntp","zone");
 }
 
-esp_err_t SensorConfig::init() {
-	esp_err_t ret = ESP_FAIL;
-	if (!isInitialized()) {
-		ret = configBase::init();
-	}
-	cJSON *pChan = cJSON_GetObjectItem(getRoot(), "sensors");
-	ESP_LOGD(TAG, "sensors 0x%8X : isArray %d , Size %d", (unsigned int )pChan,
-			pChan != NULL ? cJSON_IsArray(pChan) : false, pChan != NULL ? cJSON_GetArraySize(pChan) : 0);
-	if (pChan != NULL && cJSON_IsArray(pChan)) {
-		m_sensorCount = cJSON_GetArraySize(pChan);
-		ret = ESP_OK;
-	}
-	return ret;
+std::string SysConfig::getPass() {
+	return repo().get<std::string>("system","password");
 }
 
-int SensorConfig::parse(const char* value) {
-	int ret = 0;
-	cJSON *patch = cJSON_Parse(value);
-
-	if (patch != NULL && cJSON_GetObjectItem(patch, name())) {
-		/* test config */
-		merge(patch);
-		ret = 1;
-		cJSON_Delete(patch);
-	} else {
-		ret = configBase::parse(value);
-	}
-	return ret;
-}
-
-bool SensorConfig::isEnabled(const char* _s) {
-	const cJSON *item = getItem(_s, "enabled");
-	ESP_LOGD(TAG, "%s: 0x%08X : %s", _s, (unsigned int )item, cJSON_IsTrue(item) ? "true" : "false");
-	return cJSON_IsTrue(item);
-}
-
-const cJSON* SensorConfig::getItem(const char *name, const char *item) {
-	cJSON *ret = NULL;
-	if (isInitialized()) {
-		cJSON *pArray = cJSON_GetObjectItem(getRoot(), "sensors");
-		cJSON *aritem = pArray ? pArray->child : 0;
-		while (aritem) {
-			cJSON *sensitem = cJSON_GetObjectItem(cJSON_GetObjectItem(aritem, name), item);
-
-			if (sensitem != NULL) {
-				ret = sensitem;
-				break;
-			}
-			aritem = aritem->next;
-		}
-	}
-	return ret;
-}
-
-int SysConfig::parse(const char *value) {
-	int ret = 0;
-	cJSON *patch = cJSON_Parse(value);
-
-	if (patch != NULL && cJSON_GetObjectItem(patch, name())) {
-		/* test config */
-		merge(patch);
-		ret = 1;
-		cJSON_Delete(patch);
-	} else {
-		ret = configBase::parse(value);
-	}
-	return ret;
+std::string SysConfig::getUser() {
+	return repo().get<std::string>("system","user");
 }
 
 
@@ -354,5 +200,4 @@ int SysConfig::parse(const char *value) {
 Config::MqttConfig mqttConf;
 Config::SysConfig sysConf;
 Config::ChannelConfig chanConf;
-Config::SensorConfig sensorConf;
 

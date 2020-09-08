@@ -300,12 +300,12 @@ int WifiTask::checkWPSButton() {
 	return wps_button_count;
 }
 
-void WifiTask::addConnectionObserver(ConnectionObserver &_obs) {
+void WifiTask::addConnectionObserver(iConnectionObserver &_obs) {
 	m_observer.push_back(&_obs);
 }
 
-void WifiTask::remConnectionObserver(ConnectionObserver &_obs) {
-	for (std::vector<ConnectionObserver*>::iterator it = m_observer.begin(); it != m_observer.end(); ++it) {
+void WifiTask::remConnectionObserver(iConnectionObserver &_obs) {
+	for (std::vector<iConnectionObserver*>::iterator it = m_observer.begin(); it != m_observer.end(); ++it) {
 		if ((*it) == &_obs) {
 			delete (*it);
 			m_observer.erase(it);

@@ -11,11 +11,11 @@
 #include <thread>
 #include "MutexCPP.h"
 #include "socket.h"
-#include "ConnectionObserver.h"
 #include <vector>
+#include "iConnectionObserver.h"
 
 class EchoServer;
-class EchoConnectionObserver : public ConnectionObserver {
+class EchoConnectionObserver : public iConnectionObserver {
 public:
 	EchoConnectionObserver(EchoServer *_m) : m_obs(_m) {}
 	virtual void onConnect();
@@ -33,7 +33,7 @@ public:
 	EchoServer& operator=(EchoServer &&other) = delete;
 	virtual void task();
 	void start();
-	ConnectionObserver &obs() {return *m_obs;}
+	iConnectionObserver &obs() {return *m_obs;}
 private:
 	void removeSocket(Socket *_s);
 

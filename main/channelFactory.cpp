@@ -93,7 +93,7 @@ LedcChannelFactory::LedcChannelFactory() {
 
 ChannelBase* LedcChannelFactory::channel(uint32_t index, std::chrono::seconds _p) {
 	assert(index < count());
-	return new LedcChan(chanConf.getName(index), ledc_channel[index], _p);
+	return new LedcChan(chanConf.getName(index).c_str(), ledc_channel[index], _p);
 }
 
 uint32_t LedcChannelFactory::count() {

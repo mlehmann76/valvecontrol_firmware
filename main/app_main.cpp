@@ -15,6 +15,7 @@ void app_main();
 #endif
 
 void app_main() {
+	MainClass::instance()->setup();
 	MainClass::instance()->loop();
 }
 
