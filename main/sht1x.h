@@ -9,7 +9,6 @@
 #define MAIN_SHT1X_H_
 
 #include "hal/gpio_types.h"
-#include "statusTask.h"
 
 #define SHT1X_MEASURE_TEMP 0x03
 #define SHT1X_MEASURE_HUM 0x05
