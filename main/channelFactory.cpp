@@ -56,13 +56,6 @@ bool LedcChan::get() const {
 	return (_mode == efull || _mode == ehalf);
 }
 
-void LedcChan::notify() {
-	ESP_LOGD(TAG, "notify %s = %d", name(), get());
-	for (auto m : m_adapter) {
-		m->onNotify(this);
-	}
-}
-
 void LedcChan::half() {
 	ledc_set_duty(_config.speed_mode, _config.channel, LED_C_HALF);
 	ledc_update_duty(_config.speed_mode, _config.channel);

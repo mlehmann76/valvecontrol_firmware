@@ -29,7 +29,6 @@ class MainClass {
 	//Sht1x sht1x = {GPIO_NUM_21, GPIO_NUM_22};
 	Ota::OtaWorker otaWorker;
 	mqtt::MqttWorker mqttUser;
-	//StatusTask status = {wifitask.eventGroup()};
 	std::shared_ptr<SntpSupport> sntp;
 	std::shared_ptr<repository> _stateRepository;
 	std::shared_ptr<repository> _controlRepository;

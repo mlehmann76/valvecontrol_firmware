@@ -135,8 +135,9 @@ std::string repository::propName(const std::string &name) const {
 bool repository::set(const std::string &name, const property_base &p) {
 	std::lock_guard<std::mutex> lock(m_lock);
 	/*set works w/wo omitting repository name */
-	std::string cname = propName(name);
-	return set(m_props.find(cname), p);
+	//FIXME std::cout << name << " set " << std::endl;
+	auto it = m_props.find(propName(name));
+	return set(it, p);
 }
 
 bool repository::set(mapType::iterator it, const property_base &p) {

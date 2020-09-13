@@ -11,22 +11,32 @@
 #include <string>
 #include <vector>
 #include <chrono>
-
-class ChannelAdapterBase;
+#include <functional>
 
 class ChannelBase {
 public:
+	using notifyFuncType = std::function<void(ChannelBase *)>;
 	ChannelBase(const char* _n) : m_name(_n) {};
 	virtual ~ChannelBase() = default;
 	virtual void set(bool, std::chrono::seconds) = 0;
 	virtual bool get() const = 0;
-	virtual void notify() = 0;
+
+	void notify() {
+		for (auto m : m_notifier) {
+			m(this);
+		}
+	}
+
 	const char *name() const { return m_name.c_str(); }
 
-	void add(ChannelAdapterBase *_a);
+	void add(notifyFuncType &&_a) {
+		m_notifier.push_back(_a);
+	}
 protected:
 	std::string m_name;
-	std::vector<ChannelAdapterBase*> m_adapter;
+	std::vector<notifyFuncType> m_notifier;
 };
+
+
 
 #endif /* MAIN_CHANNELBASE_H_ */

@@ -8,6 +8,7 @@
 #ifndef MAIN_ABSTRACTCHANNELFACTORY_H_
 #define MAIN_ABSTRACTCHANNELFACTORY_H_
 
+#include "TimerCPP.h"
 #include "config_user.h"
 #include "channelBase.h"
 #include "driver/gpio.h"
@@ -37,7 +38,6 @@ public:
 	virtual ~LedcChan();
 	virtual void set(bool, std::chrono::seconds);
 	virtual bool get() const;
-	virtual void notify();
 private:
 	void onTimer();
 	void half();

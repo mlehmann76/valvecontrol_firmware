@@ -9,8 +9,10 @@
 #define MAIN_STATUSREPOSITORY_H_
 
 #include <string>
+#include <sstream>
 #include <memory>
 #include <functional>
+#include <iomanip>
 #include <mutex>
 #include "mqttWorker.h"
 #include "repository.h"
@@ -26,29 +28,11 @@ public:
 
 	virtual ~StatusRepository() = default;
 
-	void onSetNotify(const std::string &_name) override {
-		std::cout << name() << " : onSetNotify : "  << _name << std::endl;
-		std::lock_guard<std::mutex> lock(m_lock);
-		m_count++;
-	}
-
+	void onSetNotify(const std::string& _name) override;
 
 private:
 
-	void task() {
-		while(true) {
-			if (m_count) {
-				updateDateTime();
-				std::this_thread::sleep_for(std::chrono::milliseconds(200));
-				std::lock_guard<std::mutex> lock(m_lock);
-				mqtt::MqttQueueType message(new mqtt::mqttMessage(m_topic, stringify()));
-				m_mqtt->send(std::move(message));
-				m_count = 0;
-			} else {
-				std::this_thread::sleep_for(std::chrono::milliseconds(100));
-			}
-		}
-	}
+	void task();
 
 	void updateDateTime();
 
@@ -59,18 +43,36 @@ private:
 	size_t m_count;
 };
 
-inline void StatusRepository::updateDateTime() {
-	time_t now;
-	struct tm timeinfo;
-	time(&now);
-	localtime_r(&now, &timeinfo);
-	char strftime_buf[64];
-	localtime_r(&now, &timeinfo);
+inline void StatusRepository::onSetNotify(const std::string &_name) {
+	std::cout << name() << " : onSetNotify : " << _name << std::endl;
+	std::lock_guard<std::mutex> lock(m_lock);
+	m_count++;
+}
 
-	strftime(strftime_buf, sizeof(strftime_buf), "%F", &timeinfo);
-	set("dateTime", {{"date", strftime_buf}});
-	strftime(strftime_buf, sizeof(strftime_buf), "%T", &timeinfo);
-	set("dateTime", {{"time", strftime_buf}});
+inline void StatusRepository::task() {
+	while (true) {
+		if (m_count) {
+			updateDateTime();
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			std::lock_guard<std::mutex> lock(m_lock);
+			mqtt::MqttQueueType message(new mqtt::mqttMessage(m_topic, stringify()));
+			m_mqtt->send(std::move(message));
+			m_count = 0;
+		} else {
+			std::this_thread::sleep_for(std::chrono::milliseconds(20));
+		}
+	}
+}
+
+inline void StatusRepository::updateDateTime() {
+
+	std::time_t t = std::time(nullptr);
+	std::tm tm = *std::localtime(&t);
+	std::stringstream bdate,btime;
+	bdate << std::put_time(&tm, "%F");
+	set("dateTime", {{"date", bdate.str()}});
+	btime << std::put_time(&tm, "%T");
+	set("dateTime", {{"time", btime.str()}});
 }
 
 #endif /* MAIN_STATUSREPOSITORY_H_ */

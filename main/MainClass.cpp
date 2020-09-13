@@ -11,10 +11,6 @@
 
 #include "config_user.h"
 
-#include "TaskCPP.h"
-#include "SemaphoreCPP.h"
-#include "QueueCPP.h"
-#include "TimerCPP.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
@@ -72,7 +68,7 @@ void MainClass::setup() {
 	esp_log_level_set("MQTTS", ESP_LOG_VERBOSE);
 	esp_log_level_set("MAIN", ESP_LOG_VERBOSE);
 	esp_log_level_set("CHANNEL", ESP_LOG_VERBOSE);
-	esp_log_level_set("channelAdapter", ESP_LOG_VERBOSE);
+	esp_log_level_set("channelBase", ESP_LOG_VERBOSE);
 	esp_log_level_set("CONFIG", ESP_LOG_VERBOSE);
 
 	spiffsInit();
@@ -84,21 +80,20 @@ void MainClass::setup() {
 
 	for (size_t i=0; i< _channels.size();i++) {
 		_channels[i] = std::shared_ptr<ChannelBase>(LedcChannelFactory::channel(i, chanConf.getTime(i)));
-		_channels[i]->add(&(*_cex));
-		//modify status property by reading channel value, better set inside channel
-		_stateRepository->reg(_channels[i]->name(), {{{"value","OFF"}}}, nullptr, [=](){
-			return property{{{"value", _channels[i]->get() ? "ON" : "OFF"}}};
-		});
+		_cex->setChannel(&*_channels[i]);
+		_stateRepository->reg(_channels[i]->name(), {{{"value","OFF"}}});
 
 		_controlRepository->reg(_channels[i]->name(), {{{"value","OFF"}}}, [=](const property &p) {
 			auto it = p.find("value");
 			if (it != p.end() && it->second.valid() && it->second.is<std::string>()) {
 				std::string s = it->second.get<std::string>();
 				_channels[i]->set(s == "on" || s == "ON" || s == "On", chanConf.getTime(i));
-				//modify status property to generate state message
-				_stateRepository->set(_channels[i]->name(), {{"value", _channels[i]->get() ? "ON" : "OFF"}});
 			}
 		});
+
+		_channels[i]->add([=](ChannelBase *b){_cex->onNotify(b);});
+		_channels[i]->add([=](ChannelBase *b){_stateRepository->set(b->name(), {{"value", b->get() ? "ON" : "OFF"}});});
+
 	}
 }
 
@@ -148,9 +143,9 @@ int MainClass::loop() {
 			if( esp_get_free_heap_size() != heapFree) {
 				heapFree = esp_get_free_heap_size();
 				vTaskGetRunTimeStats(pcWriteBuffer.get());
-				ESP_LOGI(TAG, "[APP] Free memory: %d bytes\n", esp_get_free_heap_size());
-				ESP_LOGI(TAG, "%s\n", _controlRepository->debug().c_str());
-				ESP_LOGI(TAG, "%s\n", _stateRepository->debug().c_str());
+//				ESP_LOGI(TAG, "[APP] Free memory: %d bytes\n", esp_get_free_heap_size());
+//				ESP_LOGI(TAG, "%s\n", _controlRepository->debug().c_str());
+//				ESP_LOGI(TAG, "%s\n", _stateRepository->debug().c_str());
 				count = 500;
 			}
 		} else {
