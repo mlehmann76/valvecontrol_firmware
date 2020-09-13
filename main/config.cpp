@@ -42,9 +42,9 @@ esp_err_t configBase::init() {
 	char *nvs_json_config;
 	esp_err_t ret = ESP_OK;
 
-	repo().reg("system", {{"user","admin"},{"password","admin"}});
-	repo().reg("sntp", {{"zone",""},{"server",""}});
-	repo().reg("mqtt", {{"server",""},{"user",""},{"pass",""},{"device",""}});
+	repo().reg("system", {{{"user","admin"},{"password","admin"}}});
+	repo().reg("sntp", {{{"zone",""},{"server",""}}});
+	repo().reg("mqtt", {{{"server",""},{"user",""},{"pass",""},{"device",""}}});
 
 	esp_err_t err = nvs_flash_init();
 	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -145,12 +145,12 @@ esp_err_t ChannelConfig::init() {
 		ret = configBase::init();
 	}
 	for (unsigned i=0;i<4;i++) {
-		repo().reg(channelName(i).str(), {
+		repo().reg(channelName(i).str(), {{
 				{"name","no name"},
 				{"alt","alt name"},
 				{"enabled",BoolType(false)},
 				{"maxTime",0}
-		});
+		}});
 	}
 	return ret;
 }

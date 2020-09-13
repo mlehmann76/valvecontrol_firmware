@@ -12,6 +12,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <iostream>
 
 #include "property.h"
 
@@ -19,7 +20,7 @@ struct DefaultLinkPolicy: std::false_type {};
 struct ReplaceLinkPolicy : std::true_type {};
 template<class T>struct tag{using type=T;};
 
-using mapType = std::map<std::string, property_wrapper>;
+using mapType = std::map<std::string, std::shared_ptr<property>>;
 
 class repository {
 
@@ -39,27 +40,21 @@ public:
 	virtual ~repository() = default;
 
 	/* link a existing property in the repository */
-	property& reg(const std::string &_name, property &_p, property_wrapper::write_hook_t w = nullptr,
-			property_wrapper::read_hook_t r = nullptr);
+	property& reg(const std::string &_name, property &_p);
 
 	/* create a new property with starting value */
-	property& reg(const std::string &_name, const property &_cp, property_wrapper::write_hook_t w = nullptr,
-			property_wrapper::read_hook_t r = nullptr);
-
-	/* create a new property with default value */
 	property& reg(const std::string &_name,
-			property_wrapper::write_hook_t w = nullptr,
-			property_wrapper::read_hook_t r = nullptr) {
-		return reg(_name, {}, w, r);
-	}
+			const property &_cp,
+			property::write_hook_t w = nullptr,
+			property::read_hook_t r = nullptr);
 
 	/* unlink the property */
 	bool unreg(const std::string &_name);
 
 	/* set the property */
-	virtual bool set(const std::string &name, const property &p);
+	virtual bool set(const std::string &name, const property_base &p);
 
-	/* get the propety, return default if not existing */
+	/* get the property, return default if not existing */
 	property get(const std::string &name, const property& _default = {}) const;
 
 	/* convert the property, return given value if not existing */
@@ -68,11 +63,8 @@ public:
 		property _p = get(name);
 		property::const_iterator it = _p.find(key);
 		if (it != _p.end()) {
-			T _ret = std::move(mapbox::util::get<T>(it->second));
-			//FIXME std::cout << "get: " << key << " found in repository : " << _ret << std::endl;
-			return _ret;
-		}else{
-			//FIXME std::cout << "get: " << key << " not found in repository " << std::endl;
+			return std::move(mapbox::util::get<T>(it->second));
+		} else {
 			return _default;
 		}
 	}
@@ -97,11 +89,18 @@ public:
 	/* parse a json string */
 	void parse(const std::string &c);
 
-private:
+	/* notify */
+	virtual void onSetNotify(const std::string &name);
 
+	std::string name() const {
+		return m_repName;
+	}
+
+protected:
 	std::string propName(const std::string &name) const;
-	bool set(mapType::iterator it, const property &p);
+	bool set(mapType::iterator it, const property_base &p);
 
+private:
 	std::string m_repName;
 	mapType m_props;
 	link_policy_t link_policy;

@@ -15,7 +15,6 @@
 #include "WifiTask.h"
 #include "sht1x.h"
 #include "otaWorker.h"
-#include "statusTask.h"
 #include "HttpServer.h"
 
 class repository;
@@ -30,7 +29,7 @@ class MainClass {
 	//Sht1x sht1x = {GPIO_NUM_21, GPIO_NUM_22};
 	Ota::OtaWorker otaWorker;
 	mqtt::MqttWorker mqttUser;
-	StatusTask status = {wifitask.eventGroup()};
+	//StatusTask status = {wifitask.eventGroup()};
 	std::shared_ptr<SntpSupport> sntp;
 	std::shared_ptr<repository> _stateRepository;
 	std::shared_ptr<repository> _controlRepository;
@@ -39,7 +38,6 @@ class MainClass {
 	std::shared_ptr<MqttRepAdapter> _controlRepAdapter;
 	std::shared_ptr<MqttRepAdapter> _configRepAdapter;
 	std::vector<std::shared_ptr<ChannelBase>> _channels;
-	std::vector<std::shared_ptr<RepositoryNotifier>> _notifiers;
 	std::shared_ptr<ExclusiveAdapter> _cex; //only one channel should be active
 
 

@@ -44,7 +44,7 @@
 MainClass::MainClass() :
 		sntp(std::make_shared<SntpSupport>()), _stateRepository(), _controlRepository(), _http(),
 		_mqttOtaHandler(), _controlRepAdapter(), _configRepAdapter(),
-		_channels(4), _notifiers(4), _cex(std::make_shared<ExclusiveAdapter>())
+		_channels(4), _cex(std::make_shared<ExclusiveAdapter>())
 
 {
 	mqttConf.init();
@@ -85,14 +85,18 @@ void MainClass::setup() {
 	for (size_t i=0; i< _channels.size();i++) {
 		_channels[i] = std::shared_ptr<ChannelBase>(LedcChannelFactory::channel(i, chanConf.getTime(i)));
 		_channels[i]->add(&(*_cex));
-		_notifiers[i] = std::make_shared<RepositoryNotifier>(*_stateRepository, _channels[i]->name());
-		_channels[i]->add(&(*_notifiers[i]));
+		//modify status property by reading channel value, better set inside channel
+		_stateRepository->reg(_channels[i]->name(), {{{"value","OFF"}}}, nullptr, [=](){
+			return property{{{"value", _channels[i]->get() ? "ON" : "OFF"}}};
+		});
 
-		_controlRepository->reg(_channels[i]->name(), {{"value","OFF"}}, [=](const property &p) {
+		_controlRepository->reg(_channels[i]->name(), {{{"value","OFF"}}}, [=](const property &p) {
 			auto it = p.find("value");
 			if (it != p.end() && it->second.valid() && it->second.is<std::string>()) {
 				std::string s = it->second.get<std::string>();
 				_channels[i]->set(s == "on" || s == "ON" || s == "On", chanConf.getTime(i));
+				//modify status property to generate state message
+				_stateRepository->set(_channels[i]->name(), {{"value", _channels[i]->get() ? "ON" : "OFF"}});
 			}
 		});
 	}
@@ -138,7 +142,6 @@ int MainClass::loop() {
 		//check for time update by sntp
 		if (!(xEventGroupGetBits(MainClass::instance()->eventGroup()) & SNTP_UPDATED) && sntp->update()) {
 			xEventGroupSetBits(MainClass::instance()->eventGroup(),SNTP_UPDATED);
-			status.setUpdate(true);
 		}
 
 		if (0 == count) {
@@ -146,8 +149,8 @@ int MainClass::loop() {
 				heapFree = esp_get_free_heap_size();
 				vTaskGetRunTimeStats(pcWriteBuffer.get());
 				ESP_LOGI(TAG, "[APP] Free memory: %d bytes\n", esp_get_free_heap_size());
-//				ESP_LOGI(TAG, "%s\n", _controlRepository->debug().c_str());
-//				ESP_LOGI(TAG, "%s\n", _stateRepository->stringify().c_str());
+				ESP_LOGI(TAG, "%s\n", _controlRepository->debug().c_str());
+				ESP_LOGI(TAG, "%s\n", _stateRepository->debug().c_str());
 				count = 500;
 			}
 		} else {

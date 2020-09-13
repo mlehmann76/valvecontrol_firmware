@@ -108,7 +108,7 @@ std::string repository::debug(const mapType &_m) {
 	_ss << "map<property>" << std::endl;
 	for (mapType::const_iterator it = _m.begin(); it != _m.end(); ++it) {
 		_ss << it->first << " : ";
-		for (auto &v : it->second.get()) {
+		for (auto &v : it->second->get()) {
 			mapbox::util::apply_visitor(DebugVisitor(_ss, v.first), v.second);
 		}
 	}
@@ -119,7 +119,7 @@ std::string repository::debug(const mapType &_m) {
 std::string repository::stringify(const mapType &_m) {
 	nlohmann::json root;
 	for (mapType::const_iterator it = _m.begin(); it != _m.end(); ++it) {
-		for (auto &v : it->second.get()) {
+		for (auto &v : it->second->get()) {
 			mapbox::util::apply_visitor(JsonVisitor(it->first, v.first, root), v.second);
 		}
 	}
@@ -132,18 +132,17 @@ std::string repository::propName(const std::string &name) const {
 	return path;
 }
 
-bool repository::set(const std::string &name, const property &p) {
+bool repository::set(const std::string &name, const property_base &p) {
 	std::lock_guard<std::mutex> lock(m_lock);
 	/*set works w/wo omitting repository name */
 	std::string cname = propName(name);
 	return set(m_props.find(cname), p);
 }
 
-bool repository::set(mapType::iterator it, const property &p) {
+bool repository::set(mapType::iterator it, const property_base &p) {
 	bool ret = false;
 	if (it != m_props.end()) {
-		//FIXME std::cout << "set: " << it->first << " found in repository " << std::endl;
-		it->second.set(p);
+		it->second->set(p);
 		ret = true;
 	}
 	return ret;
@@ -152,53 +151,53 @@ bool repository::set(mapType::iterator it, const property &p) {
 property repository::get(const std::string &name, const property &_default) const {
 	/*get works w/wo omitting repository name */
 	std::string cname = propName(name);
-	if (m_props.find(cname) != m_props.end()) {
-		//FIXME std::cout << "get: " << cname << " found in repository " << std::endl;
-		return std::move(m_props.at(cname).get());
+	auto it = m_props.find(cname);
+	if (it != m_props.end()) {
+		//FIXME std::cout << name << " found in repository " << std::endl;
+		return *it->second;
 	} else {
-		//FIXME std::cout << "get: " << cname << " not found in repository" << std::endl;
+		//FIXME std::cout << name << " not found in repository" << std::endl;
 		return std::move(_default);
 	}
 }
 
-property& repository::reg(const std::string &name, const property &_cp, property_wrapper::write_hook_t w,
-		property_wrapper::read_hook_t r) {
+property& repository::reg(const std::string &name, property &_p) {
 	std::lock_guard<std::mutex> lock(m_lock);
-	property_wrapper::pointer_t _p(new property(_cp));
 	std::string cname = propName(name);
-	std::pair<mapType::iterator, bool> ret = m_props.emplace(cname, property_wrapper(std::move(_p), w, r));
+	std::pair<mapType::iterator, bool> ret = m_props.emplace(cname, nullptr);
+	_p.set(name, *this);
 
 	if (false == ret.second) {
 		//insert failed, set existing entry if allowed by link policy
 		if (true == link_policy()) {
 			//FIXME std::cout << cname << " found in repository, setting" << std::endl;
-			set(ret.first, _cp);
+			set(ret.first, _p);
 		} else {
 			//FIXME std::cout << cname << " found in repository, unchanged" << std::endl;
 		}
+	} else {
+		ret.first->second = std::shared_ptr<property>(&_p, [](property*){});
 	}
 
-	return *_p.get();
+	return *ret.first->second;
 }
 
-property& repository::reg(const std::string &name, property &_p, property_wrapper::write_hook_t w,
-		property_wrapper::read_hook_t r) {
+property& repository::reg(const std::string &name, const property &_cp, property::write_hook_t w,
+		property::read_hook_t r) {
 	std::lock_guard<std::mutex> lock(m_lock);
 	std::string cname = propName(name);
-	std::pair<mapType::iterator, bool> ret = m_props.emplace(cname, property_wrapper(_p, w, r));
+	std::pair<mapType::iterator, bool> ret = m_props.emplace(cname, std::make_shared<property>(_cp, w, r));
+	ret.first->second->set(name, *this);
 	if (false == ret.second) {
 		if (true == link_policy()) {
 			//insert failed, replace existing link if allowed by link policy
 			//FIXME std::cout << cname << " found in repository, replacing" << std::endl;
-			property old = (*ret.first).second.get();
-			m_props.erase(cname);
-			m_props.emplace(cname, property_wrapper(_p, w, r));
-			set(ret.first, old);
+			ret.first->second = std::make_shared<property>(_cp, w, r);
 		} else {
 			//FIXME std::cout << cname << " found in repository, unchanged" << std::endl;
 		}
 	}
-	return _p;
+	return *ret.first->second;
 }
 
 bool repository::unreg(const std::string &name) {
@@ -214,24 +213,24 @@ void repository::parse(const std::string &c) {
 
 		std::string path;
 		recursive_iterate(re, path, [this](std::string ipath, nlohmann::json::const_iterator it) {
-			std::string propPath = propName(ipath);
-			//FIXME std::cout << propPath << " , " << ipath << " : " << it.key() << " -> " << it.value() << std::endl;
+			std::string propPath = propName(ipath);// + "/" + it.key());
+			//FIXME std::cout << ipath << " : " << it.key() << " < " << it.value() << std::endl;
 
 			if (it.value().is_boolean()) {
-				if (!set(propPath, {{it.key(),BoolType(it->get<bool>())}})) {
-					reg(propPath, {{it.key(),BoolType(it->get<bool>())}});
+				if (!set(propPath, {{it.key(),BoolType((*it).get<bool>())}})) {
+					reg(propPath, {{{it.key(),BoolType((*it).get<bool>())}}});
 				}
 			} else if (it.value().is_number_integer()) {
-				if (!set(propPath, {{it.key(),it->get<int>()}})) {
-					reg(propPath, {{it.key(),it->get<int>()}});
+				if (!set(propPath, {{it.key(),(*it).get<int>()}})) {
+					reg(propPath, {{{it.key(),(*it).get<int>()}}});
 				}
 			} else if (it.value().is_number_float()) {
-				if (!set(propPath, {{it.key(),it->get<double>()}})) {
-					reg(propPath, {{it.key(),it->get<double>()}});
+				if (!set(propPath, {{it.key(),(*it).get<double>()}})) {
+					reg(propPath, {{{it.key(),(*it).get<double>()}}});
 				}
 			} else if (it.value().is_string()) {
-				if (!set(propPath, {{it.key(),it->get<std::string>()}})) {
-					reg(propPath, {{it.key(),it->get<std::string>()}});
+				if (!set(propPath, {{it.key(),(*it).get<std::string>()}})) {
+					reg(propPath, {{{it.key(),(*it).get<std::string>()}}});
 				}
 			} else {
 				assert(false);
@@ -240,4 +239,8 @@ void repository::parse(const std::string &c) {
 	} catch (const std::exception &e) {
 		//FIXME std::cout << "exception on parse " << e.what() << std::endl;
 	};
+}
+
+void repository::onSetNotify(const std::string &name) {
+	//FIXME std::cout << m_repName << " : onSetNotify : "  << name << std::endl;
 }

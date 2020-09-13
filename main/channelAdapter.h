@@ -35,20 +35,5 @@ private:
 	std::vector<ChannelBase*> m_vchannel;
 };
 
-/**
- *
- */
-class RepositoryNotifier : public ChannelAdapterBase {
-public:
-	RepositoryNotifier(repository &_r, std::string name) : m_repos(_r), m_name(name) {
-		_r.reg(name, {{"value", "OFF"}});
-	}
-	virtual void onNotify(const ChannelBase*) {
-		m_repos.set(m_name, {{"value", channel()->get() ? "ON" : "OFF"}});
-	}
-private:
-	repository &m_repos;
-	std::string m_name;
-};
 
 #endif /* MAIN_ABSTRACTCHANNELADAPTER_H_ */
