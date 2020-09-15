@@ -116,7 +116,7 @@ std::string repository::debug(const mapType &_m) {
 	return _ss.str();
 }
 
-std::string repository::stringify(const mapType &_m) {
+std::string repository::stringify(const mapType &_m) const {
 	nlohmann::json root;
 	for (mapType::const_iterator it = _m.begin(); it != _m.end(); ++it) {
 		for (auto &v : it->second->get()) {

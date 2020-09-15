@@ -22,7 +22,9 @@ class RequestHandlerBase;
 class DefaultHandler;
 
 class HttpServer {
-	using PathHandlerType = std::list<RequestHandlerBase*>;
+
+	using PathHandlerType = std::shared_ptr<RequestHandlerBase>;
+	using PathHandlerSetType = std::list<PathHandlerType>;
 
 public:
 	HttpServer(int _port);
@@ -47,8 +49,8 @@ public:
 	void start();
 	void stop();
 
-	void addPathHandler(RequestHandlerBase *);
-	void remPathHandler(RequestHandlerBase *);
+	void addPathHandler(PathHandlerType );
+	void remPathHandler(PathHandlerType );
 
 private:
 
@@ -65,7 +67,7 @@ private:
 	Socket m_socket;
 	Semaphore m_sem;
 	HttpServerConnectionObserver *m_obs;
-	PathHandlerType m_pathhandler;
+	PathHandlerSetType m_pathhandler;
 };
 
 class HttpServerConnectionObserver: public iConnectionObserver {

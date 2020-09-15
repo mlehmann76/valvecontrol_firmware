@@ -20,6 +20,12 @@ extern "C" {
 
 namespace http {
 
+constexpr const char RequestHandlerBase::AUTHORIZATION_HEADER[];
+constexpr const char RequestHandlerBase::WWW_Authenticate[];
+constexpr const char RequestHandlerBase::BASIC[];
+constexpr const char RequestHandlerBase::basicRealm[];
+constexpr const char RequestHandlerBase::digestRealm[];
+
 RequestHandlerBase::RequestHandlerBase(const std::string &_method, const std::string &_path) :
 		m_response(nullptr), m_method(_method), m_path(_path) {
 }
@@ -29,6 +35,24 @@ int RequestHandlerBase::_pos(const char *s, size_t s_len, const char p) {
 	for (int i = 0; i < s_len; i++) {
 		if (s[i] == p) {
 			ret = i;
+			break;
+		}
+	}
+	return ret;
+}
+
+RequestHandlerBase::regRetType RequestHandlerBase::regMatch(const std::regex &rgx, const std::string& s) {
+	std::smatch matches;
+	bool ret = std::regex_search(s, matches, rgx);
+	return std::make_pair(ret, matches);
+}
+
+bool RequestHandlerBase::hasMethod(const std::string &_method) {
+	bool ret = false;
+	auto split = utilities::split(_method, ",");
+	for (const auto& s : split) {
+		if (s == method()) {
+			ret = true;
 			break;
 		}
 	}
@@ -60,7 +84,7 @@ void RequestHandlerBase::requestAuth(HTTPAuthMethod mode, const char *realm, con
 	}
 }
 
-bool RequestHandlerBase::authenticate(char *buf, size_t buf_len, const char *pUser, const char *pPass) {
+bool RequestHandlerBase::authenticate(const char *buf, size_t buf_len, const std::string &User, const std::string &Pass) {
 	char mode[32];
 	char encoded[128];
 	char *pdecode;
@@ -72,9 +96,9 @@ bool RequestHandlerBase::authenticate(char *buf, size_t buf_len, const char *pUs
 	if (0 == ::strncmp(mode, BASIC, sizeof(BASIC))) {
 		pdecode = (char*)::base64_decode(encoded, ::strnlen(encoded, sizeof(encoded)), &outlen);
 		HttpRequest::ReqPairType _p = HttpRequest::split(std::string(const_cast<char*>(pdecode)));
-		if (outlen && pUser != NULL && pPass != NULL) {
+		if (outlen) {
 			ESP_LOGI(TAG, "Basic Authorization: %s,%s", _p.first.c_str(), _p.second.c_str());
-			if (_p.first == std::string(pUser) && _p.second == std::string(pPass)) {
+			if (_p.first == User && _p.second == Pass) {
 				ESP_LOGI(TAG, "Basic Authorization OK");
 				ret = true;
 			}

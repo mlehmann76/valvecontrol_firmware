@@ -16,13 +16,13 @@
 #include "sht1x.h"
 #include "otaWorker.h"
 #include "HttpServer.h"
+#include "RepositoryHandler.h"
 
 class repository;
 class MqttOtaHandler;
 class MqttRepAdapter;
 class ExclusiveAdapter;
 class ChannelBase;
-class RepositoryNotifier;
 
 class MainClass {
 	WifiTask wifitask;
@@ -33,6 +33,7 @@ class MainClass {
 	std::shared_ptr<repository> _stateRepository;
 	std::shared_ptr<repository> _controlRepository;
 	std::shared_ptr<http::HttpServer> _http;
+	std::shared_ptr<http::RepositoryHandler> _jsonHandler;
 	std::shared_ptr<MqttOtaHandler> _mqttOtaHandler;
 	std::shared_ptr<MqttRepAdapter> _controlRepAdapter;
 	std::shared_ptr<MqttRepAdapter> _configRepAdapter;

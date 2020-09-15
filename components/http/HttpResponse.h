@@ -53,6 +53,8 @@ public:
 	void send(const char *_buf, size_t _s);
 	void send_chunk(const char *_buf, size_t _s);
 
+	void reset();
+
 private:
 
 	void headerAddDate();

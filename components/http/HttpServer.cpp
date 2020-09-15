@@ -24,7 +24,7 @@ HttpServer::HttpServer(int _port) :
 		m_port(_port), m_socket(), m_sem("http server sem"), m_obs(
 				new HttpServerConnectionObserver(this)) {
 	//always have the defaultHandler in line
-	m_pathhandler.push_back(new DefaultHandler);
+	m_pathhandler.push_back(std::make_shared<DefaultHandler>());
 }
 
 HttpServer::~HttpServer() {
@@ -107,12 +107,12 @@ void HttpServer::stop() {
 	}
 }
 
-void HttpServer::addPathHandler(RequestHandlerBase *_p) {
+void HttpServer::addPathHandler(PathHandlerType _p) {
 	m_pathhandler.push_front(_p);
 }
 
-void HttpServer::remPathHandler(RequestHandlerBase *_p) {
-	for (PathHandlerType::iterator it = m_pathhandler.begin(); it != m_pathhandler.end(); ++it) {
+void HttpServer::remPathHandler(PathHandlerType _p) {
+	for (auto it = m_pathhandler.begin(); it != m_pathhandler.end(); ++it) {
 		if (*it == _p) {
 			m_pathhandler.erase(it);
 			break;

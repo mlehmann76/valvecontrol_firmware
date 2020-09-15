@@ -70,12 +70,12 @@ public:
 	}
 
 	/* create json representation of the repository */
-	std::string stringify() {
+	std::string stringify() const {
 		return stringify(m_props);
 	}
 
 	/* create json representation of a part the repository */
-	std::string stringify(const mapType &_m);
+	std::string stringify(const mapType &_m) const;
 
 	std::string debug() {
 		return debug(m_props);

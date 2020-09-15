@@ -97,24 +97,27 @@ void HttpResponse::send_chunk(const std::string &_chunk) {
 }
 
 void HttpResponse::send(const char *_buf, size_t _s) {
-	if (_buf != nullptr) {
-		if (!m_headerFinished) {
+	if (!m_headerFinished) {
+		if (_buf != nullptr) {
 			m_headerEntries.push_back(utilities::string_format("Content-Length: %d", _s));
-			endHeader();
 		}
-		m_request->socket()->write(m_header, m_header.length());
+		endHeader();
+	}
+	m_request->socket()->write(m_header, m_header.length());
+
+	if (_buf != nullptr) {
 		m_request->socket()->write(_buf, _s);
 	}
 }
 
 void HttpResponse::send_chunk(const char *_buf, size_t _s) {
-	if (_buf != nullptr) {
-		if (!m_firstChunkSent) {
-			m_headerEntries.push_back("Transfer-Encoding: chunked");
-			endHeader();
-			m_request->socket()->write(m_header, m_header.length());
-			m_firstChunkSent = true;
-		} else {
+	if (!m_firstChunkSent) {
+		m_headerEntries.push_back("Transfer-Encoding: chunked");
+		endHeader();
+		m_request->socket()->write(m_header, m_header.length());
+		m_firstChunkSent = true;
+	} else {
+		if (_buf != nullptr) {
 			std::string _chunkLen = utilities::string_format("%x\r\n", _s);
 			m_request->socket()->write(_chunkLen, _chunkLen.length());
 			m_request->socket()->write(_buf, _s);
@@ -131,4 +134,12 @@ std::string HttpResponse::getTime()
     strftime(buf, sizeof buf, "%a, %d %b %Y %T %Z", gmtime(&curTime.tv_sec));
     return buf;
 }
+
+void HttpResponse::reset() {
+	m_respCode = HTTP_500;
+	m_header.clear();
+	m_headerEntries.clear();
+	m_headerFinished = false;
+}
+
 } /* namespace http */

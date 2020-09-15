@@ -51,6 +51,8 @@ MainClass::MainClass() :
 
 	_http = (std::make_shared<http::HttpServer>(80));
 
+	_jsonHandler = std::make_shared<http::RepositoryHandler>("GET","/json");
+
 	_mqttOtaHandler = (std::make_shared<MqttOtaHandler>(otaWorker, mqttUser,
 			utilities::string_format("%sota/#", mqttConf.getDevName().c_str()),
 			utilities::string_format("%sota/$implementation/binary", mqttConf.getDevName().c_str())));
@@ -67,9 +69,9 @@ void MainClass::setup() {
 	esp_log_level_set("*", ESP_LOG_ERROR);
 	esp_log_level_set("MQTTS", ESP_LOG_VERBOSE);
 	esp_log_level_set("MAIN", ESP_LOG_VERBOSE);
-	esp_log_level_set("CHANNEL", ESP_LOG_VERBOSE);
-	esp_log_level_set("channelBase", ESP_LOG_VERBOSE);
-	esp_log_level_set("CONFIG", ESP_LOG_VERBOSE);
+	esp_log_level_set("SOCKET", ESP_LOG_VERBOSE);
+	esp_log_level_set("RepositoryHandler", ESP_LOG_VERBOSE);
+	esp_log_level_set("HTTPREQUEST", ESP_LOG_VERBOSE);
 
 	spiffsInit();
 
@@ -77,6 +79,12 @@ void MainClass::setup() {
 	mqttUser.init();
 	wifitask.addConnectionObserver(_http->obs());
 	wifitask.addConnectionObserver(mqttUser.obs());
+
+	_jsonHandler->add("/json/state.json", *_stateRepository);
+	_jsonHandler->add("/json/config.json", Config::repo());
+	_jsonHandler->add("/json/command.json", *_controlRepository);
+
+	_http->addPathHandler(_jsonHandler);
 
 	for (size_t i=0; i< _channels.size();i++) {
 		_channels[i] = std::shared_ptr<ChannelBase>(LedcChannelFactory::channel(i, chanConf.getTime(i)));

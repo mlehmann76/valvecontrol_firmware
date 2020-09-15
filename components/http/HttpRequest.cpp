@@ -42,6 +42,9 @@ HttpRequest::ParseResult HttpRequest::parse() {
 			if (readSize > 0) {
 				analyze(_buf);
 				ret = PARSE_OK;
+			} else if (readSize == -1) {
+				ret = PARSE_ERROR;
+				m_socket->close();
 			}
 			break;
 		}
@@ -80,6 +83,7 @@ std::vector<std::string> HttpRequest::split(const std::string &text, const std::
 }
 
 void HttpRequest::analyze(const std::string &r) {
+	m_header.clear();
 	std::vector<std::string> lines = split(r, LineEnd);
 	if (lines.size()) {
 		std::vector<std::string> first = split(lines[0], " ");
