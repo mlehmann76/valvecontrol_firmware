@@ -26,7 +26,7 @@ class ChannelBase;
 
 class MainClass {
 	WifiTask wifitask;
-	//Sht1x sht1x = {GPIO_NUM_21, GPIO_NUM_22};
+	Sht1x sht1x = {GPIO_NUM_21, GPIO_NUM_22};
 	Ota::OtaWorker otaWorker;
 	mqtt::MqttWorker mqttUser;
 	std::shared_ptr<SntpSupport> sntp;

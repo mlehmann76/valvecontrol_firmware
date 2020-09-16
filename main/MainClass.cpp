@@ -89,9 +89,9 @@ void MainClass::setup() {
 	for (size_t i=0; i< _channels.size();i++) {
 		_channels[i] = std::shared_ptr<ChannelBase>(LedcChannelFactory::channel(i, chanConf.getTime(i)));
 		_cex->setChannel(&*_channels[i]);
-		_stateRepository->reg(_channels[i]->name(), {{{"value","OFF"}}});
+		_stateRepository->reg("actors/"+std::string(_channels[i]->name()), {{{"value","OFF"}}});
 
-		_controlRepository->reg(_channels[i]->name(), {{{"value","OFF"}}}, [=](const property &p) {
+		_controlRepository->reg("actors/"+std::string(_channels[i]->name()), {{{"value","OFF"}}}, [=](const property &p) {
 			auto it = p.find("value");
 			if (it != p.end() && it->second.valid() && it->second.is<std::string>()) {
 				std::string s = it->second.get<std::string>();
@@ -101,8 +101,9 @@ void MainClass::setup() {
 
 		_channels[i]->add([=](ChannelBase *b){_cex->onNotify(b);});
 		_channels[i]->add([=](ChannelBase *b){_stateRepository->set(b->name(), {{"value", b->get() ? "ON" : "OFF"}});});
-
 	}
+
+	sht1x.regProperty(_stateRepository.get(), "sensors/sht1x");
 }
 
 void MainClass::spiffsInit(void) {

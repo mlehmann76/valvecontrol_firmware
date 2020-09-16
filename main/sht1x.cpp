@@ -20,14 +20,15 @@
 #include "config.h"
 #include "mqtt_client.h"
 #include "sht1x.h"
+#include "repository.h"
 
 static const char *TAG = "I2C";
 static const int _us = 20;
 
 Sht1x::Sht1x(gpio_num_t _sda, gpio_num_t _scl) :
 		m_timeout("otaTimer",this,&Sht1x::readSensor,( 1000 / portTICK_PERIOD_MS ),false),
-	 i2c_gpio_sda(_sda), i2c_gpio_scl(_scl), m_hum(0), m_temp(0), m_error(false), m_update(false), m_sem(
-				"sht1x") {
+	 i2c_gpio_sda(_sda), i2c_gpio_scl(_scl), m_error(false), m_rep(nullptr),
+	 m_temp(0), m_hum(0) {
 	gpio_config_t io_conf;
 	io_conf.intr_type = GPIO_INTR_DISABLE;
 	io_conf.mode = GPIO_MODE_INPUT_OUTPUT_OD;
@@ -41,7 +42,7 @@ Sht1x::Sht1x(gpio_num_t _sda, gpio_num_t _scl) :
 	m_timeout.start();
 }
 
-float Sht1x::readSHT1xTemp() {
+double Sht1x::readSHT1xTemp() {
 	static const float d1 = -40.1;
 	static const float d2 = 0.01; //12bit
 
@@ -62,7 +63,7 @@ float Sht1x::readSHT1xTemp() {
 	return (d1 + d2 * soth);
 }
 
-float Sht1x::readSHT1xHum() {
+double Sht1x::readSHT1xHum() {
 	static const float c1 = -2.0468;
 	static const float c2 = +0.0367;
 	static const float c3 = -1.5955E-6;
@@ -98,21 +99,38 @@ void Sht1x::reset() {
 	write( SHT1X_RESET);
 }
 
+void Sht1x::regProperty(repository *rep, const std::string& name) {
+	m_rep = rep;
+	m_name = name;
+	if (m_rep != nullptr) {
+		m_rep->reg(m_name, {{
+			{"temperature", m_temp},
+			{"humidity", m_hum}
+		}});
+	}
+}
+
+void Sht1x::updateProperty() {
+	if (m_rep != nullptr) {
+		m_rep->set(m_name, {
+				{"temperature", m_temp},
+				{"humidity", m_hum}
+		});
+	}
+}
+
 void Sht1x::readSensor() {
-	//if (m_sem.take(xTicksToWait) == pdTRUE) {
-		if (hasError()) {
-			m_timeout.period(std::chrono::duration_cast<portTick>(std::chrono::seconds(60)).count());
-			m_timeout.start();
-			reset();
-		} else {
-			m_timeout.period(std::chrono::duration_cast<portTick>(std::chrono::seconds(10)).count());
-			m_timeout.start();
-			m_temp = readSHT1xTemp();
-			m_hum = readSHT1xHum();
-			m_update = true;
-		}
-	//	m_sem.give();
-	//}
+	if (hasError()) {
+		m_timeout.period(std::chrono::duration_cast<portTick>(std::chrono::seconds(60)).count());
+		m_timeout.start();
+		reset();
+	} else {
+		m_timeout.period(std::chrono::duration_cast<portTick>(std::chrono::seconds(10)).count());
+		m_timeout.start();
+		m_temp = readSHT1xTemp();
+		m_hum = readSHT1xHum();
+		updateProperty();
+	}
 }
 
 void Sht1x::_sda_(int lvl) {
