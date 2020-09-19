@@ -18,12 +18,13 @@
 namespace http {
 
 class HttpServerConnectionObserver;
+class iHandler;
 class RequestHandlerBase;
 class DefaultHandler;
 
 class HttpServer {
 
-	using PathHandlerType = std::shared_ptr<RequestHandlerBase>;
+	using PathHandlerType = std::shared_ptr<iHandler>;
 	using PathHandlerSetType = std::list<PathHandlerType>;
 
 public:

@@ -13,10 +13,11 @@ namespace utilities {
 //https://stackoverflow.com/questions/236129/how-do-i-iterate-over-the-words-of-a-string
 std::vector<std::string> split(const std::string &text, const std::string &delims) {
 	std::vector<std::string> tokens;
-	std::size_t start = text.find_first_not_of(delims), end = 0;
-	while ((end = text.find_first_of(delims, start)) != std::string::npos) {
+	std::size_t start = 0, end = 0;
+
+	while ((end = text.find(delims, start)) != std::string::npos) {
 		tokens.push_back(text.substr(start, end - start));
-		start = text.find_first_not_of(delims, end);
+		start = end + delims.length();
 	}
 	if (start != std::string::npos)
 		tokens.push_back(text.substr(start));

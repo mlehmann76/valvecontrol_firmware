@@ -25,23 +25,15 @@ bool RepositoryHandler::match(const std::string &_method, const std::string &_pa
 }
 
 bool RepositoryHandler::handle(const HttpRequest& _req, HttpResponse& _res) {
-	setResponse(_res);
-//	auto it = _req.header().find(AUTHORIZATION_HEADER);
-//	if (it != _req.header().end()
-//			&& authenticate(it->second.c_str(), it->second.length(), sysConf.getUser(), sysConf.getPass())) {
-		for (auto &v : m_repositories) {
-			if (v.first == _req.path()) {
-				_res.setResponse(HttpResponse::HTTP_200);
-				_res.setContentType(HttpResponse::CT_APP_JSON);
-				_res.send(v.second->stringify());
-				_res.reset();
-				return true;
-			}
+	for (auto &v : m_repositories) {
+		if (v.first == _req.path()) {
+			_res.setResponse(HttpResponse::HTTP_200);
+			_res.setContentType(HttpResponse::CT_APP_JSON);
+			_res.send(v.second->stringify());
+			_res.reset();
+			return true;
 		}
-//	} else {
-//		requestAuth(BASIC_AUTH, nullptr, nullptr);
-//		return true;
-//	}
+	}
 
 	_res.setResponse(HttpResponse::HTTP_404);
 	_res.endHeader();

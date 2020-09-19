@@ -28,6 +28,7 @@
 
 #include "MainClass.h"
 
+#include "../components/http/HttpAuth.h"
 #include "HttpServer.h"
 #include "echoServer.h"
 #include "utilities.h"
@@ -72,6 +73,7 @@ void MainClass::setup() {
 	esp_log_level_set("SOCKET", ESP_LOG_VERBOSE);
 	esp_log_level_set("RepositoryHandler", ESP_LOG_VERBOSE);
 	esp_log_level_set("HTTPREQUEST", ESP_LOG_VERBOSE);
+	esp_log_level_set("AuthProxy", ESP_LOG_VERBOSE);
 
 	spiffsInit();
 
@@ -84,7 +86,7 @@ void MainClass::setup() {
 	_jsonHandler->add("/json/config.json", Config::repo());
 	_jsonHandler->add("/json/command.json", *_controlRepository);
 
-	_http->addPathHandler(_jsonHandler);
+	_http->addPathHandler(std::make_shared<http::HttpAuth>(_jsonHandler.get(), http::HttpAuth::DIGEST_AUTH_SHA256_MD5));
 
 	for (size_t i=0; i< _channels.size();i++) {
 		_channels[i] = std::shared_ptr<ChannelBase>(LedcChannelFactory::channel(i, chanConf.getTime(i)));
