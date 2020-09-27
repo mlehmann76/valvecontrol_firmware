@@ -8,7 +8,7 @@
 #
 $(eval GIT_BRANCH=$(shell git describe --tags))
 
-CXXFLAGS += -std=c++11
+CXXFLAGS += -std=c++17
 COMPONENT_ADD_INCLUDEDIRS := . ../components/FreeRTOScpp ../components/http ../components/json/include/nlohmann ../components/variant/include
 COMPONENT_SRCDIRS := $(COMPONENT_ADD_INCLUDEDIRS) 
 CPPFLAGS += -DPROJECT_GIT='"'$(GIT_BRANCH)'"'

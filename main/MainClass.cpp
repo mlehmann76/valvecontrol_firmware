@@ -91,18 +91,19 @@ void MainClass::setup() {
 	for (size_t i=0; i< _channels.size();i++) {
 		_channels[i] = std::shared_ptr<ChannelBase>(LedcChannelFactory::channel(i, chanConf.getTime(i)));
 		_cex->setChannel(&*_channels[i]);
-		_stateRepository->reg("actors/"+std::string(_channels[i]->name()), {{{"value","OFF"}}});
+		_stateRepository->create("actors/"+std::string(_channels[i]->name()), {{{"value","OFF"s}}});
 
-		_controlRepository->reg("actors/"+std::string(_channels[i]->name()), {{{"value","OFF"}}}, [=](const property &p) {
-			auto it = p.find("value");
-			if (it != p.end() && it->second.valid() && it->second.is<std::string>()) {
-				std::string s = it->second.get<std::string>();
-				_channels[i]->set(s == "on" || s == "ON" || s == "On", chanConf.getTime(i));
-			}
-		});
+		_controlRepository->create("actors/"+std::string(_channels[i]->name()), {{{"value","OFF"s}}})
+				.set([=](const property &p) {
+					auto it = p.find("value");
+					if (it != p.end() && it->second.valid() && it->second.is<std::string>()) {
+						std::string s = it->second.get<std::string>();
+						_channels[i]->set(s == "on" || s == "ON" || s == "On", chanConf.getTime(i));
+					}
+				});
 
 		_channels[i]->add([=](ChannelBase *b){_cex->onNotify(b);});
-		_channels[i]->add([=](ChannelBase *b){_stateRepository->set(b->name(), {{"value", b->get() ? "ON" : "OFF"}});});
+		_channels[i]->add([=](ChannelBase *b){_stateRepository->set(b->name(), {{"value", b->get() ? "ON"s : "OFF"s}});});
 	}
 
 	sht1x.regProperty(_stateRepository.get(), "sensors/sht1x");

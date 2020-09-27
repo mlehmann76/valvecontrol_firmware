@@ -23,6 +23,8 @@
 #include "repository.h"
 #include "utilities.h"
 
+using namespace std::string_literals;
+
 static const char *TAG = "CONFIG";
 
 extern const char config_json_start[] asm("_binary_config_json_start");
@@ -42,9 +44,9 @@ esp_err_t configBase::init() {
 	char *nvs_json_config;
 	esp_err_t ret = ESP_OK;
 
-	repo().reg("system", {{{"user","admin"},{"password","admin"}}});
-	repo().reg("sntp", {{{"zone",""},{"server",""}}});
-	repo().reg("mqtt", {{{"server",""},{"user",""},{"pass",""},{"device",""}}});
+	repo().create("system", {{{"user","admin"s},{"password","admin"s}}});
+	repo().create("sntp", {{{"zone",""s},{"server",""s}}});
+	repo().create("mqtt", {{{"server",""s},{"user",""s},{"pass",""s},{"device",""s}}});
 
 	esp_err_t err = nvs_flash_init();
 	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -145,9 +147,9 @@ esp_err_t ChannelConfig::init() {
 		ret = configBase::init();
 	}
 	for (unsigned i=0;i<4;i++) {
-		repo().reg(channelName(i).str(), {{
-				{"name","no name"},
-				{"alt","alt name"},
+		repo().create(channelName(i).str(), {{
+				{"name","no name"s},
+				{"alt","alt name"s},
 				{"enabled",BoolType(false)},
 				{"maxTime",0}
 		}});
@@ -170,7 +172,7 @@ std::string ChannelConfig::getAlt(unsigned ch) {
 }
 
 bool ChannelConfig::isEnabled(unsigned ch) {
-	return repo().get<BoolType>(channelName(ch).str(), "enabled").value;
+	return repo().get<BoolType>(channelName(ch).str(), "enabled");
 }
 
 std::chrono::seconds ChannelConfig::getTime(unsigned ch) {

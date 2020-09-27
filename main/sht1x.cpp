@@ -103,7 +103,7 @@ void Sht1x::regProperty(repository *rep, const std::string& name) {
 	m_rep = rep;
 	m_name = name;
 	if (m_rep != nullptr) {
-		m_rep->reg(m_name, {{
+		m_rep->create(m_name, {{
 			{"temperature", m_temp},
 			{"humidity", m_hum}
 		}});

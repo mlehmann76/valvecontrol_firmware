@@ -17,12 +17,14 @@
 #include "mqttWorker.h"
 #include "repository.h"
 
+using namespace std::string_literals;
+
 class StatusRepository : public repository {
 public:
 	template<class linkPolicy>
 	StatusRepository(std::string name, mqtt::MqttWorker &mqtt, std::string topic, tag<linkPolicy> _tag) :
 		repository(name, _tag) , m_mqtt(&mqtt), m_topic(topic), m_count(0){
-		reg("dateTime", {{{"date",""},{"time",""}}});
+		create("dateTime", {{{"date",""s},{"time",""s}}});
 		m_thread = std::thread([this]{task();});
 	}
 

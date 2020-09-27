@@ -10,7 +10,7 @@
 
 property& property::reg(const std::string &name, repository &_repo) {
 	set(name, _repo);
-	m_repository->reg(name, *this);
+	m_repository->link(name, *this);
 	return *this;
 }
 
@@ -23,8 +23,7 @@ property& property::set(const property_base &p) {
 		m_pProperty.emplace(v.first, v.second).first->second = v.second;
 	}
 
-	if (m_repository != nullptr)
-		m_repository->onSetNotify(m_name);
+	notify();
 
 	return *this;
 }
@@ -35,6 +34,7 @@ property& property::set(const key_type &name, const repository &_rep) {
 	return *this;
 }
 
-property& property::set(const key_type &_n, base_type &&_b) {
-	return set({{_n, _b}});
+void property::notify() {
+	if (m_repository != nullptr)
+		m_repository->onSetNotify(m_name);
 }
