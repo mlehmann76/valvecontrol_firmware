@@ -103,7 +103,7 @@ esp_err_t configBase::readStr(nvs_handle *pHandle, const char *pName, char **des
 }
 
 repository& repo() {
-	static repository s_repository("config", tag<ReplaceLinkPolicy>{});
+	static repository s_repository("/config", tag<ReplaceLinkPolicy>{});
 	return s_repository;
 }
 
@@ -159,7 +159,7 @@ esp_err_t ChannelConfig::init() {
 
 std::stringstream ChannelConfig::channelName(unsigned ch) {
 	std::stringstream _name;
-	_name << "config/channel" << ch+1 ;
+	_name << "channel" << ch+1 ;
 	return _name;
 }
 

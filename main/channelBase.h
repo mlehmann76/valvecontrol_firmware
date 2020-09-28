@@ -27,7 +27,7 @@ public:
 		}
 	}
 
-	const char *name() const { return m_name.c_str(); }
+	std::string name() const { return m_name; }
 
 	void add(notifyFuncType &&_a) {
 		m_notifier.push_back(_a);

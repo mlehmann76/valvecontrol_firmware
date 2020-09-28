@@ -121,11 +121,11 @@ std::string repository::propName(const std::string &name) const {
 	return path;
 }
 
-bool repository::set(const std::string &name, const property::property_base &p) {
+bool repository::set(const std::string &_name, const property::property_base &p) {
 	std::lock_guard<std::mutex> lock(m_lock);
 	/*set works w/wo omitting repository name */
-	//FIXME std::cout << name << " set " << std::endl;
-	return set(find(propName(name)), p);
+	//FIXME std::cout << "rep:" << name() << " -> " << _name << " set " << "\n";
+	return set(find(propName(_name)), p);
 }
 
 bool repository::set(mapType::iterator it, const property::property_base &p) {
@@ -146,10 +146,10 @@ property& repository::link(const std::string &name, property &_p) {
 	if (false == ret.second) {
 		//insert failed, set existing entry if allowed by link policy
 		if (true == link_policy()) {
-			//FIXME std::cout << cname << " found in repository, setting" << std::endl;
+			//FIXME std::cout << cname << " found in repository, setting" << "\n";
 			set(ret.first, _p);
 		} else {
-			//FIXME std::cout << cname << " found in repository, unchanged" << std::endl;
+			//FIXME std::cout << cname << " found in repository, unchanged" << "\n";
 		}
 	} else {
 		ret.first->second = mappedType(&_p, [](property*){});
@@ -162,17 +162,9 @@ property& repository::create(const std::string &name, const property &_cp) {
 	std::lock_guard<std::mutex> lock(m_lock);
 	std::string cname = propName(name);
 	std::pair<mapType::iterator, bool> ret = m_properties.emplace(cname, nullptr);
-	if (false == ret.second) {
-//		if (true == link_policy()) {
-//			//insert failed, replace existing link if allowed by link policy
-//			//FIXME std::cout << cname << " found in repository, replacing" << std::endl;
-//			ret.first->second = std::make_shared<property>(_cp, w, r);
-//		} else {
-//			//FIXME std::cout << cname << " found in repository, unchanged" << std::endl;
-//		}
-	} else {
+	if (true == ret.second) {
 		ret.first->second = std::make_shared<property>(_cp);
-		ret.first->second->set(name, *this);
+		ret.first->second->set(name, *this); //TODO name or cname
 	}
 	return *ret.first->second;
 }
@@ -183,28 +175,28 @@ bool repository::unlink(const std::string &name) {
 }
 
 void repository::parse(const std::string &c) {
-	//FIXME std::cout << "parsing : " << c << std::endl;
+	//FIXME std::cout << "parsing : " << c << "\n";
 	try {
 		nlohmann::json re = nlohmann::json::parse(c);
 
 		std::string path;
 		recursive_iterate(re, path, [this](std::string ipath, nlohmann::json::const_iterator it) {
 			std::string propPath = propName(ipath);
-			//FIXME std::cout << ipath << " : " << it.key() << " < " << it.value() << std::endl;
+			//FIXME std::cout << propPath << " : " << it.key() << " < " << it.value() << "\n";
 			if (it.value().is_boolean()) {
-				this->operator [](propPath)[it.key()] = (*it).get<bool>();
+				create(propPath, property())[it.key()] = it->get<bool>();
 			} else if (it.value().is_number_integer()) {
-				this->operator [](propPath)[it.key()] = (*it).get<int>();
+				create(propPath, property())[it.key()] = it->get<int>();
 			} else if (it.value().is_number_float()) {
-				this->operator [](propPath)[it.key()] = (*it).get<double>();
+				create(propPath, property())[it.key()] = it->get<double>();
 			} else if (it.value().is_string()) {
-				this->operator [](propPath)[it.key()] = (*it).get<std::string>();
+				create(propPath, property())[it.key()] = it->get<std::string>();
 			} else {
 				assert(false);
 			}
 		});
 	} catch (const std::exception &e) {
-		//FIXME std::cout << "exception on parse " << e.what() << std::endl;
+		//FIXME std::cout << "exception on parse " << e.what() << "\n";
 	};
 }
 

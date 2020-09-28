@@ -45,10 +45,10 @@ MainClass::MainClass() :
 
 {
 	mqttConf.init();
-	_stateRepository = (std::make_shared<StatusRepository>("state", mqttUser,
+	_stateRepository = (std::make_shared<StatusRepository>("/state", mqttUser,
 			utilities::string_format("%sstate", mqttConf.getDevName().c_str()), tag<DefaultLinkPolicy> { }));
 
-	_controlRepository = (std::make_shared<repository>("control", tag<DefaultLinkPolicy> { }));
+	_controlRepository = (std::make_shared<repository>("/control", tag<DefaultLinkPolicy> { }));
 
 	_http = (std::make_shared<http::HttpServer>(80));
 
@@ -91,19 +91,19 @@ void MainClass::setup() {
 	for (size_t i=0; i< _channels.size();i++) {
 		_channels[i] = std::shared_ptr<ChannelBase>(LedcChannelFactory::channel(i, chanConf.getTime(i)));
 		_cex->setChannel(&*_channels[i]);
-		_stateRepository->create("actors/"+std::string(_channels[i]->name()), {{{"value","OFF"s}}});
+		_stateRepository->create("actors/"+chanConf.getName(i), {{{"value","OFF"s}}});
 
-		_controlRepository->create("actors/"+std::string(_channels[i]->name()), {{{"value","OFF"s}}})
+		_controlRepository->create("actors/"+chanConf.getName(i), {{{"value","OFF"s}}})
 				.set([=](const property &p) {
 					auto it = p.find("value");
-					if (it != p.end() && it->second.valid() && it->second.is<std::string>()) {
-						std::string s = it->second.get<std::string>();
+					if (it != p.end() && it->second.is<StringType>()) {
+						std::string s = it->second.get<StringType>();
 						_channels[i]->set(s == "on" || s == "ON" || s == "On", chanConf.getTime(i));
 					}
 				});
 
 		_channels[i]->add([=](ChannelBase *b){_cex->onNotify(b);});
-		_channels[i]->add([=](ChannelBase *b){_stateRepository->set(b->name(), {{"value", b->get() ? "ON"s : "OFF"s}});});
+		_channels[i]->add([=](ChannelBase *b){_stateRepository->set("actors/"+b->name(), {{"value", b->get() ? "ON"s : "OFF"s}});});
 	}
 
 	sht1x.regProperty(_stateRepository.get(), "sensors/sht1x");

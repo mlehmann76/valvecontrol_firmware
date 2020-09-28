@@ -43,7 +43,7 @@ public:
 
 		template<typename T>
 		void operator=(T&& _v) {
-			m_p.set(m_n, mapped_type{_v});
+			m_p.set({{m_n, _v}});
 		}
 
 		mapped_type operator()() const {
@@ -90,10 +90,6 @@ public:
 
 	property& set(const property_base &p);
 
-	property& set(const key_type &_n, mapped_type &&_b) {
-		return set({{_n, _b}});
-	}
-
 	property& set(const key_type &name, const repository& _rep);
 
 	property& set(write_hook_t &&w) {
@@ -118,6 +114,7 @@ public:
 		return get();
 	}
 
+	std::string name() const { return m_name; }
 
 private:
 
