@@ -91,9 +91,9 @@ void MainClass::setup() {
 	for (size_t i=0; i< _channels.size();i++) {
 		_channels[i] = std::shared_ptr<ChannelBase>(LedcChannelFactory::channel(i, chanConf.getTime(i)));
 		_cex->setChannel(&*_channels[i]);
-		_stateRepository->create("actors/"+chanConf.getName(i), {{{"value","OFF"s}}});
+		_stateRepository->create("actors/"+_channels[i]->name(), {{{"value","OFF"s}}});
 
-		_controlRepository->create("actors/"+chanConf.getName(i), {{{"value","OFF"s}}})
+		_controlRepository->create("actors/"+_channels[i]->name(), {{{"value","OFF"s}}})
 				.set([=](const property &p) {
 					auto it = p.find("value");
 					if (it != p.end() && it->second.is<StringType>()) {
