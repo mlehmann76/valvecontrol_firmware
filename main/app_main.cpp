@@ -6,15 +6,7 @@
 #include "MainClass.h"
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-void app_main();
-#ifdef __cplusplus
-}
-#endif
-
-void app_main() {
+extern "C" void app_main() {
 	MainClass::instance()->setup();
 	MainClass::instance()->loop();
 }

@@ -7,13 +7,11 @@
 
 #include <string>
 #include <cstring>
-#include "config_user.h"
-#include "esp_log.h"
 #include "RequestHandlerBase.h"
 #include "utilities.h"
 
 extern "C" {
-#include "../esp-idf/components/wpa_supplicant/src/utils/base64.h"
+#include "base64.h"
 }
 
 #define TAG "RequestHandlerBase"

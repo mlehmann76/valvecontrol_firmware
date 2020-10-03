@@ -6,11 +6,10 @@
  */
 
 
-#include "config_user.h"
 #include <thread>
 #include <esp_log.h>
-#include <esp_pthread.h>
-#include <freertos/task.h>
+//#include <esp_pthread.h>
+//#include <freertos/task.h>
 #include "HttpRequest.h"
 #include "HttpResponse.h"
 #include "HttpServer.h"
@@ -50,7 +49,7 @@ void HttpServer::task() {
 		if (socket().hasNewConnection(std::chrono::microseconds(1))) {
 			Socket *_con = socket().accept(std::chrono::microseconds(1));
 			if (_con != nullptr) {
-				ESP_LOGD(TAG, "socket(%d) accepted", _con->get());
+				//ESP_LOGD(TAG, "socket(%d) accepted", _con->get());
 
 				HttpRequest req(_con);
 				HttpResponse resp(req);
@@ -84,13 +83,13 @@ void HttpServer::task() {
 
 void HttpServer::start() {
 	if (!m_sem.take(10 / portTICK_PERIOD_MS)) {
-		ESP_LOGD(TAG, "server already running on start");
+		//ESP_LOGD(TAG, "server already running on start");
 		return;
 	}
-	auto cfg = esp_pthread_get_default_config();
-	cfg.thread_name = "http task";
-	cfg.prio = 6;
-	esp_pthread_set_cfg(&cfg);
+//	auto cfg = esp_pthread_get_default_config();
+//	cfg.thread_name = "http task";
+//	cfg.prio = 6;
+//	esp_pthread_set_cfg(&cfg);
 	m_thread = std::thread([this]{task();});
 
 }

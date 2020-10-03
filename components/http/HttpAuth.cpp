@@ -19,15 +19,18 @@
 #include "esp_log.h"
 #include "HttpResponse.h"
 #include "HttpRequest.h"
-#include "utilities.h"
 #include "mbedtls/md5.h"
 #include "mbedtls/sha256.h"
+#include "utilities.h"
 
 extern "C" {
-#include "../esp-idf/components/wpa_supplicant/src/utils/base64.h"
+//#include "../esp-idf/components/wpa_supplicant/src/utils/base64.h"
+#include "base64.h"
 }
 
 #define TAG "AuthProxy"
+
+
 
 namespace http {
 
@@ -47,12 +50,11 @@ bool HttpAuth::handle(const HttpRequest& _req, HttpResponse& _res) {
 	m_request = &_req;
 	auto it = _req.header().find(AUTHORIZATION_HEADER);
 	if (it != _req.header().end()
-			&& authenticate(it->second, sysConf.getUser(), sysConf.getPass())) {
+			&& authenticate(it->second, m_token)) {
 		return m_handler->handle(_req, _res);
-	} else {
-		requestAuth(m_mode, nullptr, nullptr);
-		return false;
 	}
+	requestAuth(m_mode, nullptr, nullptr);
+	return false;
 }
 
 
@@ -119,18 +121,18 @@ void HttpAuth::requestAuth(HTTPAuthMethod mode, const char *realm, const char *f
 	}
 }
 
-bool HttpAuth::authenticate(const std::string& ans, const std::string &User, const std::string &Pass) {
+bool HttpAuth::authenticate(const std::string& ans, const AuthToken& _t) {
 	char *pdecode;
 	bool ret = false;
 	size_t outlen = 0;
-	std::vector<std::string> _b = utilities::split(ans, " ");
+	std::vector<std::string> _b = HttpRequest::split(ans, " "); //FIXME
 	ESP_LOGV(TAG, "Authorization: %s", ans.c_str());
 	//BASIC Mode
 	if (_b[0] == BASIC) {
-		pdecode = (char*)::base64_decode(_b[1].data(), _b[1].length(), &outlen);
+		pdecode = (char*)::base64_decode((const unsigned char*)(_b[1].data()), _b[1].length(), &outlen);
 		if (outlen && pdecode) {
 			std::vector<std::string> _p = HttpRequest::split(std::string(const_cast<char*>(pdecode)),":");
-			if (_p[0] == User && _p[1] == Pass) {
+			if (_p[0] == _t.user && _p[1] == _t.pass) {
 				ESP_LOGV(TAG, "Basic Authorization OK");
 				ret = true;
 			}
@@ -156,7 +158,7 @@ bool HttpAuth::authenticate(const std::string& ans, const std::string &User, con
 		}
 
 		//HA1 = MD5(username:realm:password)
-		std::string sha1 = _hashFunc(tokenmap["username"] + ":" + tokenmap["realm"] + ":" + Pass);
+		std::string sha1 = _hashFunc(tokenmap["username"] + ":" + tokenmap["realm"] + ":" + _t.pass);
 		//HA2 = MD5(method:digestURI)
 		std::string sha2 = _hashFunc(m_request->method() + ":" + tokenmap["uri"]);
 		//If the qop directive's value is "auth" or "auth-int", then compute the response as follows:

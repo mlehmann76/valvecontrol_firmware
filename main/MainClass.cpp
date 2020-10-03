@@ -86,7 +86,8 @@ void MainClass::setup() {
 	_jsonHandler->add("/json/config.json", Config::repo());
 	_jsonHandler->add("/json/command.json", *_controlRepository);
 
-	_http->addPathHandler(std::make_shared<http::HttpAuth>(_jsonHandler.get(), http::HttpAuth::DIGEST_AUTH_SHA256_MD5));
+	http::HttpAuth::AuthToken _token; _token.pass = "admin"; _token.user = "admin";
+	_http->addPathHandler(std::make_shared<http::HttpAuth>(_jsonHandler.get(), _token, http::HttpAuth::DIGEST_AUTH_SHA256_MD5));
 
 	for (size_t i=0; i< _channels.size();i++) {
 		_channels[i] = std::shared_ptr<ChannelBase>(LedcChannelFactory::channel(i, chanConf.getTime(i)));
@@ -97,7 +98,7 @@ void MainClass::setup() {
 				.set([=](const property &p) {
 					auto it = p.find("value");
 					if (it != p.end() && it->second.is<StringType>()) {
-						std::string s = it->second.get<StringType>();
+						std::string s = it->second.get_unchecked<StringType>();
 						_channels[i]->set(s == "on" || s == "ON" || s == "On", chanConf.getTime(i));
 					}
 				});

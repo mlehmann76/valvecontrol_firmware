@@ -8,7 +8,8 @@
 #include "HttpRequest.h"
 
 #include <esp_log.h>
-#include "config_user.h"
+//#include "config_user.h"
+
 #include "socket.h"
 
 #define TAG "HTTPREQUEST"

@@ -5,8 +5,8 @@
  *      Author: marco
  */
 
-#ifndef MAIN_SOCKET_H_
-#define MAIN_SOCKET_H_
+#ifndef COMPONENTS_HTTP_SOCKET_H_
+#define COMPONENTS_HTTP_SOCKET_H_
 
 #include <string>
 #include <chrono>
@@ -71,4 +71,4 @@ private:
 };
 
 
-#endif /* MAIN_SOCKET_H_ */
+#endif /* COMPONENTS_HTTP_SOCKET_H_ */

@@ -10,8 +10,9 @@
 
 #include <thread>
 #include "MutexCPP.h"
-#include "socket.h"
 #include <vector>
+
+#include "../components/http/socket.h"
 #include "iConnectionObserver.h"
 
 class EchoServer;

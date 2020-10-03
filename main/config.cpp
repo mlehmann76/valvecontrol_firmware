@@ -16,9 +16,6 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 
-#include "cJSON.h"
-#include "cJSON_Utils.h"
-
 #include "config.h"
 #include "repository.h"
 #include "utilities.h"

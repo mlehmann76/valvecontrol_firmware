@@ -8,13 +8,15 @@
 #ifndef MAIN_REPOSITORY_H_
 #define MAIN_REPOSITORY_H_
 
+#include "property.h"
+
 #include <string>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <iostream>
 
-#include "property.h"
+#include <mapbox/variant.hpp>
 
 struct DefaultLinkPolicy: std::false_type {};
 struct ReplaceLinkPolicy : std::true_type {};
@@ -61,7 +63,7 @@ public:
 	T const get(const keyType &name, const std::string &key, const T &_default = T{}) {
 		iterator _it = find(propName(name));
 		if (_it != end() && (*_it->second).find(key) != (*_it->second).end()) {
-			return mapbox::util::get<T>((*_it->second).find(key)->second);
+			return mapbox::util::get_unchecked<T>((*_it->second).find(key)->second);
 		} else {
 			return _default;
 		}
@@ -99,10 +101,10 @@ public:
 
 	iterator begin() { return m_properties.begin(); }
 	iterator end() { return m_properties.end(); }
-	iterator find(const keyType& key) { return m_properties.find(key); }
+	iterator find(const keyType& key) { return m_properties.find(propName(key)); }
 	const_iterator begin() const { return m_properties.begin(); }
 	const_iterator end() const { return m_properties.end(); }
-	const_iterator find(const keyType& key) const { return m_properties.find(key); }
+	const_iterator find(const keyType& key) const { return m_properties.find(propName(key)); }
 
 protected:
 	std::string propName(const std::string &name) const;

@@ -5,8 +5,8 @@
  *      Author: marco
  */
 
-#include "socket.h"
 #include "DefaultHandler.h"
+#include "socket.h"
 
 namespace http {
 

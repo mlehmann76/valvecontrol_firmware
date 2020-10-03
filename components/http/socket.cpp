@@ -5,13 +5,13 @@
  *      Author: marco
  */
 
-#include "config_user.h"
+#include "socket.h"
+
 #include <strings.h>
 #include <unistd.h>
 #include <memory>
 #include <netdb.h>
 #include <esp_log.h>
-#include "socket.h"
 
 #define TAG "SOCKET"
 

@@ -9,6 +9,7 @@
 #define COMPONENTS_HTTP_HTTPAUTH_H_
 
 #include "iHandler.h"
+#include <string>
 
 namespace http {
 
@@ -22,6 +23,11 @@ class HttpAuth: public iHandler {
 
 public:
 
+	struct AuthToken {
+		std::string user;
+		std::string pass;
+	};
+
 	enum HTTPAuthMethod {
 		BASIC_AUTH,
 		DIGEST_AUTH_MD5,
@@ -30,7 +36,7 @@ public:
 	} ;
 
 	virtual ~HttpAuth() = default;
-	HttpAuth(iHandler* _h, HTTPAuthMethod mode = BASIC_AUTH) : m_handler(_h), m_response(), m_request(), m_mode(mode) {}
+	HttpAuth(iHandler* _h, AuthToken _at, HTTPAuthMethod mode = BASIC_AUTH) : m_handler(_h), m_response(), m_request(), m_mode(mode), m_token(std::move(_at)) {}
 	HttpAuth(const HttpAuth &other) = delete;
 	HttpAuth(HttpAuth &&other) = delete;
 	HttpAuth& operator=(const HttpAuth &other) = default;
@@ -40,7 +46,7 @@ public:
 	bool handle(const HttpRequest &, HttpResponse &) override;
 protected:
 	void requestAuth(HTTPAuthMethod mode, const char *realm, const char *failMsg);
-	bool authenticate(const std::string& ans, const std::string &pUser, const std::string &pPass);
+	bool authenticate(const std::string& ans, const AuthToken& _t);
 
 private:
 	static std::string _getRandomHexString();
@@ -56,6 +62,7 @@ private:
 	std::string nonce;
 	std::string opaque;
 	std::string pbrealm;
+	AuthToken m_token;
 };
 
 } /* namespace http */

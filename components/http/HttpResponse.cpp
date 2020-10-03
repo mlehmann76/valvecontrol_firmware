@@ -5,9 +5,10 @@
  *      Author: marco
  */
 
-#include "socket.h"
 #include "HttpRequest.h"
 #include "HttpResponse.h"
+
+#include "socket.h"
 #include "utilities.h"
 
 namespace http {
@@ -54,7 +55,7 @@ void HttpResponse::headerAddDate() {
 
 void HttpResponse::headerAddServer() {
 	m_header.append("server: valveControl-");
-	m_header.append(PROJECT_GIT);
+	//m_header.append(PROJECT_GIT);
 	m_header.append(LineEnd);
 }
 

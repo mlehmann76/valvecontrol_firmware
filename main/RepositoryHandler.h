@@ -5,8 +5,8 @@
  *      Author: marco
  */
 
-#ifndef COMPONENTS_HTTP_REPOSITORYHANDLER_H_
-#define COMPONENTS_HTTP_REPOSITORYHANDLER_H_
+#ifndef MAIN_REPOSITORYHANDLER_H_
+#define MAIN_REPOSITORYHANDLER_H_
 
 #include <map>
 #include <string>
@@ -42,4 +42,4 @@ private:
 
 } /* namespace http */
 
-#endif /* COMPONENTS_HTTP_REPOSITORYHANDLER_H_ */
+#endif /* MAIN_REPOSITORYHANDLER_H_ */

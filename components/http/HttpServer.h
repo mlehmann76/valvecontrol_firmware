@@ -12,8 +12,8 @@
 #include <thread>
 
 #include "../../main/iConnectionObserver.h"
-#include "SemaphoreCPP.h"
 #include "socket.h"
+#include "SemaphoreCPP.h"
 
 namespace http {
 

@@ -1,39 +1,119 @@
 {
-    "mqtt": {
-        "server": "mqtt://raspberrypi.fritz.box:1883",
-        "user": "user",
-        "pass": "pass"
-    },
-    "sntp": {
-        "server" : "pool.ntp.org",
-        "zone"   : "CET-1CEST,M3.5.0,M10.5.0/3"
-    },
-    "system": {
-    	"user" : "admin",
-    	"password" : "admin"
-    },
-    "channel1": { 
-		"name" : "Channel1",
-		"alt" : "channel1",
-		"enabled" : true,
-		"maxTime" : 1800
-    },
-    "channel2":	{ 
-		"name" : "Channel2",
-		"alt" : "channel2",
-		"enabled" : true,
-		"maxTime" : 1800
-	},
-    "channel3": { 
-		"name" : "Channel3",
-		"alt" : "channel3",
-		"enabled" : true,
-		"maxTime" : 1800
-    },
-    "channel4":	{ 
-		"name" : "Channel4",
-		"alt" : "channel4",
-		"enabled" : true,
-		"maxTime" : 1800
-    }
+   "mqtt":{
+      "server":"mqtt://raspberrypi.fritz.box:1883",
+      "user":"user",
+      "pass":"pass"
+   },
+   "sntp":{
+      "server":"pool.ntp.org",
+      "zone":"CET-1CEST,M3.5.0,M10.5.0/3"
+   },
+   "system":{
+      "user":"admin",
+      "password":"admin"
+   },
+   "channel1":{
+      "name":"Channel1",
+      "alt":"channel1",
+      "enabled":true,
+      "maxTime":1800
+   },
+   "channel2":{
+      "name":"Channel2",
+      "alt":"channel2",
+      "enabled":true,
+      "maxTime":1800
+   },
+   "channel3":{
+      "name":"Channel3",
+      "alt":"channel3",
+      "enabled":true,
+      "maxTime":1800
+   },
+   "channel4":{
+      "name":"Channel4",
+      "alt":"channel4",
+      "enabled":true,
+      "maxTime":1800
+   },
+   "task1":{
+      "name":"task1",
+      "alt-name":"",
+      "enabled":false,
+      "auto":false,
+      "starttime":"",
+      "first":"task1/node1",
+      "node1":{
+         "name":"Channel1",
+         "next":"",
+         "time":1800
+      }
+   },
+   "task2":{
+      "name":"task2",
+      "alt-name":"",
+      "enabled":false,
+      "auto":false,
+      "starttime":"",
+      "first":"task2/node1",
+      "node1":{
+         "name":"Channel2",
+         "next":"",
+         "time":1800
+      }
+   },
+   "task3":{
+      "name":"task3",
+      "alt-name":"",
+      "enabled":false,
+      "auto":false,
+      "starttime":"",
+      "first":"task3/node1",
+      "node1":{
+         "name":"Channel3",
+         "next":"",
+         "time":1800
+      }
+   },
+   "task4":{
+      "name":"task4",
+      "alt-name":"",
+      "enabled":false,
+      "auto":false,
+      "starttime":"",
+      "first":"task4/node1",
+      "node1":{
+         "name":"Channel1",
+         "next":"",
+         "time":1800
+      }
+   },
+   "task5":{
+      "name":"task5",
+      "alt-name":"",
+      "enabled":false,
+      "auto":false,
+      "starttime":"",
+      "first":"task5/node1",
+      "node1":{
+         "name":"Channel1",
+         "next":"task5/node2",
+         "time":1800
+      },
+      "node2":{
+         "name":"Channel2",
+         "next":"task5/node3",
+         "time":1800
+      },
+      "node3":{
+         "name":"Channel3",
+         "next":"task5/node4",
+         "time":1800
+      },
+      "node4":{
+         "name":"Channel4",
+         "next":"",
+         "time":1800
+      }
+   }
 }
