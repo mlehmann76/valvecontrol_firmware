@@ -8,7 +8,6 @@ http://openbook.rheinwerk-verlag.de/linux_unix_programmierung/Kap11-013.htm#RxxK
 
 
 #include "config_user.h"
-#include <strings.h>
 #include <unistd.h>
 #include <memory>
 #include <netdb.h>

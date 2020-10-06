@@ -5,7 +5,6 @@
  *      Author: marco
  */
 
-#include <stdio.h>
 #include <chrono>
 
 #include "config_user.h"

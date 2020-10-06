@@ -6,13 +6,14 @@
 # lib(subdirectory_name).a in the build directory. This behaviour is entirely configurable,
 # please read the ESP-IDF documents if you need to do this.
 #
-$(eval GIT_BRANCH=$(shell git describe --tags))
+#$(eval GIT_BRANCH=$(shell git describe --tags))
 
-CXXFLAGS += -std=c++17
-COMPONENT_ADD_INCLUDEDIRS := . ../components/FreeRTOScpp ../components/http ../components/json/include/nlohmann ../components/variant/include
-COMPONENT_SRCDIRS := $(COMPONENT_ADD_INCLUDEDIRS) 
-CPPFLAGS += -DPROJECT_GIT='"'$(GIT_BRANCH)'"'
-COMPONENT_EMBED_TXTFILES := config.json
+
+#CXXFLAGS += -std=c++17
+#COMPONENT_ADD_INCLUDEDIRS := . ../components/FreeRTOScpp ../components/http ../components/json/include/nlohmann ../components/variant/include
+#COMPONENT_SRCDIRS := $(COMPONENT_ADD_INCLUDEDIRS) 
+#CPPFLAGS += -DPROJECT_GIT='"'$(GIT_BRANCH)'"'
+#COMPONENT_EMBED_TXTFILES := config.json
 
 	
 	

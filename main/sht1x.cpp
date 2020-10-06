@@ -5,7 +5,7 @@
  *      Author: marco
  */
 
-#include <stdio.h>
+
 #include <time.h>
 #include "config_user.h"
 
