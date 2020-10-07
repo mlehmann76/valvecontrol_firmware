@@ -5,6 +5,7 @@
  *      Author: marco
  */
 
+#include "utilities.h"
 #include "tasks.h"
 #include "repository.h"
 #include <array>
@@ -36,7 +37,7 @@ void TaskConfig::readTaskDetail(const std::string &name, Task &_t) {
 	_t.m_alt = m_repo.get<StringType>(name, "alt-name");
 	_t.m_enabled = m_repo.get<BoolType>(name, "enabled");
 	_t.m_autoMode = m_repo.get<BoolType>(name, "auto");
-	_t.m_autoTime = m_repo.get<StringType>(name, "alt-name");
+	_t.m_autoTime = m_repo.get<StringType>(name, "starttime");
 }
 
 TaskConfig::Task::TasksItem TaskConfig::readTaskItemDetail(const std::string &_next) {
@@ -191,13 +192,13 @@ void Tasks::startTask() {
 		for (auto &_t : m_activeTask->m_taskitems) {
 			m_remain += _t->m_time;
 		}
-		_start(m_activeTask->m_taskitems.begin());
+		start(m_activeTask->m_taskitems.begin());
 		m_state->update(true, m_start);
 	}
 	std::cout << "startTask" << "\n";
 }
 
-void Tasks::_start(listIterator _findIter) {
+void Tasks::start(listIterator _findIter) {
 	m_activeItem = &**_findIter;
 	m_control->repo()[m_activeItem->m_channel]["value"] = "ON"s;
 	m_state->update(*m_activeTask, *m_activeItem);
@@ -213,12 +214,12 @@ void Tasks::stopTask() {
 		// update channel
 		m_control->repo()[m_activeItem->m_channel]["value"] = "OFF"s;
 		// stop task
-		_stop();
+		stop();
 	}
 	std::cout << "stopTask" << "\n";
 }
 
-void Tasks::_stop() {
+void Tasks::stop() {
 	m_activeItem = &NoneTaskItem;
 	m_activeTask = &NoneTask;
 	m_state->update(false, system_clock::now());
@@ -237,14 +238,17 @@ void Tasks::task() {
 	while(m_aexit == false) {
 		if (m_activeTask != &NoneTask) {
 			std::lock_guard<std::mutex> lock(m_lock);
-			auto tdiff = system_clock::now() - m_start;
+			//make sure, that tdiff is positive even after system clock change
+			auto tdiff = system_clock::now() > m_start ?
+					system_clock::now() - m_start : m_start - system_clock::now();
+
 			if ((system_clock::now() - _last) >= milliseconds(250)) {
 				_last = system_clock::now();
 				m_state->update(duration_cast<seconds>(tdiff),
 						duration_cast<seconds>(m_remain - tdiff));
 			}
 			if (tdiff >= m_activeItem->m_time) {
-				m_remain -= duration_cast<seconds>(tdiff);
+				m_remain -= m_activeItem->m_time;
 				m_control->repo()[m_activeItem->m_channel]["value"] = "OFF"s;
 				//switch to the next channel
 				auto _iterend = m_activeTask->m_taskitems.end();
@@ -255,27 +259,60 @@ void Tasks::task() {
 				}
 
 				if (++_findIter != _iterend) {
-					_start(_findIter);
+					start(_findIter);
 				} else {
-					_stop();
+					stop();
 				}
 			}
 		} else {
-			_checkTimeString();
+			checkTimeString();
 		}
 		std::this_thread::sleep_for(milliseconds(200));
 	} //while
 }
 
-void Tasks::_checkTimeString() {
-	//timeString "weekday,weekday,... time [repeat]"
+void Tasks::checkTimeString() {
+	//timeString "weekday,weekday,... time (H:M)"
+	for (auto &_item : m_config->map()) {
+		if (_item.second->m_autoMode) {
+			auto parts = utilities::split(_item.second->m_autoTime, " ");
+			if (parts.size()>1 && checkWeekDay(parts[0]) && checkTimePoint(parts[1])) {
+				m_nextRequest = _item.second->m_name;
+				startTask();
+				break;
+			}
+		}
+	}
+}
+
+bool Tasks::checkWeekDay(const std::string &d) {
+	auto parts = utilities::split(d, ",");
 	std::time_t t = std::time(nullptr);
 	std::stringstream wd;
 	wd << std::put_time(std::gmtime(&t), "%w"); //writes weekday as a decimal number, where Sunday is 0 (range [0-6])
+	const std::string today = wd.str();
+	for (const auto &s : parts) {
+		if (s == today) return true;
+	}
+	return false;
+}
 
+bool Tasks::checkTimePoint(const std::string &d) {
+	auto now = system_clock::now();
+	auto in_time_t = system_clock::to_time_t(now);
+	std::stringstream ss;
+	ss << std::put_time(std::localtime(&in_time_t), "%T");
+
+	auto tp = toTimePoint(d);
+	auto tpn = toTimePoint(ss.str());
+
+	auto diff = tp>tpn ? tp-tpn : tpn-tp;
+	return diff < seconds(1) ? true : false;
+}
+
+system_clock::time_point Tasks::toTimePoint(const std::string &d) {
 	std::tm tm = {};
-	std::stringstream ss("12:35:34");
+	std::stringstream ss(d);
 	ss >> std::get_time(&tm, "%H:%M:%S");
-	auto tp = std::chrono::system_clock::from_time_t(std::mktime(&tm));
-
+	return system_clock::from_time_t(std::mktime(&tm));
 }

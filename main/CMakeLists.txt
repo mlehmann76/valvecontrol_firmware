@@ -19,5 +19,6 @@ idf_component_register(SRCS
 	"sht1x.cpp"
 	"sntp.cpp"
 	"utilities.cpp"
+	"tasks.cpp"
 	INCLUDE_DIRS "."
 	REQUIRES FreeRTOScpp mqtt http variant nvs_flash cjson json app_update pthread log spiffs)

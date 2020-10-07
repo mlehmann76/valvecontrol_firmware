@@ -47,25 +47,28 @@ public:
 				return m_channel != rhs.m_channel;
 			}
 		};
-		using listType = std::list<std::shared_ptr<TasksItem>>;
-		listType m_taskitems;
+		using itemListType = std::list<std::shared_ptr<TasksItem>>;
+		itemListType m_taskitems;
 		Task() : m_enabled(false), m_autoMode(false) {}
 	};
-
-	std::map<std::string,std::shared_ptr<Task>> m_tasks;
+	using taskListType = std::map<std::string,std::shared_ptr<Task>>;
 
 	void readTasks();
-	bool readTask(const std::string &name);
 
 	Task& get(const std::string &name) const {
 		return *m_tasks.at(name);
 	}
 
-	void readTaskDetail(const std::string &name, Task &_t);
-	Task::TasksItem readTaskItemDetail(const std::string &_next);
+	const taskListType& map() const {return m_tasks;}
+
 	repository& repo() const { return m_repo;}
 
 private:
+	bool readTask(const std::string &name);
+	void readTaskDetail(const std::string &name, Task &_t);
+	Task::TasksItem readTaskItemDetail(const std::string &_next);
+
+	taskListType m_tasks;
 	repository& m_repo;
 };
 /**
@@ -110,7 +113,7 @@ private:
 class Tasks {
 	static detail::TaskConfig::Task NoneTask;
 	static detail::TaskConfig::Task::TasksItem NoneTaskItem;
-	using listIterator = detail::TaskConfig::Task::listType::iterator;
+	using listIterator = detail::TaskConfig::Task::itemListType::iterator;
 public:
 	Tasks(repository& config, repository& state, repository& ctrl);
 	~Tasks();
@@ -121,9 +124,12 @@ public:
 
 private:
 	void task();
-	void _start(listIterator _findIter);
-	void _stop();
-	void _checkTimeString();
+	void start(listIterator _findIter);
+	void stop();
+	void checkTimeString();
+	bool checkWeekDay(const std::string& d);
+	bool checkTimePoint(const std::string& d);
+	std::chrono::system_clock::time_point toTimePoint(const std::string& d);
 
 	std::shared_ptr<detail::TaskConfig> m_config;
 	std::shared_ptr<detail::TaskState> m_state;

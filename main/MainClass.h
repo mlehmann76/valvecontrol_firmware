@@ -23,13 +23,14 @@ class MqttOtaHandler;
 class MqttRepAdapter;
 class ExclusiveAdapter;
 class ChannelBase;
+class Tasks;
 
 class MainClass {
 	WifiTask wifitask;
 	Sht1x sht1x = {GPIO_NUM_21, GPIO_NUM_22};
 	Ota::OtaWorker otaWorker;
 	mqtt::MqttWorker mqttUser;
-	std::shared_ptr<SntpSupport> sntp;
+	std::shared_ptr<SntpSupport> _sntp;
 	std::shared_ptr<repository> _stateRepository;
 	std::shared_ptr<repository> _controlRepository;
 	std::shared_ptr<http::HttpServer> _http;
@@ -39,7 +40,7 @@ class MainClass {
 	std::shared_ptr<MqttRepAdapter> _configRepAdapter;
 	std::vector<std::shared_ptr<ChannelBase>> _channels;
 	std::shared_ptr<ExclusiveAdapter> _cex; //only one channel should be active
-
+	std::shared_ptr<Tasks> _tasks;
 
 public:
 	void setup();

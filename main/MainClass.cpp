@@ -35,11 +35,12 @@
 #include "repository.h"
 #include "statusrepository.h"
 #include "MqttRepAdapter.h"
+#include "tasks.h"
 
 #define TAG "MAIN"
 
 MainClass::MainClass() :
-		sntp(std::make_shared<SntpSupport>()), _stateRepository(), _controlRepository(), _http(),
+		_sntp(std::make_shared<SntpSupport>()), _stateRepository(), _controlRepository(), _http(),
 		_mqttOtaHandler(), _controlRepAdapter(), _configRepAdapter(),
 		_channels(4), _cex(std::make_shared<ExclusiveAdapter>())
 
@@ -64,6 +65,8 @@ MainClass::MainClass() :
 	_configRepAdapter = (std::make_shared<MqttRepAdapter>(Config::repo(), mqttUser,
 			utilities::string_format("%sconfig", mqttConf.getDevName().c_str())));
 
+	_tasks = std::make_shared<Tasks>(Config::repo(), *_stateRepository, *_controlRepository);
+
 }
 
 void MainClass::setup() {
@@ -77,8 +80,10 @@ void MainClass::setup() {
 
 	spiffsInit();
 
-	sntp->init();
+	_sntp->init();
+	_tasks->setup();
 	mqttUser.init();
+
 	wifitask.addConnectionObserver(_http->obs());
 	wifitask.addConnectionObserver(mqttUser.obs());
 
@@ -147,8 +152,8 @@ int MainClass::loop() {
 	std::unique_ptr<char[]> pcWriteBuffer(new char[2048]);
 
 	while (1) {
-		//check for time update by sntp
-		if (!(xEventGroupGetBits(MainClass::instance()->eventGroup()) & SNTP_UPDATED) && sntp->update()) {
+		//check for time update by _sntp
+		if (!(xEventGroupGetBits(MainClass::instance()->eventGroup()) & SNTP_UPDATED) && _sntp->update()) {
 			xEventGroupSetBits(MainClass::instance()->eventGroup(),SNTP_UPDATED);
 		}
 
