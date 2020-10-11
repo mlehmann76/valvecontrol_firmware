@@ -9,6 +9,7 @@
 #define MAIN_MAINCLASS_H_
 
 #include <vector>
+#include <memory>
 #include "mqttWorker.h"
 #include "TimerCPP.h"
 #include "SemaphoreCPP.h"

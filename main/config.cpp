@@ -8,6 +8,7 @@
 #include <sstream>
 #include <stdlib.h>
 #include <memory>
+#include <fmt/printf.h>
 
 #include "sdkconfig.h"
 #include "esp_system.h"
@@ -116,20 +117,18 @@ esp_err_t MqttConfig::init() {
 		configBase::init();
 	}
 	/* read mqtt device name */
-	/* set default device name */
-	uint8_t mac[6] = { 0 };
-	char def_mqtt_device[64] = { 0 };
-	esp_efuse_mac_get_default(mac);
-	snprintf(def_mqtt_device, sizeof(def_mqtt_device), MQTT_PUB_MESSAGE_FORMAT, //
-			MQTT_DEVICE, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], "/");
 
-	mqtt_device_name = Config::repo().get<std::string>("mqtt", "device", def_mqtt_device);
+	mqtt_device_name = Config::repo().get<std::string>("mqtt", "device");
 
 	if (mqtt_device_name == "") {
-		mqtt_device_name = std::string(def_mqtt_device);
+		/* set default device name */
+		uint8_t mac[6] = { 0 };
+		esp_efuse_mac_get_default(mac);
+		mqtt_device_name = fmt::sprintf(MQTT_PUB_MESSAGE_FORMAT, //
+			MQTT_DEVICE, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], "/");
 	}
 
-	mqtt_pub_msg = utilities::string_format("%sstate", mqtt_device_name.c_str());
+	mqtt_pub_msg = fmt::format("{}state", mqtt_device_name);
 
 	return ESP_OK;
 }

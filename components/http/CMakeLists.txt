@@ -8,4 +8,4 @@ idf_component_register(SRCS
 	"utilities.cpp"
 	"socket.cpp"
 	INCLUDE_DIRS "."
-	REQUIRES FreeRTOScpp mbedtls wpa_supplicant )
+	REQUIRES FreeRTOScpp mbedtls wpa_supplicant fmt)

@@ -32,7 +32,7 @@ public:
 	/*
 	 *
 	 */
-	void add(std::string name, const repository &rep) {
+	void add(const std::string& name, const repository &rep) {
 		m_repositories[name] = &rep;
 	}
 

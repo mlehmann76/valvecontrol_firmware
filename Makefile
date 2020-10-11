@@ -4,7 +4,7 @@
 #
 
 PROJECT_NAME := mqtt-valvecontrol
-IDF_PATH := ./esp-idf
+#IDF_PATH := ./esp-idf
 
 include $(IDF_PATH)/make/project.mk
 

@@ -63,11 +63,11 @@ public:
 	}
 	esp_err_t init();
 
-	std::string getPubMsg() {
+	std::string getPubMsg() const {
 		return mqtt_pub_msg;
 	}
 
-	std::string getDevName() {
+	std::string getDevName() const {
 		return mqtt_device_name;
 	}
 

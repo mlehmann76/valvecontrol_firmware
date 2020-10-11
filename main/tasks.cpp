@@ -12,6 +12,7 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include <chrono>
 
 using namespace std::string_literals;
 using namespace std::chrono;
@@ -153,13 +154,13 @@ void Tasks::onControl(const property &p) {
 	 * control Message
 	 * { "task" : { "name" : "task|[n]", "value" : "ON|OFF" } }
 	 */
-	std::cout << "onControl : name -> " << p.name() << "\n";
+	//std::cout << "onControl : name -> " << p.name() << "\n";
 
 	std::stringstream s;
 	for (auto &v : p) {
 		mapbox::util::apply_visitor(DebugVisitor(s, v.first), v.second);
 	}
-	std::cout << "onControl : -> " << s.str() << "\n";
+	//std::cout << "onControl : -> " << s.str() << "\n";
 
 	auto nit = p.find("name");
 	auto end = p.end();

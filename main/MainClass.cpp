@@ -8,6 +8,9 @@
 #include <string>
 #include <stdlib.h>
 #include <memory>
+#include <fmt/format.h>
+#include <unistd.h>
+#include <thread>
 
 #include "config_user.h"
 
@@ -31,11 +34,12 @@
 #include "../components/http/HttpAuth.h"
 #include "HttpServer.h"
 #include "echoServer.h"
-#include "utilities.h"
 #include "repository.h"
 #include "statusrepository.h"
 #include "MqttRepAdapter.h"
 #include "tasks.h"
+
+using namespace std::string_literals;
 
 #define TAG "MAIN"
 
@@ -47,7 +51,7 @@ MainClass::MainClass() :
 {
 	mqttConf.init();
 	_stateRepository = (std::make_shared<StatusRepository>("/state", mqttUser,
-			utilities::string_format("%sstate", mqttConf.getDevName().c_str()), tag<DefaultLinkPolicy> { }));
+			fmt::format("{}state", mqttConf.getDevName()), tag<DefaultLinkPolicy> { }));
 
 	_controlRepository = (std::make_shared<repository>("/control", tag<DefaultLinkPolicy> { }));
 
@@ -56,14 +60,14 @@ MainClass::MainClass() :
 	_jsonHandler = std::make_shared<http::RepositoryHandler>("GET","/json");
 
 	_mqttOtaHandler = (std::make_shared<MqttOtaHandler>(otaWorker, mqttUser,
-			utilities::string_format("%sota/#", mqttConf.getDevName().c_str()),
-			utilities::string_format("%sota/$implementation/binary", mqttConf.getDevName().c_str())));
+			fmt::format("{}ota/#", mqttConf.getDevName()),
+			fmt::format("{}ota/$implementation/binary", mqttConf.getDevName())));
 
 	_controlRepAdapter = (std::make_shared<MqttRepAdapter>(*_controlRepository.get(), mqttUser,
-			utilities::string_format("%scontrol", mqttConf.getDevName().c_str())));
+			fmt::format("{}control", mqttConf.getDevName())));
 
 	_configRepAdapter = (std::make_shared<MqttRepAdapter>(Config::repo(), mqttUser,
-			utilities::string_format("%sconfig", mqttConf.getDevName().c_str())));
+			fmt::format("{}config", mqttConf.getDevName())));
 
 	_tasks = std::make_shared<Tasks>(Config::repo(), *_stateRepository, *_controlRepository);
 
@@ -169,6 +173,6 @@ int MainClass::loop() {
 		} else {
 			count--;
 		}
-		vTaskDelay(1);
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}
 }

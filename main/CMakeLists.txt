@@ -21,4 +21,4 @@ idf_component_register(SRCS
 	"utilities.cpp"
 	"tasks.cpp"
 	INCLUDE_DIRS "."
-	REQUIRES FreeRTOScpp mqtt http variant nvs_flash cjson json app_update pthread log spiffs)
+	REQUIRES FreeRTOScpp mqtt http variant nvs_flash cjson json app_update pthread log spiffs fmt)
