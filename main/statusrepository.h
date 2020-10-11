@@ -8,73 +8,74 @@
 #ifndef MAIN_STATUSREPOSITORY_H_
 #define MAIN_STATUSREPOSITORY_H_
 
-#include <string>
-#include <sstream>
-#include <memory>
-#include <functional>
-#include <iomanip>
-#include <mutex>
 #include "mqttWorker.h"
 #include "repository.h"
+#include <functional>
+#include <iomanip>
+#include <memory>
+#include <mutex>
+#include <sstream>
+#include <string>
 
 using namespace std::string_literals;
 
 class StatusRepository : public repository {
-public:
-	template<class linkPolicy>
-	StatusRepository(std::string name, mqtt::MqttWorker &mqtt, std::string topic, tag<linkPolicy> _tag) :
-		repository(name, _tag) , m_mqtt(&mqtt), m_topic(topic), m_count(0){
-		create("dateTime", {{{"date",""s},{"time",""s}}});
-		m_thread = std::thread([this]{task();});
-	}
+  public:
+    template <class linkPolicy>
+    StatusRepository(std::string name, mqtt::MqttWorker &mqtt,
+                     std::string topic, tag<linkPolicy> _tag)
+        : repository(name, _tag), m_mqtt(&mqtt), m_topic(topic), m_count(0) {
+        create("dateTime", {{{"date", ""s}, {"time", ""s}}});
+        m_thread = std::thread([this] { task(); });
+    }
 
-	virtual ~StatusRepository() = default;
+    virtual ~StatusRepository() = default;
 
-	void onSetNotify(const std::string& _name) override;
+    void onSetNotify(const std::string &_name) override;
 
-private:
+  private:
+    void task();
 
-	void task();
+    void updateDateTime();
 
-	void updateDateTime();
-
-	mqtt::MqttWorker *m_mqtt;
-	std::mutex m_lock;
-	std::string m_topic;
-	std::thread m_thread;
-	size_t m_count;
+    mqtt::MqttWorker *m_mqtt;
+    std::mutex m_lock;
+    std::string m_topic;
+    std::thread m_thread;
+    size_t m_count;
 };
 
 inline void StatusRepository::onSetNotify(const std::string &_name) {
-	std::cout << name() << " : onSetNotify : " << _name << std::endl;
-	std::lock_guard<std::mutex> lock(m_lock);
-	m_count++;
+    std::cout << name() << " : onSetNotify : " << _name << std::endl;
+    std::lock_guard<std::mutex> lock(m_lock);
+    m_count++;
 }
 
 inline void StatusRepository::task() {
-	while (true) {
-		if (m_count) {
-			updateDateTime();
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
-			std::lock_guard<std::mutex> lock(m_lock);
-			mqtt::MqttQueueType message(new mqtt::mqttMessage(m_topic, stringify()));
-			m_mqtt->send(std::move(message));
-			m_count = 0;
-		} else {
-			std::this_thread::sleep_for(std::chrono::milliseconds(20));
-		}
-	}
+    while (true) {
+        if (m_count) {
+            updateDateTime();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::lock_guard<std::mutex> lock(m_lock);
+            mqtt::MqttQueueType message(
+                new mqtt::mqttMessage(m_topic, stringify()));
+            m_mqtt->send(std::move(message));
+            m_count = 0;
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+    }
 }
 
 inline void StatusRepository::updateDateTime() {
 
-	std::time_t t = std::time(nullptr);
-	std::tm tm = *std::localtime(&t);
-	std::stringstream bdate,btime;
-	bdate << std::put_time(&tm, "%F");
-	set("dateTime", {{"date", bdate.str()}});
-	btime << std::put_time(&tm, "%T");
-	set("dateTime", {{"time", btime.str()}});
+    std::time_t t = std::time(nullptr);
+    std::tm tm = *std::localtime(&t);
+    std::stringstream bdate, btime;
+    bdate << std::put_time(&tm, "%F");
+    set("dateTime", {{"date", bdate.str()}});
+    btime << std::put_time(&tm, "%T");
+    set("dateTime", {{"time", btime.str()}});
 }
 
 #endif /* MAIN_STATUSREPOSITORY_H_ */

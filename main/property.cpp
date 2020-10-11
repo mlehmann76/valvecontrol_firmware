@@ -5,36 +5,36 @@
  *      Author: marco
  */
 
-#include "repository.h"
 #include "property.h"
+#include "repository.h"
 
-property& property::reg(const std::string &name, repository &_repo) {
-	set(name, _repo);
-	m_repository->link(name, *this);
-	return *this;
+property &property::reg(const std::string &name, repository &_repo) {
+    set(name, _repo);
+    m_repository->link(name, *this);
+    return *this;
 }
 
-property& property::set(const property_base &p) {
-	if (write_hook != nullptr) {
-		write_hook(p);
-	}
+property &property::set(const property_base &p) {
+    if (write_hook != nullptr) {
+        write_hook(p);
+    }
 
-	for (auto &v : p) {
-		m_pProperty.emplace(v.first, v.second).first->second = v.second;
-	}
+    for (auto &v : p) {
+        m_pProperty.emplace(v.first, v.second).first->second = v.second;
+    }
 
-	notify();
+    notify();
 
-	return *this;
+    return *this;
 }
 
-property& property::set(const key_type &name, const repository &_rep) {
-	m_name = name;
-	m_repository = &const_cast<repository&>(_rep);
-	return *this;
+property &property::set(const key_type &name, const repository &_rep) {
+    m_name = name;
+    m_repository = &const_cast<repository &>(_rep);
+    return *this;
 }
 
 void property::notify() {
-	if (m_repository != nullptr)
-		m_repository->onSetNotify(m_name);
+    if (m_repository != nullptr)
+        m_repository->onSetNotify(m_name);
 }

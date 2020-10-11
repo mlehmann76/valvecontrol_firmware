@@ -8,67 +8,67 @@
 #ifndef COMPONENTS_HTTP_SOCKET_H_
 #define COMPONENTS_HTTP_SOCKET_H_
 
-#include <string>
 #include <chrono>
+#include <string>
 #include <sys/socket.h>
 
 #define SocketSetSize FD_SETSIZE
 
 class Socket {
-public:
-	typedef std::chrono::microseconds TimeoutValue;
-	enum PollType { newData, errorState, noData };
-	enum SocketType { SOCKET_STREAM = 1, SOCKET_DGRAM = 2};
+  public:
+    typedef std::chrono::microseconds TimeoutValue;
+    enum PollType { newData, errorState, noData };
+    enum SocketType { SOCKET_STREAM = 1, SOCKET_DGRAM = 2 };
 
-	Socket(int = -1, SocketType = SOCKET_STREAM);
-	Socket(const Socket&) = delete;
-	Socket(Socket&&) = delete;
-	~Socket();
-	Socket& operator =(const Socket&) = delete;
-	Socket& operator =(Socket&&) = delete;
+    Socket(int = -1, SocketType = SOCKET_STREAM);
+    Socket(const Socket &) = delete;
+    Socket(Socket &&) = delete;
+    ~Socket();
+    Socket &operator=(const Socket &) = delete;
+    Socket &operator=(Socket &&) = delete;
 
-	Socket* accept(const TimeoutValue &timeout);
+    Socket *accept(const TimeoutValue &timeout);
 
-	bool bind(int port, struct in_addr adr = {IPADDR_ANY});
+    bool bind(int port, struct in_addr adr = {IPADDR_ANY});
 
-	void close();
+    void close();
 
-	bool connect(std::string hostname, unsigned short remotePort, const TimeoutValue &timeout);
+    bool connect(std::string hostname, unsigned short remotePort,
+                 const TimeoutValue &timeout);
 
-	bool listen(unsigned short backlog);
+    bool listen(unsigned short backlog);
 
-	int read(char *buffer, size_t size);
-	int read(std::string &buffer, size_t size);
+    int read(char *buffer, size_t size);
+    int read(std::string &buffer, size_t size);
 
-	int write(const std::string &buffer, size_t size);
-	int write(const char *buffer, size_t size);
+    int write(const std::string &buffer, size_t size);
+    int write(const char *buffer, size_t size);
 
-	PollType pollConnectionState(const TimeoutValue &timeout);
+    PollType pollConnectionState(const TimeoutValue &timeout);
 
-	bool setSocketOption(int option, void* value, size_t len);
+    bool setSocketOption(int option, void *value, size_t len);
 
-	bool setNonBlocking(bool state);
+    bool setNonBlocking(bool state);
 
-	bool hasNewConnection(const TimeoutValue &timeout);
+    bool hasNewConnection(const TimeoutValue &timeout);
 
-	bool IsConnected();
+    bool IsConnected();
 
-	int get() { return m_socket;}
+    int get() { return m_socket; }
 
-	void create();
+    void create();
 
-private:
-	struct timeval toTimeVal(const TimeoutValue &timeout) {
-		struct timeval _timeout;
-		_timeout.tv_sec = 0;
-		_timeout.tv_usec = timeout.count();
-		return _timeout;
-	}
+  private:
+    struct timeval toTimeVal(const TimeoutValue &timeout) {
+        struct timeval _timeout;
+        _timeout.tv_sec = 0;
+        _timeout.tv_usec = timeout.count();
+        return _timeout;
+    }
 
-	int m_socket;
-	SocketType m_socketType;
-	bool m_isConnected;
+    int m_socket;
+    SocketType m_socketType;
+    bool m_isConnected;
 };
-
 
 #endif /* COMPONENTS_HTTP_SOCKET_H_ */

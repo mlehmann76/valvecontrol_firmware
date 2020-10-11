@@ -8,36 +8,36 @@
 #ifndef MAIN_REPOSITORYHANDLER_H_
 #define MAIN_REPOSITORYHANDLER_H_
 
+#include "RequestHandlerBase.h"
 #include <map>
 #include <string>
-#include "RequestHandlerBase.h"
 
 class repository;
 
 namespace http {
 
-class RepositoryHandler: public RequestHandlerBase {
-public:
-	RepositoryHandler(const std::string &_method, const std::string &_path);
-	virtual ~RepositoryHandler() {
-		// TODO Auto-generated destructor stub
-	}
-	RepositoryHandler(const RepositoryHandler &other) = delete;
-	RepositoryHandler(RepositoryHandler &&other) = default;
-	RepositoryHandler& operator=(const RepositoryHandler &other) = default;
-	RepositoryHandler& operator=(RepositoryHandler &&other) = default;
-	//from RequestHandlerBase
-	virtual bool match(const std::string &,const std::string &);
-	virtual bool handle(const HttpRequest &, HttpResponse &);
-	/*
-	 *
-	 */
-	void add(const std::string& name, const repository &rep) {
-		m_repositories[name] = &rep;
-	}
+class RepositoryHandler : public RequestHandlerBase {
+  public:
+    RepositoryHandler(const std::string &_method, const std::string &_path);
+    virtual ~RepositoryHandler() {
+        // TODO Auto-generated destructor stub
+    }
+    RepositoryHandler(const RepositoryHandler &other) = delete;
+    RepositoryHandler(RepositoryHandler &&other) = default;
+    RepositoryHandler &operator=(const RepositoryHandler &other) = default;
+    RepositoryHandler &operator=(RepositoryHandler &&other) = default;
+    // from RequestHandlerBase
+    virtual bool match(const std::string &, const std::string &);
+    virtual bool handle(const HttpRequest &, HttpResponse &);
+    /*
+     *
+     */
+    void add(const std::string &name, const repository &rep) {
+        m_repositories[name] = &rep;
+    }
 
-private:
-	std::map<std::string, const repository *> m_repositories;
+  private:
+    std::map<std::string, const repository *> m_repositories;
 };
 
 } /* namespace http */

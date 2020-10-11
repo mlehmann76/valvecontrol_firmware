@@ -8,16 +8,14 @@
 #ifndef MAIN_UTILITIES_H_
 #define MAIN_UTILITIES_H_
 
-#include <string>
 #include <memory>
+#include <string>
 #include <vector>
 namespace utilities {
 
-std::vector<std::string> split(const std::string &text, const std::string &delims);
+std::vector<std::string> split(const std::string &text,
+                               const std::string &delims);
 
-
-} //namespace utilities
-
-
+} // namespace utilities
 
 #endif /* MAIN_UTILITIES_H_ */

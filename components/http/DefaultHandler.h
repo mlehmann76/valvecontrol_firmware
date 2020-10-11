@@ -12,17 +12,17 @@
 
 namespace http {
 
-class DefaultHandler: public RequestHandlerBase {
-public:
-	DefaultHandler();
-	virtual ~DefaultHandler();
-	DefaultHandler(const DefaultHandler &other) = delete;
-	DefaultHandler(DefaultHandler &&other) = delete;
-	DefaultHandler& operator=(const DefaultHandler &other) = delete;
-	DefaultHandler& operator=(DefaultHandler &&other) = delete;
-	//from RequestHandlerBase
-	virtual bool match(const std::string &,const std::string &);
-	virtual bool handle(const HttpRequest &, HttpResponse &);
+class DefaultHandler : public RequestHandlerBase {
+  public:
+    DefaultHandler();
+    virtual ~DefaultHandler();
+    DefaultHandler(const DefaultHandler &other) = delete;
+    DefaultHandler(DefaultHandler &&other) = delete;
+    DefaultHandler &operator=(const DefaultHandler &other) = delete;
+    DefaultHandler &operator=(DefaultHandler &&other) = delete;
+    // from RequestHandlerBase
+    virtual bool match(const std::string &, const std::string &);
+    virtual bool handle(const HttpRequest &, HttpResponse &);
 };
 
 } /* namespace http */

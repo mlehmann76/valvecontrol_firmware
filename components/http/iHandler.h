@@ -15,10 +15,11 @@ class HttpRequest;
 class HttpResponse;
 
 class iHandler {
-public:
-	virtual ~iHandler() = default;
-	virtual bool match(const std::string &_method, const std::string &_path) = 0;
-	virtual bool handle(const HttpRequest &, HttpResponse &) = 0;
+  public:
+    virtual ~iHandler() = default;
+    virtual bool match(const std::string &_method,
+                       const std::string &_path) = 0;
+    virtual bool handle(const HttpRequest &, HttpResponse &) = 0;
 };
 
 } /* namespace http */

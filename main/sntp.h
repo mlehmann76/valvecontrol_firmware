@@ -11,11 +11,12 @@
 #include <string>
 
 class SntpSupport {
-public:
-	void init();
-	bool update();
-private:
-	std::string server;
-	std::string timeZone;
+  public:
+    void init();
+    bool update();
+
+  private:
+    std::string server;
+    std::string timeZone;
 };
 #endif /* MAIN_SNTP_H_ */
