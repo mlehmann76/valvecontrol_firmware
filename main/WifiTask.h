@@ -8,6 +8,7 @@
 #ifndef WIFITASK_H_
 #define WIFITASK_H_
 
+#include "esp_event.h"
 #include "esp_wps.h"
 #include "freertos/event_groups.h"
 #include "iConnectionObserver.h"
