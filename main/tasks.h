@@ -87,8 +87,8 @@ class TaskState {
                 const TaskConfig::Task::TasksItem &item);
     void update(std::chrono::seconds time, std::chrono::seconds remain);
 
-    std::string name() { return m_state["name"]().get<StringType>(); }
-    bool running() { return m_state["running"]().get<BoolType>(); }
+    std::string name() { return m_state["name"].get<StringType>(); }
+    bool running() { return m_state["running"].get<BoolType>(); }
     repository &repo() const { return m_stateRep; }
 
   private:

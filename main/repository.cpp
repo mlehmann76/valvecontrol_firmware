@@ -190,16 +190,21 @@ bool repository::unlink(const std::string &name) {
 
 void repository::parse(const std::string &c) {
     // FIXME std::cout << "parsing : " << c << "\n";
+#if (defined(__cpp_exceptions))
     try {
         nlohmann::json re = nlohmann::json::parse(c);
-
+#else
+    nlohmann::json re = nlohmann::json::parse(c, nullptr, false, true);
+    // allow_exceptions=false, ignore_comments = true
+    if (!re.is_discarded()) {
+#endif
         std::string path;
         recursive_iterate(
             re, path,
             [this](std::string ipath, nlohmann::json::const_iterator it) {
                 std::string propPath = propName(ipath);
-                // FIXME std::cout << propPath << " : " << it.key() << " < " <<
-                // it.value() << "\n";
+                // FIXME std::cout << propPath << " : " << it.key() << " < "
+                // << it.value() << "\n";
                 if (it.value().is_boolean()) {
                     create(propPath, property())[it.key()] = it->get<bool>();
                 } else if (it.value().is_number_integer()) {
@@ -213,9 +218,13 @@ void repository::parse(const std::string &c) {
                     assert(false);
                 }
             });
+#if (defined(__cpp_exceptions))
     } catch (const std::exception &e) {
         // FIXME std::cout << "exception on parse " << e.what() << "\n";
     };
+#else
+    }
+#endif
 }
 
 property &repository::operator[](const std::string &key) {

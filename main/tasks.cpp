@@ -166,11 +166,11 @@ void Tasks::onControl(const property &p) {
     auto nit = p.find("name");
     auto end = p.end();
     if (m_nextRequest == "" && nit != end) {
-        m_nextRequest = nit->second.get<StringType>();
+        m_nextRequest = nit->second.get_unchecked<StringType>();
     } else {
         auto vit = p.find("value");
         if (vit != end && vit->second.is<StringType>()) {
-            std::string s = vit->second.get<StringType>();
+            std::string s = vit->second.get_unchecked<StringType>();
             if (s == "on" || s == "ON" || s == "On") {
                 startTask();
             } else {
