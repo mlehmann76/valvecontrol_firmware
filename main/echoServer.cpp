@@ -7,7 +7,6 @@ http://openbook.rheinwerk-verlag.de/linux_unix_programmierung/Kap11-013.htm#RxxK
  */
 
 #include "config_user.h"
-#include <esp_log.h>
 #include <esp_pthread.h>
 #include <memory>
 #include <netdb.h>
@@ -42,7 +41,7 @@ void EchoServer::task() {
                 Socket *_con =
                     m_sockets.front()->accept(std::chrono::microseconds(1));
                 if (_con != nullptr) {
-                    ESP_LOGD(TAG, "socket(%d) accepted", _con->get());
+                    log_inst.debug(TAG, "socket({:d}) accepted", _con->get());
                     m_sockets.push_back(_con);
                 }
             }
@@ -53,18 +52,18 @@ void EchoServer::task() {
                     switch (
                         _s->pollConnectionState(std::chrono::microseconds(1))) {
                     case Socket::noData:
-                        ESP_LOGV(TAG, "Socket(%d)::noData", _s->get());
+                        log_inst.debug(TAG, "Socket({:d})::noData", _s->get());
                         break;
                     case Socket::errorState:
-                        ESP_LOGV(TAG, "Socket(%d)::errorState", _s->get());
+                        log_inst.debug(TAG, "Socket({:d})::errorState", _s->get());
                         removeSocket(_s);
                         break;
                     case Socket::newData:
-                        ESP_LOGV(TAG, "Socket(%d)::newData", _s->get());
+                        log_inst.debug(TAG, "Socket({:d})::newData", _s->get());
                         bzero(buf, sizeof(buf));
                         int readSize = _s->read(buf, sizeof(buf));
                         if (readSize >= 0) {
-                            ESP_LOGD(TAG, "socket(%d) read: %d , %s", _s->get(),
+                            log_inst.debug(TAG, "socket({:d}) read: {:d} , {}", _s->get(),
                                      readSize, buf);
                             _s->write(buf, readSize);
                         } else {

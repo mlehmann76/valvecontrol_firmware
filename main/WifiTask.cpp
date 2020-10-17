@@ -15,7 +15,6 @@
 #include "TimerCPP.h"
 #include "driver/gpio.h"
 #include "esp_event.h"
-#include "esp_log.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_wps.h"
@@ -87,30 +86,30 @@ void WifiTask::event_handler(esp_event_base_t event_base, int32_t event_id,
     case WIFI_EVENT_STA_START: /**< ESP32 station start */
         switch (esp_wifi_connect()) {
         case ESP_OK:
-            ESP_LOGI(TAG, "connected successfully");
+            log_inst.info(TAG, "connected successfully");
             break;
 
         case ESP_ERR_WIFI_NOT_INIT:
-            ESP_LOGE(TAG, "WiFi is not initialized by eps_wifi_init");
+            log_inst.error(TAG, "WiFi is not initialized by eps_wifi_init");
             break;
 
         case ESP_ERR_WIFI_NOT_STARTED:
-            ESP_LOGE(TAG, "WiFi is not started by esp_wifi_start");
+            log_inst.error(TAG, "WiFi is not started by esp_wifi_start");
             break;
 
         case ESP_ERR_WIFI_CONN:
-            ESP_LOGE(
+            log_inst.error(
                 TAG,
                 "WiFi internal error, station or soft-AP control block wrong");
             break;
 
         case ESP_ERR_WIFI_SSID:
-            ESP_LOGE(TAG, "SSID of AP which station connects is invalid");
+            log_inst.error(TAG, "SSID of AP which station connects is invalid");
             enableWPS = true;
             break;
 
         default:
-            ESP_LOGE(TAG, "Unknown return code");
+            log_inst.error(TAG, "Unknown return code");
             break;
         }
         break;
@@ -134,30 +133,30 @@ void WifiTask::event_handler(esp_event_base_t event_base, int32_t event_id,
         /*point: the function esp_wifi_wps_start() only get ssid & password
          * so call the function esp_wifi_connect() here
          * */
-        ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_SUCCESS");
+        log_inst.info(TAG, "SYSTEM_EVENT_STA_WPS_ER_SUCCESS");
         ESP_ERROR_CHECK(esp_wifi_wps_disable());
         ESP_ERROR_CHECK(esp_wifi_connect());
 
         break;
     case WIFI_EVENT_STA_WPS_ER_FAILED: /**< ESP32 station wps fails in enrollee
                                           mode */
-        ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_FAILED");
+        log_inst.info(TAG, "SYSTEM_EVENT_STA_WPS_ER_FAILED");
         ESP_ERROR_CHECK(esp_wifi_wps_disable());
         ESP_ERROR_CHECK(esp_wifi_wps_enable(&config));
         ESP_ERROR_CHECK(esp_wifi_wps_start(0));
         break;
     case WIFI_EVENT_STA_WPS_ER_TIMEOUT: /**< ESP32 station wps timeout in
                                            enrollee mode */
-        ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_TIMEOUT");
+        log_inst.info(TAG, "SYSTEM_EVENT_STA_WPS_ER_TIMEOUT");
         ESP_ERROR_CHECK(esp_wifi_wps_disable());
         ESP_ERROR_CHECK(esp_wifi_wps_enable(&config));
         ESP_ERROR_CHECK(esp_wifi_wps_start(0));
         break;
     case WIFI_EVENT_STA_WPS_ER_PIN: /**< ESP32 station wps pin code in enrollee
                                        mode */
-        ESP_LOGI(TAG, "SYSTEM_EVENT_STA_WPS_ER_PIN");
+        log_inst.info(TAG, "SYSTEM_EVENT_STA_WPS_ER_PIN");
         /*show the PIN code here*/
-        ESP_LOGI(
+        log_inst.info(
             TAG, "WPS_PIN = " PINSTR,
             PIN2STR(((wifi_event_sta_wps_er_pin_t *)event_data)->pin_code));
         break;
@@ -187,7 +186,7 @@ void WifiTask::got_ip_event_handler(esp_event_base_t event_base,
     ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
     switch (event_id) {
     case IP_EVENT_STA_GOT_IP:
-        ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+        log_inst.info(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         xEventGroupSetBits(main_event_group, CONNECTED_BIT);
         notifyConnect();
         break;
@@ -248,9 +247,9 @@ void WifiTask::task() {
         case w_connected:
             if (!isConnected()) {
                 if (timeout == 0) {
-                    ESP_LOGI(TAG, "wifi_init_sta stop sta");
+                    log_inst.info(TAG, "wifi_init_sta stop sta");
                     ESP_ERROR_CHECK(esp_wifi_stop());
-                    ESP_LOGI(TAG, "wifi_init_sta deinit sta");
+                    log_inst.info(TAG, "wifi_init_sta deinit sta");
                     ESP_ERROR_CHECK(esp_wifi_deinit());
                     w_state = w_disconnected;
                 } else {
@@ -264,7 +263,7 @@ void WifiTask::task() {
         case w_wps_enable:
             if (!isConnected()) {
                 if (timeout == 0) {
-                    ESP_LOGI(TAG, "start wps...");
+                    log_inst.info(TAG, "start wps...");
                     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_wps_enable(&config));
                     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_wps_start(0));
                     enableWPS = false;

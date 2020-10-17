@@ -9,7 +9,6 @@
 
 #include "config.h"
 #include "config_user.h"
-#include "esp_log.h"
 
 #include "TimerCPP.h"
 #include "channelAdapter.h"

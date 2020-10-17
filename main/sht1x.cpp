@@ -14,9 +14,9 @@
 #include "freertos/event_groups.h"
 
 #include "driver/i2c.h"
-#include "esp_log.h"
 
 #include "config.h"
+#include "config_user.h"
 #include "mqtt_client.h"
 #include "repository.h"
 #include "sht1x.h"
@@ -178,7 +178,7 @@ uint32_t Sht1x::read(uint32_t numBits, int ack) {
     _scl_(0);
     _sda_(1);
 
-    ESP_LOGI(TAG, "read i2c %d", ret);
+    log_inst.info(TAG, "read i2c %d", ret);
     return (ret);
 }
 
@@ -204,7 +204,7 @@ esp_err_t Sht1x::readSHT1xReg16(uint8_t reg, uint16_t *pData) {
     ack += write(reg);
 
     if (ack != 0) {
-        ESP_LOGI(TAG, "error on ack i2c 1");
+        log_inst.info(TAG, "error on ack i2c 1");
         ret = ESP_ERR_TIMEOUT;
     }
 
@@ -218,7 +218,7 @@ esp_err_t Sht1x::readSHT1xReg16(uint8_t reg, uint16_t *pData) {
             break;
         }
         if (difftime(now, start) >= 2) {
-            ESP_LOGI(TAG, "timeout on waiting i2c ");
+            log_inst.info(TAG, "timeout on waiting i2c ");
             ret = ESP_ERR_TIMEOUT;
             break;
         }

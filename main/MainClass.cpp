@@ -15,7 +15,8 @@
 #include <string>
 #include <thread>
 
-#include "../components/http/HttpAuth.h"
+#include "logger.h"
+#include "HttpAuth.h"
 #include "HttpServer.h"
 #include "MqttRepAdapter.h"
 #include "channelAdapter.h"
@@ -24,7 +25,6 @@
 #include "config_user.h"
 #include "echoServer.h"
 #include "esp_event.h"
-#include "esp_log.h"
 #include "esp_spiffs.h"
 #include "esp_system.h"
 #include "esp_task_wdt.h"
@@ -38,6 +38,9 @@
 #include "tasks.h"
 
 using namespace std::string_literals;
+
+logger::Logger<	logger::DefaultLogPolicy, logger::ColoredOutput<
+		logger::severity_type::debug,logger::severity_type::debug>> log_inst("") ;
 
 #define TAG "MAIN"
 
@@ -77,13 +80,6 @@ MainClass::MainClass()
 }
 
 void MainClass::setup() {
-    esp_log_level_set("*", ESP_LOG_ERROR);
-    esp_log_level_set("MQTTS", ESP_LOG_VERBOSE);
-    esp_log_level_set("MAIN", ESP_LOG_VERBOSE);
-    esp_log_level_set("SOCKET", ESP_LOG_VERBOSE);
-    esp_log_level_set("RepositoryHandler", ESP_LOG_VERBOSE);
-    esp_log_level_set("HTTPREQUEST", ESP_LOG_VERBOSE);
-    esp_log_level_set("AuthProxy", ESP_LOG_VERBOSE);
 
     spiffsInit();
 
@@ -133,7 +129,7 @@ void MainClass::setup() {
 }
 
 void MainClass::spiffsInit(void) {
-    ESP_LOGI(TAG, "Initializing SPIFFS");
+    log_inst.info(TAG, "Initializing SPIFFS");
 
     esp_vfs_spiffs_conf_t conf = {.base_path = "/spiffs",
                                   .partition_label = NULL,
@@ -146,11 +142,11 @@ void MainClass::spiffsInit(void) {
 
     if (ret != ESP_OK) {
         if (ret == ESP_FAIL) {
-            ESP_LOGE(TAG, "Failed to mount or format filesystem");
+        	log_inst.error(TAG, "Failed to mount or format filesystem");
         } else if (ret == ESP_ERR_NOT_FOUND) {
-            ESP_LOGE(TAG, "Failed to find SPIFFS partition");
+        	log_inst.error(TAG, "Failed to find SPIFFS partition");
         } else {
-            ESP_LOGE(TAG, "Failed to initialize SPIFFS (%s)",
+        	log_inst.error(TAG, "Failed to initialize SPIFFS {}",
                      esp_err_to_name(ret));
         }
         return;
@@ -159,10 +155,10 @@ void MainClass::spiffsInit(void) {
     size_t total = 0, used = 0;
     ret = esp_spiffs_info(NULL, &total, &used);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to get SPIFFS partition information (%s)",
+    	log_inst.error(TAG, "Failed to get SPIFFS partition information {}",
                  esp_err_to_name(ret));
     } else {
-        ESP_LOGI(TAG, "Partition size: total: %d, used: %d", total, used);
+    	log_inst.info(TAG, "Partition size: total: {:d}, used: {:d}", total, used);
     }
 }
 

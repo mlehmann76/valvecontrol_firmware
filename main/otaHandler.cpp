@@ -8,7 +8,6 @@
 #include "otaHandler.h"
 #include "Json.h"
 #include "config_user.h"
-#include "esp_log.h"
 #include "otaWorker.h"
 
 #define TAG "MQTTOTA"
@@ -48,14 +47,14 @@ int MqttOtaHandler::onMessage(esp_mqtt_event_handle_t event) {
     int ret = 0;
     if (((event->topic_len == 0) && m_ota.isRunning()) ||
         (event->topic && event->topic == m_updatetopic)) {
-        ESP_LOGE(TAG, "OTA update topic %s",
+        log_inst.error(TAG, "OTA update topic {}",
                  event->data_len < 64 ? event->data : "data");
         Ota::OtaPacket p(event->data, event->data_len);
         ret = m_ota.handle(p);
     } else if (event->topic &&
                event->topic ==
                    m_firmwaretopic.substr(0, m_firmwaretopic.length() - 2)) {
-        ESP_LOGI(TAG, "%.*s", event->topic_len, event->topic);
+        log_inst.info(TAG, "{}", std::string(event->topic,event->topic_len));
         Json root;
 
         Json firmware = root.parse(event->data)["firmware"];
@@ -100,18 +99,18 @@ void MqttOtaHandler::handleFirmwareMessage(const Json *firmware) {
         }
 
         if (error) {
-            ESP_LOGE(TAG, "handleFirmwareMsg error %d", error);
+            log_inst.error(TAG, "handleFirmwareMsg error {:d}", error);
         } else {
-            ESP_LOGI(TAG,
-                     "fileSize :%d ->md5: "
-                     "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%"
-                     "02x%02x",
-                     md5_update.len, md5_update.md5[0], md5_update.md5[1],
-                     md5_update.md5[2], md5_update.md5[3], md5_update.md5[4],
-                     md5_update.md5[5], md5_update.md5[6], md5_update.md5[7],
-                     md5_update.md5[8], md5_update.md5[9], md5_update.md5[10],
-                     md5_update.md5[11], md5_update.md5[12], md5_update.md5[13],
-                     md5_update.md5[14], md5_update.md5[15]);
+//            ESP_LOGI(TAG,
+//                     "fileSize :%d ->md5: "
+//                     "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%"
+//                     "02x%02x",
+//                     md5_update.len, md5_update.md5[0], md5_update.md5[1],
+//                     md5_update.md5[2], md5_update.md5[3], md5_update.md5[4],
+//                     md5_update.md5[5], md5_update.md5[6], md5_update.md5[7],
+//                     md5_update.md5[8], md5_update.md5[9], md5_update.md5[10],
+//                     md5_update.md5[11], md5_update.md5[12], md5_update.md5[13],
+//                     md5_update.md5[14], md5_update.md5[15]);
 
             m_ota.start(md5_update);
         }

@@ -220,8 +220,6 @@ void Tasks::stopTask() {
         // stop task
         stop();
     }
-    std::cout << "stopTask"
-              << "\n";
 }
 
 void Tasks::stop() {

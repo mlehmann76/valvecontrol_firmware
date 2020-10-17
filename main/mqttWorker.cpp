@@ -22,7 +22,6 @@
 #include "config_user.h"
 
 #include "MainClass.h"
-#include "esp_log.h"
 #include "otaWorker.h"
 
 static const char *TAG = "MQTTS";
@@ -35,12 +34,12 @@ esp_err_t MqttWorker::mqtt_event_handler(esp_mqtt_event_handle_t event) {
     int msg_id;
     switch (event->event_id) {
     case MQTT_EVENT_CONNECTED:
-        ESP_LOGD(TAG, "MQTT_EVENT_CONNECTED");
+        log_inst.debug(TAG, "MQTT_EVENT_CONNECTED");
         xEventGroupSetBits(MainClass::instance()->eventGroup(),
                            MQTT_CONNECTED_BIT);
         for (auto _s : mqtt->subTopics()) {
             msg_id = esp_mqtt_client_subscribe(client, _s.c_str(), 1);
-            ESP_LOGD(TAG, "sent subscribe %s successful, msg_id=%d", _s.c_str(),
+            log_inst.debug(TAG, "sent subscribe {} successful, msg_id={:d}", _s.c_str(),
                      msg_id);
         }
         mqtt->isMqttConnected = true;
@@ -48,31 +47,31 @@ esp_err_t MqttWorker::mqtt_event_handler(esp_mqtt_event_handle_t event) {
     case MQTT_EVENT_DISCONNECTED:
         xEventGroupClearBits(MainClass::instance()->eventGroup(),
                              MQTT_CONNECTED_BIT);
-        ESP_LOGD(TAG, "MQTT_EVENT_DISCONNECTED");
+        log_inst.debug(TAG, "MQTT_EVENT_DISCONNECTED");
         mqtt->isMqttConnected = false;
         mqtt->isMqttInit = false;
         break;
     case MQTT_EVENT_SUBSCRIBED:
-        ESP_LOGD(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
+        log_inst.debug(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id={:d}", event->msg_id);
         break;
     case MQTT_EVENT_UNSUBSCRIBED:
-        ESP_LOGD(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
+        log_inst.debug(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id={:d}", event->msg_id);
         break;
     case MQTT_EVENT_PUBLISHED:
-        ESP_LOGD(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+        log_inst.debug(TAG, "MQTT_EVENT_PUBLISHED, msg_id={:d}", event->msg_id);
         break;
     case MQTT_EVENT_DATA:
-        ESP_LOGD(TAG, "MQTT_EVENT_DATA");
+        log_inst.debug(TAG, "MQTT_EVENT_DATA");
         mqtt->handle(event);
         break;
     case MQTT_EVENT_ERROR:
-        ESP_LOGE(TAG, "MQTT_EVENT_ERROR");
+        log_inst.error(TAG, "MQTT_EVENT_ERROR");
         break;
     case MQTT_EVENT_BEFORE_CONNECT:
-        ESP_LOGE(TAG, "MQTT_EVENT_BEFORE_CONNECT");
+        log_inst.error(TAG, "MQTT_EVENT_BEFORE_CONNECT");
         break;
     case MQTT_EVENT_ANY:
-        ESP_LOGE(TAG, "MQTT_EVENT_ANY");
+        log_inst.error(TAG, "MQTT_EVENT_ANY");
     }
     return ESP_OK;
 }
@@ -85,18 +84,18 @@ void MqttWorker::send(MqttQueueType rx) {
 
 void MqttWorker::handle(esp_mqtt_event_handle_t event) {
     if (event->data_len < 64) {
-        ESP_LOGD(TAG, "Topic received!: (%d) %.*s (%d) %.*s", event->topic_len,
-                 event->topic_len, event->topic, event->data_len,
-                 event->data_len, event->data);
+        log_inst.debug(TAG, "Topic received!: ({:d}) {} ({:d}) {}", event->topic_len,
+                 std::string(event->topic,event->topic_len), event->data_len,
+				 std::string(event->data, event->data_len));
     } else {
-        ESP_LOGD(TAG, "Topic received!: (%d) %.*s", event->topic_len,
-                 event->topic_len, event->topic);
+        log_inst.debug(TAG, "Topic received!: ({:d}) {}", event->topic_len,
+        		std::string(event->topic,event->topic_len));
     }
 
     int ret = 0;
     // provide message to last handler for accelerated test
     if (m_lastMqttRec != nullptr) {
-        ESP_LOGD(TAG, "Forwarding ...");
+        log_inst.debug(TAG, "Forwarding ...");
         ret = m_lastMqttRec->onMessage(event);
     }
     if (!ret) { // not handled yet
@@ -116,28 +115,29 @@ void MqttWorker::addHandle(AbstractMqttReceiver *_a) {
     auto search = m_subtopics.find(_a->topic());
     if (search == m_subtopics.end()) {
         m_subtopics.insert(_a->topic());
-        ESP_LOGV(TAG, "addHandle, add topic = %s", _a->topic().c_str());
+        log_inst.debug(TAG, "addHandle, add topic = {}", _a->topic());
         if (isMqttConnected) {
             int msg_id =
                 esp_mqtt_client_subscribe(client, _a->topic().c_str(), 1);
-            ESP_LOGD(TAG, "sent subscribe %s successful, msg_id=%d",
-                     _a->topic().c_str(), msg_id);
+            log_inst.debug(TAG, "sent subscribe {} successful, msg_id={:d}",
+                     _a->topic(), msg_id);
         }
     } else {
-        ESP_LOGV(TAG, "addHandle, topic %s already registered",
-                 _a->topic().c_str());
+        log_inst.debug(TAG, "addHandle, topic {} already registered",
+                 _a->topic());
     }
 }
 
 void MqttWorker::send(mqttMessage *rxData) {
     if ((client != NULL) && isMqttConnected) {
-        ESP_LOGD(TAG, "publish %.*s : %.*s", rxData->m_topic.length(),
-                 rxData->m_topic.c_str(), rxData->m_data.length(),
-                 rxData->m_data.c_str());
+        log_inst.debug(TAG, "publish {} : {}",
+        		std::string(rxData->m_topic,rxData->m_topic.length()),
+                std::string(rxData->m_data,rxData->m_data.length())
+                 );
         int msg_id = esp_mqtt_client_publish(client, rxData->m_topic.c_str(),
                                              rxData->m_data.c_str(),
                                              rxData->m_data.length() + 1, 1, 0);
-        ESP_LOGD(TAG, "sent publish successful, msg_id=%d", msg_id);
+        log_inst.debug(TAG, "sent publish successful, msg_id={:d}", msg_id);
     }
 }
 
@@ -160,15 +160,15 @@ void MqttWorker::init(void) {
 
 void MqttWorker::connect(void) {
     if (client != NULL) {
-        ESP_LOGD(TAG, "starting client");
+        log_inst.debug(TAG, "starting client");
         esp_mqtt_client_start(client);
     } else {
-        ESP_LOGE(TAG, "mqtt connect failed, client not initialized");
+        log_inst.error(TAG, "mqtt connect failed, client not initialized");
     }
 }
 
 void MqttWorker::disconnect(void) {
-    ESP_LOGE(TAG, "stopping client");
+    log_inst.error(TAG, "stopping client");
 
     if (client != NULL)
         esp_mqtt_client_stop(client);

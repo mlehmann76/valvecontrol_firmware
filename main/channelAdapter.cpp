@@ -5,7 +5,6 @@
  *      Author: marco
  */
 
-#include "esp_log.h"
 #include <cassert>
 #include <chrono>
 #include <memory>

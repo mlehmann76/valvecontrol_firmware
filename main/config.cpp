@@ -11,13 +11,13 @@
 #include <string>
 
 #include "esp_err.h"
-#include "esp_log.h"
 #include "esp_system.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "sdkconfig.h"
 
 #include "config.h"
+#include "config_user.h"
 #include "repository.h"
 #include "utilities.h"
 
@@ -61,13 +61,13 @@ esp_err_t configBase::init() {
 
     err = nvs_open("storage", NVS_READWRITE, &my_handle);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "nvs_open storage failed (%s)", esp_err_to_name(err));
+        log_inst.error(TAG, "nvs_open storage failed ({})", esp_err_to_name(err));
     }
 #if 0
 	//try opening saved json config
 	err = readStr(&my_handle, "config_json", &nvs_json_config);
 	if (ESP_OK != err) {
-		ESP_LOGE(TAG, "config_json read failed (%s)", esp_err_to_name(err));
+		log_inst.error(TAG, "config_json read failed ({})", esp_err_to_name(err));
 //		pConfig = cJSON_Parse(config_json_start);
 		repo().parse(config_json_start);
 	} else {
@@ -82,7 +82,7 @@ esp_err_t configBase::init() {
     repo().parse(config_json_start);
 #endif
     m_isInitialized = true;
-    ESP_LOGV(TAG, "repo (%s)", repo().debug().c_str());
+    log_inst.debug(TAG, "repo ({})", repo().debug());
 
     return ret;
 }

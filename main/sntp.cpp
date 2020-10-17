@@ -7,7 +7,7 @@
 
 #include "lwip/apps/sntp.h"
 #include "config.h"
-#include "esp_log.h"
+#include "config_user.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -22,10 +22,10 @@
 static const char *TAG = "sntp";
 
 void SntpSupport::init() {
-    ESP_LOGI(TAG, "Initializing SNTP");
+    log_inst.info(TAG, "Initializing SNTP");
     server = Config::repo().get<std::string>("sntp", "server");
     timeZone = Config::repo().get<std::string>("sntp", "zone");
-    ESP_LOGI(TAG, "sntp server (%s) (%s)", server.c_str(), timeZone.c_str());
+    log_inst.info(TAG, "sntp server ({}) ({})", server, timeZone);
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_setservername(0, server.c_str());
     // sntp_set_time_sync_notification_cb(time_sync_notification_cb);
@@ -50,6 +50,6 @@ bool SntpSupport::update() {
     time(&now);
     localtime_r(&now, &timeinfo);
     strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-    ESP_LOGI(TAG, "The current date/time is: %s", strftime_buf);
+    log_inst.info(TAG, "The current date/time is: {}", strftime_buf);
     return true;
 }
