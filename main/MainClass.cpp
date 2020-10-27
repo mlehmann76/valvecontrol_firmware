@@ -39,8 +39,7 @@
 
 using namespace std::string_literals;
 
-logger::Logger<	logger::DefaultLogPolicy, logger::ColoredOutput<
-		logger::severity_type::debug,logger::severity_type::debug>> log_inst("") ;
+logType log_inst({},{}) ;
 
 #define TAG "MAIN"
 
@@ -80,6 +79,8 @@ MainClass::MainClass()
 }
 
 void MainClass::setup() {
+
+	log_inst.setLogSeverity("I2C", logger::severity_type::warning);
 
     spiffsInit();
 
@@ -179,10 +180,8 @@ int MainClass::loop() {
         if (0 == count) {
             if (esp_get_free_heap_size() != heapFree) {
                 heapFree = esp_get_free_heap_size();
-                vTaskGetRunTimeStats(pcWriteBuffer.get());
-                //				ESP_LOGI(TAG, "[APP] Free
-                //memory: %d bytes\n",
-                // esp_get_free_heap_size());
+                //vTaskGetRunTimeStats(pcWriteBuffer.get());
+                log_inst.info(TAG, "[APP] Free memory: {:d} bytes", esp_get_free_heap_size());
                 // ESP_LOGI(TAG,
                 // "%s\n", _controlRepository->debug().c_str());
                 // ESP_LOGI(TAG, "%s\n", _stateRepository->debug().c_str());

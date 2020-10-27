@@ -10,107 +10,101 @@
 
 #include <fmt/color.h>
 #include <fmt/format.h>
+#include <logger_def.h>
 
+#include <iostream>
 #include <mutex>
 #include <sstream>
 #include <unordered_map>
 
-#include "../logger/logger_policy.h"
-
 namespace logger {
 
-enum class severity_type { error, warning, info, debug };
-
+struct iLogPolicy;
 namespace detail {
 
-template <                 //
-    typename log_policy,   //
-    typename option_traits //
-    >                      //
+template <               //
+    severity_type def,   //
+    class... log_polices //
+    >                    //
 class LoggerImpl {
 
-  struct severity {
-    constexpr severity(severity_type v = option_traits().def) : value(v) {}
-    severity_type value;
-  };
+    struct severity {
+        constexpr severity(severity_type v = def) : value(v) {}
+        severity_type value;
+    };
 
-  using mapType = std::unordered_map<std::string, severity>;
+    struct count {
+        static const std::size_t value = sizeof...(log_polices);
+    };
 
-public:
-  template <class T, typename C, typename S, typename... Args>
-  void print(const T &severity, const C &tag, const S &format_str,
-             Args &&... args) {
-    if (severity.type <= m_map[tag].value) {
-      std::lock_guard<std::mutex> lock(m_mutex);
-      m_stream << std::chrono::duration_cast<std::chrono::microseconds>(
-                      std::chrono::steady_clock::now() - m_startTime)
-                      .count()
-               << " : ";
-      m_stream << severity.name << " : " << tag << " : ";
-      m_stream << fmt::format(format_str, args...);
-      m_stream << "\n";
-      if (option_traits().echo) {
-        if (option_traits().colored)
-          fmt::print(fg(severity.color), m_stream.str());
-        else
-          fmt::print(m_stream.str());
-      }
-      print_impl();
+    using mapType = std::unordered_map<std::string, severity>;
+    using arrayType = std::array<std::unique_ptr<iLogPolicy>, count::value>;
+
+  public:
+    LoggerImpl(log_polices &&... lp) noexcept
+        : m_startTime(std::chrono::steady_clock::now()), m_index(0) {
+        create(std::forward<log_polices>(lp)...);
+        for (auto &l : m_policies)
+            l->open();
     }
-  }
 
-  LoggerImpl(std::string name)
-      : m_policy(std::make_unique<log_policy>()),
-        m_startTime(std::chrono::steady_clock::now()) {
-    m_policy->open(std::move(name));
-  }
+    ~LoggerImpl() {
+        for (auto &l : m_policies)
+            l->close();
+    }
 
-  LoggerImpl(const LoggerImpl &) = delete;
-  LoggerImpl(LoggerImpl &&) = delete;
-  LoggerImpl &operator=(const LoggerImpl &) = delete;
+    iLogPolicy *policy(size_t i) const {
+        return m_policies[i % count::value].get();
+    }
 
-  ~LoggerImpl() { m_policy->close(); }
+    template <class T, typename C, typename S, typename... Args>
+    void print(const T &severity, const C &tag, const S &format_str,
+               Args &&... args) {
+        if (severity.type <= m_map[tag].value) {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_stream << std::chrono::duration_cast<std::chrono::microseconds>(
+                            std::chrono::steady_clock::now() - m_startTime)
+                            .count()
+                     << " : ";
+            m_stream << severity.name << " : " << tag << " : ";
+            m_stream << fmt::format(format_str, args...);
+            m_stream << "\n";
+            print_impl(severity);
+        }
+    }
 
-  log_policy *policy() const { return m_policy.get(); }
+    template <typename C> void setLogSeverity(const C &tag, severity_type sev) {
+        m_map[tag] = sev;
+    }
 
-  template <typename C> void setLogSeverity(const C &tag, severity_type sev) {
-    m_map[tag] = sev;
-  }
+  private:
+    template <class T, class... Ts> void create(T p1, Ts &&... ts) {
+        m_policies[m_index++] = std::make_unique<T>(std::forward<T>(p1));
+        create(std::forward<Ts>(ts)...);
+    }
 
-private:
-  void print_impl() {
-    m_policy->write(m_stream.str());
-    m_stream.str("");
-  }
+    void create() {}
 
-  template <typename First, typename... Rest>
-  void print_impl(First parm1, Rest... parm) {
-    m_stream << parm1;
-    print_impl(parm...);
-  }
+    template <class T> void print_impl(const T &severity) {
+        for (auto &l : m_policies)
+            l->write(severity.type, m_stream.str());
+        m_stream.str("");
+    }
 
-  std::stringstream m_stream;
-  std::unique_ptr<log_policy> m_policy;
-  std::mutex m_mutex;
-  std::chrono::steady_clock::time_point m_startTime;
-  mapType m_map;
+    std::stringstream m_stream;
+    arrayType m_policies;
+    std::mutex m_mutex;
+    std::chrono::steady_clock::time_point m_startTime;
+    mapType m_map;
+    size_t m_index;
 };
 
 /**
  * traits
  */
-template <severity_type s, char *n, fmt::color c> struct severity_trait {
-  static constexpr severity_type type = s;
-  static constexpr const char *name = n;
-  static constexpr fmt::color color = c;
-};
-
-template <severity_type _d, severity_type _m, bool _e, bool _c>
-struct option_traits {
-  static constexpr severity_type def = _d;
-  static constexpr severity_type min = _m;
-  static constexpr bool echo = _e;
-  static constexpr bool colored = _c;
+template <severity_type s, char *n> struct severity_trait {
+    static constexpr severity_type type = s;
+    static constexpr const char *name = n;
 };
 
 namespace {
@@ -124,23 +118,15 @@ char info_string[] = "INFO";
  * traits specialisation
  */
 using sdebug = detail::severity_trait< //
-    severity_type::debug, detail::debug_string, fmt::color::white>;
+    severity_type::debug, detail::debug_string>;
 using serror = detail::severity_trait< //
-    severity_type::error, detail::error_string, fmt::color::red>;
+    severity_type::error, detail::error_string>;
 using swarning = detail::severity_trait< //
-    severity_type::warning, detail::warning_string, fmt::color::orange>;
+    severity_type::warning, detail::warning_string>;
 using sinfo = detail::severity_trait< //
-    severity_type::info, detail::info_string, fmt::color::green>;
+    severity_type::info, detail::info_string>;
+
 } // namespace detail
-
-template <severity_type _d, severity_type _m>
-using NoOutput = detail::option_traits<_d, _m, false, false>;
-
-template <severity_type _d, severity_type _m>
-using ColoredOutput = detail::option_traits<_d, _m, true, true>;
-
-template <severity_type _d, severity_type _m>
-using UncoloredOutput = detail::option_traits<_d, _m, true, false>;
 
 } // namespace logger
 

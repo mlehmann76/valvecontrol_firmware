@@ -12,9 +12,14 @@
 #include "sdkconfig.h"
 #include <chrono>
 #include <logger.h>
+#include <circular_policy.h>
 
-extern logger::Logger<	logger::DefaultLogPolicy, logger::ColoredOutput<
-		logger::severity_type::debug,logger::severity_type::debug>> log_inst ;
+using logType = logger::Logger<
+		logger::severity_type::debug,
+		logger::ColoredTerminal,
+		logger::CircularLogPolicy<32>>;
+
+extern logType log_inst ;
 
 #define LED_GPIO_PIN /*(GPIO_NUM_27)*/
 #define LED_GPIO_BIT /*(GPIO_SEL_27)*/
