@@ -1,6 +1,3 @@
-[submodule "components/json"]
-	path = components/json
-	url = https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent.git
 [submodule "components/variant"]
 	path = components/variant
 	url = https://github.com/mapbox/variant.git

@@ -186,7 +186,7 @@ void WifiTask::got_ip_event_handler(esp_event_base_t event_base,
     ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
     switch (event_id) {
     case IP_EVENT_STA_GOT_IP:
-        log_inst.info(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+        log_inst.info(TAG, "got ip:" "{:d}.{:d}.{:d}.{:d}", IP2STR(&event->ip_info.ip));
         xEventGroupSetBits(main_event_group, CONNECTED_BIT);
         notifyConnect();
         break;

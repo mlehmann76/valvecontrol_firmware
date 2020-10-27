@@ -83,14 +83,17 @@ void MqttWorker::send(MqttQueueType rx) {
 }
 
 void MqttWorker::handle(esp_mqtt_event_handle_t event) {
-    if (event->data_len < 64) {
-        log_inst.debug(TAG, "Topic received!: ({:d}) {} ({:d}) {}", event->topic_len,
-                 std::string(event->topic,event->topic_len), event->data_len,
-				 std::string(event->data, event->data_len));
-    } else {
-        log_inst.debug(TAG, "Topic received!: ({:d}) {}", event->topic_len,
-        		std::string(event->topic,event->topic_len));
-    }
+//    if (event->topic != nullptr && event->data != nullptr) {
+//        if (event->data_len < 64) {
+//            log_inst.debug(
+//                TAG, "Topic received!: ({:d}) {} ({:d}) {}", event->topic_len,
+//                std::string(event->topic, event->topic_len), event->data_len,
+//                std::string(event->data, event->data_len));
+//        } else {
+//            log_inst.debug(TAG, "Topic received!: ({:d}) {}", event->topic_len,
+//                           std::string(event->topic, event->topic_len));
+//        }
+//    }
 
     int ret = 0;
     // provide message to last handler for accelerated test
@@ -130,10 +133,7 @@ void MqttWorker::addHandle(AbstractMqttReceiver *_a) {
 
 void MqttWorker::send(mqttMessage *rxData) {
     if ((client != NULL) && isMqttConnected) {
-        log_inst.debug(TAG, "publish {} : {}",
-        		std::string(rxData->m_topic,rxData->m_topic.length()),
-                std::string(rxData->m_data,rxData->m_data.length())
-                 );
+        //log_inst.debug(TAG, "publish {:s} : {:s}",rxData->m_topic,rxData->m_data);
         int msg_id = esp_mqtt_client_publish(client, rxData->m_topic.c_str(),
                                              rxData->m_data.c_str(),
                                              rxData->m_data.length() + 1, 1, 0);

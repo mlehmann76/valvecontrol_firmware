@@ -46,7 +46,6 @@ class StatusRepository : public repository {
 };
 
 inline void StatusRepository::onSetNotify(const std::string &_name) {
-    std::cout << name() << " : onSetNotify : " << _name << std::endl;
     std::lock_guard<std::mutex> lock(m_lock);
     m_count++;
 }

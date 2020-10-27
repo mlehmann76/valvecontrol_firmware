@@ -178,7 +178,7 @@ uint32_t Sht1x::read(uint32_t numBits, int ack) {
     _scl_(0);
     _sda_(1);
 
-    log_inst.info(TAG, "read i2c %d", ret);
+    log_inst.debug(TAG, "read i2c %d", ret);
     return (ret);
 }
 
@@ -204,7 +204,7 @@ esp_err_t Sht1x::readSHT1xReg16(uint8_t reg, uint16_t *pData) {
     ack += write(reg);
 
     if (ack != 0) {
-        log_inst.info(TAG, "error on ack i2c 1");
+        log_inst.debug(TAG, "error on ack i2c 1");
         ret = ESP_ERR_TIMEOUT;
     }
 
@@ -218,7 +218,7 @@ esp_err_t Sht1x::readSHT1xReg16(uint8_t reg, uint16_t *pData) {
             break;
         }
         if (difftime(now, start) >= 2) {
-            log_inst.info(TAG, "timeout on waiting i2c ");
+            log_inst.debug(TAG, "timeout on waiting i2c ");
             ret = ESP_ERR_TIMEOUT;
             break;
         }

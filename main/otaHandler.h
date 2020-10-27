@@ -11,8 +11,10 @@
 #include "mqttWorker.h"
 #include "mqtt_client.h"
 #include <string>
+#include <optional>
+#include <json.hpp>
 
-class Json;
+using Json = nlohmann::json;
 
 namespace Ota {
 class OtaWorker;
@@ -29,6 +31,9 @@ class MqttOtaHandler : public mqtt::AbstractMqttReceiver {
   private:
     static int md5StrToAr(const char *pMD5, uint8_t *md5);
     void handleFirmwareMessage(const Json *firmware);
+    std::optional<std::string> readString(const Json &_item);
+    std::optional<double> readDouble(const Json &_item);
+
     Ota::OtaWorker &m_ota;
     mqtt::MqttWorker &m_messager;
     std::string m_firmwaretopic;

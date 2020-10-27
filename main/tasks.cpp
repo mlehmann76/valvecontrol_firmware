@@ -197,8 +197,8 @@ void Tasks::startTask() {
         start(m_activeTask->m_taskitems.begin());
         m_state->update(true, m_start);
     }
-    std::cout << "startTask"
-              << "\n";
+//    std::cout << "startTask"
+//              << "\n";
 }
 
 void Tasks::start(listIterator _findIter) {
