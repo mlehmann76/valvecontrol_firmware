@@ -82,7 +82,7 @@ esp_err_t configBase::init() {
     repo().parse(config_json_start);
 #endif
     m_isInitialized = true;
-    log_inst.debug(TAG, "repo ({})", repo().debug());
+    //log_inst.debug(TAG, "repo ({})", repo().debug());
 
     return ret;
 }
