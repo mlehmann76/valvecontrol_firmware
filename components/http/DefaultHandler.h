@@ -16,10 +16,10 @@ class DefaultHandler : public RequestHandlerBase {
   public:
     DefaultHandler();
     virtual ~DefaultHandler();
-    DefaultHandler(const DefaultHandler &other) = delete;
-    DefaultHandler(DefaultHandler &&other) = delete;
-    DefaultHandler &operator=(const DefaultHandler &other) = delete;
-    DefaultHandler &operator=(DefaultHandler &&other) = delete;
+    DefaultHandler(const DefaultHandler &other) = default;
+    DefaultHandler(DefaultHandler &&other) = default;
+    DefaultHandler &operator=(const DefaultHandler &other) = default;
+    DefaultHandler &operator=(DefaultHandler &&other) = default;
     // from RequestHandlerBase
     virtual bool match(const std::string &, const std::string &);
     virtual bool handle(const HttpRequest &, HttpResponse &);

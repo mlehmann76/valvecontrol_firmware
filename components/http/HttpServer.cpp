@@ -49,12 +49,14 @@ void HttpServer::task() {
             if (_con != nullptr) {
                 // ESP_LOGD(TAG, "socket(%d) accepted", _con->get());
 
-                HttpRequest req(_con);
-                HttpResponse resp(req);
+                std::unique_ptr<HttpRequest> req =
+                    std::make_unique<HttpRequest>(_con);
+                std::unique_ptr<HttpResponse> resp =
+                    std::make_unique<HttpResponse>(*req);
 
                 bool exit = false;
                 while (!exit) {
-                    switch (req.parse()) {
+                    switch (req->parse()) {
                     case HttpRequest::PARSE_ERROR:
                         exit = true;
                         break;
@@ -62,8 +64,8 @@ void HttpServer::task() {
                         break;
                     case HttpRequest::PARSE_OK:
                         for (auto _p : m_pathhandler) {
-                            if (_p->match(req.method(), req.path())) {
-                                exit = !(_p->handle(req, resp));
+                            if (_p->match(req->method(), req->path())) {
+                                exit = !(_p->handle(*req, *resp));
                                 break;
                             }
                         }

@@ -18,6 +18,8 @@
 #include "logger.h"
 #include "HttpAuth.h"
 #include "HttpServer.h"
+#include "FileHandler.h"
+#include "RepositoryHandler.h"
 #include "MqttRepAdapter.h"
 #include "channelAdapter.h"
 #include "channelFactory.h"
@@ -61,6 +63,7 @@ MainClass::MainClass()
     _http = (std::make_shared<http::HttpServer>(80));
 
     _jsonHandler = std::make_shared<http::RepositoryHandler>("GET", "/json");
+    _spiffsHandler = std::make_shared<http::FileHandler>("GET" , "/", "/spiffs");
 
     _mqttOtaHandler = (std::make_shared<MqttOtaHandler>(
         otaWorker, mqttUser, fmt::format("{}ota/#", mqttConf.getDevName()),
@@ -94,6 +97,8 @@ void MainClass::setup() {
     _jsonHandler->add("/json/state.json", *_stateRepository);
     _jsonHandler->add("/json/config.json", Config::repo());
     _jsonHandler->add("/json/command.json", *_controlRepository);
+
+    _http->addPathHandler(_spiffsHandler);
 
     http::HttpAuth::AuthToken _token;
     _token.pass = "admin";

@@ -21,12 +21,6 @@ RepositoryHandler::RepositoryHandler(const std::string &_method,
                                      const std::string &_path)
     : RequestHandlerBase(_method, _path), m_repositories() {}
 
-bool RepositoryHandler::match(const std::string &_method,
-                              const std::string &_path) {
-    RequestHandlerBase::regRetType rgx = regMatch(std::regex(path()), _path);
-    return rgx.first && hasMethod(_method);
-}
-
 bool RepositoryHandler::handle(const HttpRequest &_req, HttpResponse &_res) {
     for (auto &v : m_repositories) {
         if (v.first == _req.path()) {

@@ -12,7 +12,6 @@
 #include <vector>
 
 #include "HttpServer.h"
-#include "RepositoryHandler.h"
 #include "SemaphoreCPP.h"
 #include "TimerCPP.h"
 #include "WifiTask.h"
@@ -28,6 +27,11 @@ class ChannelBase;
 class Tasks;
 class SntpSupport;
 
+namespace http {
+	class FileHandler;
+	class RepositoryHandler;
+}
+
 class MainClass {
     WifiTask wifitask;
     Sht1x sht1x = {GPIO_NUM_21, GPIO_NUM_22};
@@ -38,6 +42,7 @@ class MainClass {
     std::shared_ptr<repository> _controlRepository;
     std::shared_ptr<http::HttpServer> _http;
     std::shared_ptr<http::RepositoryHandler> _jsonHandler;
+    std::shared_ptr<http::FileHandler> _spiffsHandler;
     std::shared_ptr<MqttOtaHandler> _mqttOtaHandler;
     std::shared_ptr<MqttRepAdapter> _controlRepAdapter;
     std::shared_ptr<MqttRepAdapter> _configRepAdapter;

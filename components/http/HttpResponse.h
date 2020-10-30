@@ -8,8 +8,9 @@
 #ifndef COMPONENTS_HTTP_HTTPRESPONSE_H_
 #define COMPONENTS_HTTP_HTTPRESPONSE_H_
 
+#include <map>
 #include <string>
-#include <unordered_map>
+#include <string_view>
 #include <vector>
 
 namespace http {
@@ -33,18 +34,21 @@ class HttpResponse {
     };
 
     enum ContentType {
+        CT_TEXT_PLAIN,
         CT_APP_JSON,
         CT_APP_OCSTREAM,
+        CT_APP_PDF,
         CT_TEXT_JAVASCRIPT,
         CT_TEXT_HTML,
-        CT_TEXT_PLAIN,
     };
 
-    using ResponseMapType = std::unordered_map<ResponseCode, const char *>;
-    using ContentTypeMapType = std::unordered_map<ContentType, const char *>;
+    using ResponseMapType = std::map<ResponseCode, std::string_view>;
+    using ContentTypeMapType = std::map<ContentType, std::string_view>;
+    using FileContentMapType = std::map<std::string_view, ContentType>;
 
-    static ResponseMapType respMap;
-    static ContentTypeMapType ctMap;
+    static ResponseMapType s_respMap;
+    static ContentTypeMapType s_ctMap;
+    static FileContentMapType s_fcmap;
 
     HttpResponse(HttpRequest &_s);
     virtual ~HttpResponse();
@@ -56,6 +60,7 @@ class HttpResponse {
     void setResponse(ResponseCode _c);
     void setHeader(const std::string &, const std::string &);
     void setContentType(ContentType _c);
+    ContentType nameToContentType(const std::string &_name);
     void endHeader();
 
     void send(const std::string &);

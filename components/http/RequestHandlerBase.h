@@ -24,13 +24,13 @@ class RequestHandlerBase : public iHandler {
   public:
     RequestHandlerBase(const std::string &_method, const std::string &_path);
     virtual ~RequestHandlerBase() = default;
-    RequestHandlerBase(const RequestHandlerBase &other) = delete;
-    RequestHandlerBase(RequestHandlerBase &&other) = delete;
-    RequestHandlerBase &operator=(const RequestHandlerBase &other) = delete;
-    RequestHandlerBase &operator=(RequestHandlerBase &&other) = delete;
+    RequestHandlerBase(const RequestHandlerBase &other) = default;
+    RequestHandlerBase(RequestHandlerBase &&other) = default;
+    RequestHandlerBase &operator=(const RequestHandlerBase &other) = default;
+    RequestHandlerBase &operator=(RequestHandlerBase &&other) = default;
 
-    virtual bool match(const std::string &_method, const std::string &_path);
-    virtual bool handle(const HttpRequest &, HttpResponse &) = 0;
+    bool match(const std::string &_method, const std::string &_path) override;
+    bool handle(const HttpRequest &, HttpResponse &) override { return false; };
 
     const std::string &path() const { return m_path; }
     const std::string &method() const { return m_method; }

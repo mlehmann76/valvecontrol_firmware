@@ -6,10 +6,6 @@
  */
 
 #include "HttpRequest.h"
-
-#include <esp_log.h>
-//#include "config_user.h"
-
 #include "socket.h"
 
 #define TAG "HTTPREQUEST"
@@ -29,18 +25,16 @@ HttpRequest::ParseResult HttpRequest::parse() {
         std::string _buf;
         switch (m_socket->pollConnectionState(std::chrono::milliseconds(10))) {
         case Socket::noData:
-            // ESP_LOGV(TAG, "Socket(%d)::noData", _con->get());
             ret = PARSE_NODATA;
             break;
         case Socket::errorState:
-            // ESP_LOGD(TAG, "Socket(%d)::errorState", _con->get());
             ret = PARSE_ERROR;
             m_socket->close();
             break;
         case Socket::newData:
             int readSize = m_socket->read(_buf, 1024);
-            ESP_LOGD(TAG, "parse (size %d) -> %s", readSize, _buf.c_str());
             if (readSize > 0) {
+                // TODO just forward if part of a bigger message
                 analyze(_buf);
                 ret = PARSE_OK;
             } else if (readSize == -1) {
@@ -98,8 +92,10 @@ void HttpRequest::analyze(const std::string &r) {
         ReqPairType p = split(lines[i]);
         m_header[p.first] = p.second;
     }
-    ESP_LOGD(TAG, "Req:%s uri:%s vers:%s", method().c_str(), path().c_str(),
-             version().c_str());
+    // TODO check xtra data
+    //    ESP_LOGD(TAG, "Req:%s uri:%s vers:%s", method().c_str(),
+    //    path().c_str(),
+    //             version().c_str());
 }
 
 } /* namespace http */

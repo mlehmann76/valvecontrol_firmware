@@ -14,7 +14,7 @@
 
 namespace http {
 //@formatter:off
-HttpResponse::ResponseMapType HttpResponse::respMap = {
+HttpResponse::ResponseMapType HttpResponse::s_respMap = {
     {HTTP_200, "200 OK"},
     {HTTP_204, "204 No Content"},
     {HTTP_400, "400 Bad Request"},
@@ -24,13 +24,22 @@ HttpResponse::ResponseMapType HttpResponse::respMap = {
     {HTTP_503, "503 Service Unavailable"},
     {HTTP_511, "511 Network Authentication Required"}};
 
-HttpResponse::ContentTypeMapType HttpResponse::ctMap = {
+HttpResponse::ContentTypeMapType HttpResponse::s_ctMap = {
     {CT_APP_JSON, "application/json"},
     {CT_APP_OCSTREAM, "application/octet-stream"},
+    {CT_APP_PDF, "application/pdf"},
     {CT_TEXT_JAVASCRIPT, "text/javascript"},
     {CT_TEXT_HTML, "text/html"},
     {CT_TEXT_PLAIN, "text/plain"},
 };
+
+HttpResponse::FileContentMapType HttpResponse::s_fcmap = {
+    {".html", CT_TEXT_HTML},
+    {".htm", CT_TEXT_HTML},
+    {".js", CT_TEXT_JAVASCRIPT},
+    {".pdf", CT_APP_PDF},
+};
+
 //@formatter:on
 HttpResponse::HttpResponse(HttpRequest &_s)
     : m_respCode(HTTP_500), m_request(&_s), m_headerFinished(false),
@@ -67,13 +76,13 @@ void HttpResponse::headerAddEntries() {
 }
 
 void HttpResponse::setContentType(ContentType _c) {
-    m_headerEntries.push_back(fmt::sprintf("Content-Type: %s", ctMap[_c]));
+    m_headerEntries.push_back(fmt::sprintf("Content-Type: %s", s_ctMap[_c]));
 }
 
 void HttpResponse::headerAddStatusLine() {
     m_header.append(HTTP_Ver);
     m_header.append(" ");
-    m_header.append(respMap[m_respCode]);
+    m_header.append(s_respMap[m_respCode]);
     m_header.append(LineEnd);
 }
 
@@ -114,14 +123,14 @@ void HttpResponse::send_chunk(const char *_buf, size_t _s) {
         endHeader();
         m_request->socket()->write(m_header, m_header.length());
         m_firstChunkSent = true;
-    } else {
-        if (_buf != nullptr) {
-            std::string _chunkLen = fmt::sprintf("%x\r\n", _s);
-            m_request->socket()->write(_chunkLen, _chunkLen.length());
-            m_request->socket()->write(_buf, _s);
-            m_request->socket()->write(LineEnd, strlen(LineEnd));
-        }
+    } // else {
+    if (_buf != nullptr) {
+        std::string _chunkLen = fmt::sprintf("%x\r\n", _s);
+        m_request->socket()->write(_chunkLen, _chunkLen.length());
+        m_request->socket()->write(_buf, _s);
+        m_request->socket()->write(LineEnd, strlen(LineEnd));
     }
+    //}
 }
 
 std::string HttpResponse::getTime() {
@@ -137,6 +146,13 @@ void HttpResponse::reset() {
     m_header.clear();
     m_headerEntries.clear();
     m_headerFinished = false;
+}
+
+HttpResponse::ContentType
+HttpResponse::nameToContentType(const std::string &_name) {
+    std::string::size_type _end = _name.find_last_of('.');
+    return _end != std::string::npos ? s_fcmap[_name.substr(_end, 5)]
+                                     : CT_TEXT_PLAIN;
 }
 
 } /* namespace http */

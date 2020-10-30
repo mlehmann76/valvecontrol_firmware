@@ -27,7 +27,6 @@ class RepositoryHandler : public RequestHandlerBase {
     RepositoryHandler &operator=(const RepositoryHandler &other) = default;
     RepositoryHandler &operator=(RepositoryHandler &&other) = default;
     // from RequestHandlerBase
-    virtual bool match(const std::string &, const std::string &);
     virtual bool handle(const HttpRequest &, HttpResponse &);
     /*
      *
