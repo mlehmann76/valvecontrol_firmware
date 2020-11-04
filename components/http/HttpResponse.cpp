@@ -12,6 +12,8 @@
 #include "socket.h"
 #include "utilities.h"
 
+#include <sys/time.h>
+
 namespace http {
 //@formatter:off
 HttpResponse::ResponseMapType HttpResponse::s_respMap = {

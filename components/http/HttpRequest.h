@@ -44,7 +44,7 @@ class HttpRequest {
     const Header &header() const { return m_header; }
     Socket *socket() const { return m_socket; }
 
-    static ReqPairType split(const std::string &line);
+    static ReqPairType splitHeaderLine(const std::string &line);
     static std::vector<std::string> split(const std::string &s,
                                           const std::string &seperator);
 
@@ -57,6 +57,7 @@ class HttpRequest {
     std::string m_method;
     std::string m_path;
     std::string m_version;
+    std::string m_body;
     Header m_header;
 };
 

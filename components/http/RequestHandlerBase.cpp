@@ -10,10 +10,6 @@
 #include <cstring>
 #include <string>
 
-extern "C" {
-#include "base64.h"
-}
-
 #define TAG "RequestHandlerBase"
 
 namespace http {

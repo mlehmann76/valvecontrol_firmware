@@ -8,6 +8,8 @@
 #include "HttpRequest.h"
 #include "socket.h"
 
+#include <iostream>
+
 #define TAG "HTTPREQUEST"
 
 namespace http {
@@ -52,7 +54,7 @@ HttpRequest::HttpRequest(Socket *_s) : m_socket(_s) {}
 HttpRequest::~HttpRequest() {}
 
 std::pair<std::string, std::string>
-HttpRequest::split(const std::string &line) {
+HttpRequest::splitHeaderLine(const std::string &line) {
     std::pair<std::string, std::string> token;
     std::vector<std::string> _l = split(line, ": ");
     if (_l.size() > 1) {
@@ -88,14 +90,17 @@ void HttpRequest::analyze(const std::string &r) {
             m_version = first[2];
         }
     }
-    for (size_t i = 1; i < lines.size(); i++) {
-        ReqPairType p = split(lines[i]);
+    size_t i;
+    for (i = 1; lines[i].length() > 0 && lines[i] != LineEnd; i++) {
+        ReqPairType p = splitHeaderLine(lines[i]);
         m_header[p.first] = p.second;
     }
-    // TODO check xtra data
-    //    ESP_LOGD(TAG, "Req:%s uri:%s vers:%s", method().c_str(),
-    //    path().c_str(),
-    //             version().c_str());
+    // skip empty line
+    ++i;
+    // check for body
+    if (i < lines.size()) {
+        m_body = lines[i];
+    }
 }
 
 } /* namespace http */

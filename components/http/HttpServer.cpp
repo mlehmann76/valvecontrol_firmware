@@ -5,24 +5,25 @@
  *      Author: marco
  */
 
-#include <esp_log.h>
-#include <thread>
-//#include <esp_pthread.h>
-//#include <freertos/task.h>
+#include "HttpServer.h"
 #include "DefaultHandler.h"
 #include "HttpRequest.h"
 #include "HttpResponse.h"
-#include "HttpServer.h"
+#include <future>
+#include <mutex>
+#include <thread>
 
 #define TAG "HTTPSERVER"
 
 namespace http {
 
-HttpServer::HttpServer(int _port)
-    : m_port(_port), m_socket(), m_sem("http server sem"),
-      m_obs(new HttpServerConnectionObserver(this)) {
+HttpServer::HttpServer(int _port, size_t maxCons)
+    : m_port(_port), m_socket(), m_sem(),
+      m_obs(new HttpServerConnectionObserver(this)), m_cons(),
+      m_maxCons(maxCons) {
     // always have the defaultHandler in line
     m_pathhandler.push_back(std::make_shared<DefaultHandler>());
+    m_cons.reserve(maxCons);
 }
 
 HttpServer::~HttpServer() { delete m_obs; }
@@ -32,56 +33,39 @@ void HttpServer::task() {
     while (!_s.bind(port())) {
         // if bind failed, get a new socket
         _s.create();
-        vTaskDelay(10);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
-    if (_s.listen(0)) {
+    if (_s.listen(m_maxCons > 0 ? m_maxCons - 1 : 0)) {
         _s.setNonBlocking(true);
     }
 
     while (1) {
         if (Socket::errorState ==
-            socket().pollConnectionState(std::chrono::microseconds(1))) {
-            sem().give();
+            socket().pollConnectionState(std::chrono::milliseconds(10))) {
+            sem().unlock();
             return;
         }
-        if (socket().hasNewConnection(std::chrono::microseconds(1))) {
-            Socket *_con = socket().accept(std::chrono::microseconds(1));
-            if (_con != nullptr) {
-                // ESP_LOGD(TAG, "socket(%d) accepted", _con->get());
-
-                std::unique_ptr<HttpRequest> req =
-                    std::make_unique<HttpRequest>(_con);
-                std::unique_ptr<HttpResponse> resp =
-                    std::make_unique<HttpResponse>(*req);
-
-                bool exit = false;
-                while (!exit) {
-                    switch (req->parse()) {
-                    case HttpRequest::PARSE_ERROR:
-                        exit = true;
-                        break;
-                    case HttpRequest::PARSE_NODATA:
-                        break;
-                    case HttpRequest::PARSE_OK:
-                        for (auto _p : m_pathhandler) {
-                            if (_p->match(req->method(), req->path())) {
-                                exit = !(_p->handle(*req, *resp));
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                    std::this_thread::sleep_for(std::chrono::milliseconds(20));
-                } // while
-                removeSocket(&_con);
+        if (m_cons.size() < m_maxCons &&
+            socket().hasNewConnection(std::chrono::milliseconds(10))) {
+            std::unique_ptr<Socket> s(
+                socket().accept(std::chrono::milliseconds(10)));
+            m_cons.emplace_back(
+                std::async(&HttpServer::handleConnection, this, std::move(s)));
+        } // if
+        // check if thread is done, remove thread
+        for (auto i = 0; i < m_cons.size(); ++i) {
+            if (is_ready(m_cons[i])) {
+                std::swap(m_cons[i], m_cons.back());
+                m_cons.pop_back();
+                break;
             } // if
-        }     // if
+        }     // for
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
 
 void HttpServer::start() {
-    if (!m_sem.take(10 / portTICK_PERIOD_MS)) {
+    if (!m_sem.try_lock()) {
         // ESP_LOGD(TAG, "server already running on start");
         return;
     }
@@ -96,8 +80,8 @@ void HttpServer::stop() {
     // close the main socket
     m_socket.close();
     // wait for task to stop
-    m_sem.take(-1);
-    m_sem.give();
+    m_sem.lock();
+    m_sem.unlock();
 
     if (m_thread.joinable()) {
         m_thread.join();
@@ -115,6 +99,32 @@ void HttpServer::remPathHandler(PathHandlerType _p) {
             break;
         }
     }
+}
+
+void HttpServer::handleConnection(std::unique_ptr<Socket> _con) {
+    std::unique_ptr<HttpRequest> req = std::make_unique<HttpRequest>(&*_con);
+    std::unique_ptr<HttpResponse> resp = std::make_unique<HttpResponse>(*req);
+
+    bool exit = false;
+    while (!exit) {
+        switch (req->parse()) {
+        case HttpRequest::PARSE_ERROR:
+            exit = true;
+            break;
+        case HttpRequest::PARSE_NODATA:
+            break;
+        case HttpRequest::PARSE_OK:
+            for (auto _p : m_pathhandler) {
+                if (_p->match(req->method(), req->path())) {
+                    exit = !(_p->handle(*req, *resp));
+                    break;
+                }
+            }
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    } // while
+    _con->close();
 }
 
 } /* namespace http */

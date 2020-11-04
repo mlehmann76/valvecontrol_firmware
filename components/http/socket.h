@@ -9,10 +9,14 @@
 #define COMPONENTS_HTTP_SOCKET_H_
 
 #include <chrono>
+#include <netinet/in.h>
 #include <string>
 #include <sys/socket.h>
 
 #define SocketSetSize FD_SETSIZE
+#ifndef IPADDR_ANY
+#define IPADDR_ANY ((uint32_t)0x00000000UL)
+#endif
 
 class Socket {
   public:

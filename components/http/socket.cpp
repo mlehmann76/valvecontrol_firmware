@@ -6,8 +6,7 @@
  */
 
 #include "socket.h"
-
-#include <esp_log.h>
+#include <fcntl.h>
 #include <memory>
 #include <netdb.h>
 #include <strings.h>
@@ -25,7 +24,7 @@ Socket::Socket(int _s, SocketType _type)
 void Socket::create() {
     m_socket = ::socket(AF_INET, m_socketType, 0);
     if (m_socket == -1) {
-        ESP_LOGE(TAG, "error creating Socket");
+        // ESP_LOGE(TAG, "error creating Socket");
     }
 }
 
@@ -46,24 +45,24 @@ Socket *Socket::accept(const TimeoutValue &timeout) {
         newSocketHandle = ::accept(m_socket, (struct sockaddr *)&client, &len);
 
         if (newSocketHandle == -1) {
-            ESP_LOGD(TAG, "error on accept(%d) -> %s", m_socket,
-                     strerror(errno));
+            // ESP_LOGD(TAG, "error on accept(%d) -> %s", m_socket,
+            // strerror(errno));
             return nullptr;
         }
 
         return new Socket(newSocketHandle, m_socketType);
     } else {
-        ESP_LOGE(TAG, "error on select %s", strerror(errno));
+        // ESP_LOGE(TAG, "error on select %s", strerror(errno));
     }
 
     return nullptr;
 }
 
 bool Socket::bind(int port, struct in_addr adr) {
-    ESP_LOGD(TAG, "bind: port=%d", port);
+    // ESP_LOGD(TAG, "bind: port=%d", port);
 
     if (m_socket == -1) {
-        ESP_LOGE(TAG, "bind: Socket is not initialized.");
+        // ESP_LOGE(TAG, "bind: Socket is not initialized.");
     }
 
     struct sockaddr_in _serv_addr;
@@ -75,7 +74,7 @@ bool Socket::bind(int port, struct in_addr adr) {
     int _b =
         ::bind(m_socket, (struct sockaddr *)&_serv_addr, sizeof(_serv_addr));
     if (_b < 0) {
-        ESP_LOGE(TAG, "ERROR on binding %s", strerror(errno));
+        // ESP_LOGE(TAG, "ERROR on binding %s", strerror(errno));
         return false;
     } else {
         return true;
@@ -83,7 +82,7 @@ bool Socket::bind(int port, struct in_addr adr) {
 }
 
 void Socket::close() {
-    ESP_LOGD(TAG, "socket %d close", m_socket);
+    // ESP_LOGD(TAG, "socket %d close", m_socket);
     if (m_socket != -1) {
         ::close(m_socket);
         m_isConnected = false;
@@ -93,9 +92,9 @@ void Socket::close() {
 bool Socket::connect(std::string hostname, unsigned short remotePort,
                      const TimeoutValue &timeout) {
     bool connectSuccess = false;
-    ESP_LOGD(TAG, "connect %s, port %d", hostname.c_str(), remotePort);
+    // ESP_LOGD(TAG, "connect %s, port %d", hostname.c_str(), remotePort);
     if (m_socket == -1) {
-        ESP_LOGE(TAG, "connect: Socket is not initialized.");
+        // ESP_LOGE(TAG, "connect: Socket is not initialized.");
     }
     std::string service = std::to_string(remotePort);
     struct addrinfo getaddrinfoHints;
@@ -105,8 +104,8 @@ bool Socket::connect(std::string hostname, unsigned short remotePort,
 
     if (::getaddrinfo(hostname.c_str(), service.c_str(), &getaddrinfoHints,
                       &getResults) != 0) {
-        ESP_LOGE(TAG, "error on getaddrinfo %s,%s", hostname.c_str(),
-                 service.c_str());
+        // ESP_LOGE(TAG, "error on getaddrinfo %s,%s", hostname.c_str(),
+        // service.c_str());
         freeaddrinfo(getResults);
         return false;
     }
@@ -117,7 +116,7 @@ bool Socket::connect(std::string hostname, unsigned short remotePort,
                                (int)getResults->ai_addrlen);
 
     if (connReturn == -1) {
-        ESP_LOGE(TAG, "error on connect %d", connReturn);
+        // ESP_LOGE(TAG, "error on connect %d", connReturn);
         int m_lastErrorCode = errno;
 
         //  Connection error : FATAL
@@ -140,7 +139,7 @@ bool Socket::connect(std::string hostname, unsigned short remotePort,
             selectReturn = ::select(-1, NULL, &writeFDS, &exceptFDS, &_timeout);
 
             if (selectReturn == -1) {
-                ESP_LOGE(TAG, "error on select %s", strerror(errno));
+                // ESP_LOGE(TAG, "error on select %s", strerror(errno));
                 connectSuccess = false;
             } else if (selectReturn > 0) {
                 if (FD_ISSET(m_socket, &exceptFDS)) {
@@ -160,13 +159,13 @@ bool Socket::connect(std::string hostname, unsigned short remotePort,
 }
 
 bool Socket::listen(unsigned short backlog) {
-    ESP_LOGD(TAG, "socket %d listen, backlog %d", m_socket, backlog);
+    // ESP_LOGD(TAG, "socket %d listen, backlog %d", m_socket, backlog);
     if (m_socket == -1) {
-        ESP_LOGE(TAG, "listen: Socket is not initialized.");
+        // ESP_LOGE(TAG, "listen: Socket is not initialized.");
     }
     int lret = ::listen(m_socket, backlog);
     if (lret < 0) {
-        ESP_LOGE(TAG, "ERROR on listen %d", lret);
+        // ESP_LOGE(TAG, "ERROR on listen %d", lret);
         return false;
     } else {
         return true;
@@ -175,14 +174,14 @@ bool Socket::listen(unsigned short backlog) {
 
 int Socket::read(char *buffer, size_t size) {
     if (m_socket == -1) {
-        ESP_LOGE(TAG, "read: Socket is not initialized.");
+        // ESP_LOGE(TAG, "read: Socket is not initialized.");
     }
     int recReturn = ::recv(m_socket, buffer, size, 0);
     if (recReturn == -1) {
         if (errno == EWOULDBLOCK) {
             recReturn = 0;
         } else {
-            ESP_LOGE(TAG, "receive: %s", strerror(errno));
+            // ESP_LOGE(TAG, "receive: %s", strerror(errno));
         }
     }
     return recReturn;
@@ -201,17 +200,17 @@ int Socket::write(const std::string &buffer, size_t size) {
 
 int Socket::write(const char *buffer, size_t size) {
     if (m_socket == -1) {
-        ESP_LOGE(TAG, "write: Socket is not initialized.");
+        // ESP_LOGE(TAG, "write: Socket is not initialized.");
     }
     int writeReturn = ::send(m_socket, buffer, size, 0);
     if (writeReturn == -1) {
         if (errno == EWOULDBLOCK) {
             writeReturn = 0;
         } else {
-            ESP_LOGE(TAG, "write: %s", strerror(errno));
+            // ESP_LOGE(TAG, "write: %s", strerror(errno));
         }
     } else {
-        ESP_LOGD(TAG, "written: %s", buffer);
+        // ESP_LOGD(TAG, "written: %s", buffer);
     }
     return writeReturn;
 }
@@ -244,7 +243,7 @@ Socket::PollType Socket::pollConnectionState(const TimeoutValue &timeout) {
 bool Socket::setSocketOption(int option, void *value, size_t len) {
     int res = ::setsockopt(m_socket, SOL_SOCKET, option, value, len);
     if (res < 0) {
-        ESP_LOGE(TAG, "setSocketOption -> %X : %d", option, errno);
+        // ESP_LOGE(TAG, "setSocketOption -> %X : %d", option, errno);
     }
     return res < 0 ? false : true;
 }
@@ -257,7 +256,7 @@ bool Socket::hasNewConnection(const TimeoutValue &timeout) {
 
     struct timeval _timeout = toTimeVal(timeout);
     if (::select(SocketSetSize, &read_fd_set, NULL, NULL, &_timeout) < 0) {
-        ESP_LOGE(TAG, "::select() failed, unable to continue.");
+        // ESP_LOGE(TAG, "::select() failed, unable to continue.");
     }
 
     if (FD_ISSET(m_socket, &read_fd_set)) {
@@ -279,7 +278,7 @@ bool Socket::setNonBlocking(bool state) {
     }
     ret = ::fcntl(m_socket, F_SETFL, flags);
     if (ret == -1) {
-        ESP_LOGE(TAG, "::fcntl() failed");
+        // ESP_LOGE(TAG, "::fcntl() failed");
         return false;
     }
     return true;
@@ -287,4 +286,6 @@ bool Socket::setNonBlocking(bool state) {
 
 bool Socket::IsConnected() { return m_isConnected; }
 
-Socket::~Socket() { ESP_LOGD(TAG, "~Socket() called %d", m_socket); }
+Socket::~Socket() {
+    // ESP_LOGD(TAG, "connect %s, port %d", hostname.c_str(), remotePort);
+}

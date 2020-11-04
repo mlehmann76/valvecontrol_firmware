@@ -16,18 +16,12 @@
 #include <sstream>
 #include <string>
 
+#include "Base64.h"
 #include "HttpRequest.h"
 #include "HttpResponse.h"
-#include "config.h"
-#include "esp_log.h"
 #include "mbedtls/md5.h"
 #include "mbedtls/sha256.h"
 #include "utilities.h"
-
-extern "C" {
-//#include "../esp-idf/components/wpa_supplicant/src/utils/base64.h"
-#include "base64.h"
-}
 
 #define TAG "AuthProxy"
 
@@ -122,24 +116,20 @@ void HttpAuth::requestAuth(HTTPAuthMethod mode, const char *realm,
 }
 
 bool HttpAuth::authenticate(const std::string &ans, const AuthToken &_t) {
-    char *pdecode;
     bool ret = false;
-    size_t outlen = 0;
     std::vector<std::string> _b = HttpRequest::split(ans, " "); // FIXME
-    ESP_LOGV(TAG, "Authorization: %s", ans.c_str());
+    // ESP_LOGV(TAG, "Authorization: %s", ans.c_str());
     // BASIC Mode
     if (_b[0] == BASIC) {
-        pdecode = (char *)::base64_decode((const unsigned char *)(_b[1].data()),
-                                          _b[1].length(), &outlen);
-        if (outlen && pdecode) {
-            std::vector<std::string> _p = HttpRequest::split(
-                std::string(const_cast<char *>(pdecode)), ":");
+        std::string decode;
+        macaron::Base64::Decode(_b[1], decode);
+        if (decode.length()) {
+            std::vector<std::string> _p = HttpRequest::split(decode, ":");
             if (_p[0] == _t.user && _p[1] == _t.pass) {
-                ESP_LOGV(TAG, "Basic Authorization OK");
+                // ESP_LOGV(TAG, "Basic Authorization OK");
                 ret = true;
             }
         }
-        free(pdecode);
     } else if ((m_request != nullptr) && _b[0] == DIGEST) {
 
         const std::string auth = ": Digest";
@@ -153,7 +143,6 @@ bool HttpAuth::authenticate(const std::string &ans, const AuthToken &_t) {
             std::vector<std::string> token = HttpRequest::split(v, "=");
             tokenmap[token[0]] =
                 std::regex_replace(token[1], std::regex("\\\""), "");
-            ;
         }
         std::function<std::string(const std::string &)> _hashFunc =
             HttpAuth::ToMD5HexStr;
