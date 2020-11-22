@@ -14,12 +14,19 @@
 
 namespace http {
 
-HttpRequest::MethodMapType HttpRequest::MethodMap = //
-    {{"", NONE},           {"GET", GET},            //
-     {"HEAD", HEAD},       {"POST", POST},          //
-     {"PUT", PUT},         {"DELETE", DELETE},      //
-     {"CONNECT", CONNECT}, {"OPTIONS", OPTIONS},    //
+const HttpRequest::MethodMapType HttpRequest::MethodMap = //
+    {{"", NONE},           {"GET", GET},                  //
+     {"HEAD", HEAD},       {"POST", POST},                //
+     {"PUT", PUT},         {"DELETE", DELETE},            //
+     {"CONNECT", CONNECT}, {"OPTIONS", OPTIONS},          //
      {"TRACE", TRACE}};
+
+const HttpRequest::MethodStringType HttpRequest::s_MethodString = {
+    {NONE, ""},           {GET, "GET"},         //
+    {HEAD, "HEAD"},       {POST, "POST"},       //
+    {PUT, "PUT"},         {DELETE, "DELETE"},   //
+    {CONNECT, "CONNECT"}, {OPTIONS, "OPTIONS"}, //
+    {TRACE, "TRACE"}};
 
 HttpRequest::ParseResult HttpRequest::parse() {
     ParseResult ret = PARSE_NODATA;
@@ -101,6 +108,10 @@ void HttpRequest::analyze(const std::string &r) {
     if (i < lines.size()) {
         m_body = lines[i];
     }
+}
+
+bool HttpRequest::hasMethod(Method m) const {
+    return (method().find(s_MethodString.at(m), 0) != std::string::npos);
 }
 
 } /* namespace http */

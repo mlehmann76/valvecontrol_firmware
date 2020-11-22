@@ -21,7 +21,7 @@ bool DefaultHandler::match(const std::string &method, const std::string &path) {
 bool DefaultHandler::handle(const HttpRequest &_req, HttpResponse &_res) {
     if (_req.method() == "OPTIONS") {
         _res.setResponse(HttpResponse::HTTP_204);
-        _res.setHeader("Allow", "OPTIONS, GET, HEAD, POST");
+        _res.setHeader("Allow", "OPTIONS, GET, HEAD, POST, PUT");
         _res.setHeader("Accept-Charset", "iso-8859-1");
         _res.setHeader("Connection", "Close");
         _res.endHeader();

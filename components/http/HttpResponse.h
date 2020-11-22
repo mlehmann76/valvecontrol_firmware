@@ -24,6 +24,7 @@ class HttpResponse {
   public:
     enum ResponseCode {
         HTTP_200,
+        HTTP_201,
         HTTP_204,
         HTTP_400,
         HTTP_401,
@@ -41,6 +42,8 @@ class HttpResponse {
         CT_TEXT_JAVASCRIPT,
         CT_TEXT_HTML,
     };
+
+    enum ContentEncoding { CT_ENC_IDENTITY, CT_ENC_GZIP };
 
     using ResponseMapType = std::map<ResponseCode, std::string_view>;
     using ContentTypeMapType = std::map<ContentType, std::string_view>;
@@ -60,6 +63,7 @@ class HttpResponse {
     void setResponse(ResponseCode _c);
     void setHeader(const std::string &, const std::string &);
     void setContentType(ContentType _c);
+    void setContentEncoding(ContentEncoding _e);
     ContentType nameToContentType(const std::string &_name);
     void endHeader();
 

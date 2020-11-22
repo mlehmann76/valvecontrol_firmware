@@ -44,9 +44,9 @@ RequestHandlerBase::regMatch(const std::regex &rgx, const std::string &s) {
 
 bool RequestHandlerBase::hasMethod(const std::string &_method) {
     bool ret = false;
-    auto split = utilities::split(_method, ",");
+    auto split = utilities::split(method(), ",");
     for (const auto &s : split) {
-        if (s == method()) {
+        if (s == _method) {
             ret = true;
             break;
         }

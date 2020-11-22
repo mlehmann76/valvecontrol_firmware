@@ -20,12 +20,12 @@ class FileHandler : public RequestHandlerBase {
                 const std::string &_base);
     virtual ~FileHandler();
 
-    // bool match(const std::string &_method, const std::string &_path)
-    // override;
     bool handle(const HttpRequest &, HttpResponse &) override;
 
   private:
     bool doGet(const HttpRequest &_req, HttpResponse &_res);
+    bool doPut(const HttpRequest &_req, HttpResponse &_res);
+    void _sendFile(HttpResponse &_res, std::ifstream &ifs, size_t length);
 
     const std::string m_base;
 };

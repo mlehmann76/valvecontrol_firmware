@@ -23,11 +23,13 @@ class HttpRequest {
     enum ParseResult { PARSE_OK, PARSE_NODATA, PARSE_ERROR };
 
     using Header = std::unordered_map<std::string, std::string>;
-    using MethodMapType = std::unordered_map<const char *, enum Method>;
+    using MethodMapType = std::unordered_map<std::string, enum Method>;
+    using MethodStringType = std::unordered_map<enum Method, std::string>;
     using ReqPairType = std::pair<std::string, std::string>;
 
   private:
-    static MethodMapType MethodMap;
+    static const MethodMapType MethodMap;
+    static const MethodStringType s_MethodString;
     static constexpr const char *LineEnd = "\r\n";
 
   public:
@@ -38,9 +40,11 @@ class HttpRequest {
     HttpRequest &operator=(const HttpRequest &other) = delete;
     HttpRequest &operator=(HttpRequest &&other) = delete;
 
+    bool hasMethod(Method m) const;
     const std::string &method() const { return m_method; }
     const std::string &path() const { return m_path; }
     const std::string &version() const { return m_version; }
+    const std::string &body() const { return m_body; }
     const Header &header() const { return m_header; }
     Socket *socket() const { return m_socket; }
 

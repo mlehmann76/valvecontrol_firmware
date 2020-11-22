@@ -103,8 +103,10 @@ void MainClass::setup() {
     http::HttpAuth::AuthToken _token;
     _token.pass = "admin";
     _token.user = "admin";
-    _http->addPathHandler(std::make_shared<http::HttpAuth>(
-        _jsonHandler.get(), _token, http::HttpAuth::DIGEST_AUTH_SHA256_MD5));
+//    _http->addPathHandler(std::make_shared<http::HttpAuth>(
+//        _jsonHandler.get(), _token, http::HttpAuth::DIGEST_AUTH_SHA256_MD5));
+
+    _http->addPathHandler(_jsonHandler);
 
     for (size_t i = 0; i < _channels.size(); i++) {
         _channels[i] = std::shared_ptr<ChannelBase>(

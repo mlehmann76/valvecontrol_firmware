@@ -18,6 +18,7 @@ namespace http {
 //@formatter:off
 HttpResponse::ResponseMapType HttpResponse::s_respMap = {
     {HTTP_200, "200 OK"},
+    {HTTP_201, "201 Created"},
     {HTTP_204, "204 No Content"},
     {HTTP_400, "400 Bad Request"},
     {HTTP_401, "401 Unauthorized"},
@@ -155,6 +156,14 @@ HttpResponse::nameToContentType(const std::string &_name) {
     std::string::size_type _end = _name.find_last_of('.');
     return _end != std::string::npos ? s_fcmap[_name.substr(_end, 5)]
                                      : CT_TEXT_PLAIN;
+}
+
+void HttpResponse::setContentEncoding(ContentEncoding _e) {
+    if (_e == CT_ENC_GZIP) {
+        m_headerEntries.push_back("Content-Encoding: gzip");
+    } else {
+        m_headerEntries.push_back("Content-Encoding: identity");
+    }
 }
 
 } /* namespace http */

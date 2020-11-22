@@ -7,8 +7,6 @@
 
 #include "RepositoryHandler.h"
 
-#include "config.h"
-#include "config_user.h"
 #include "repository.h"
 #include "utilities.h"
 #include <regex>
@@ -24,11 +22,21 @@ RepositoryHandler::RepositoryHandler(const std::string &_method,
 bool RepositoryHandler::handle(const HttpRequest &_req, HttpResponse &_res) {
     for (auto &v : m_repositories) {
         if (v.first == _req.path()) {
-            _res.setResponse(HttpResponse::HTTP_200);
-            _res.setContentType(HttpResponse::CT_APP_JSON);
-            _res.send(v.second->stringify());
-            _res.reset();
-            return true;
+        	if (_req.hasMethod(HttpRequest::GET)) {
+				_res.setResponse(HttpResponse::HTTP_200);
+				_res.setContentType(HttpResponse::CT_APP_JSON);
+				_res.setHeader("Access-Control-Allow-Origin","*"); //FIXME only for react testing
+				_res.send(v.second->stringify());
+				_res.reset();
+				return true;
+        	} else if (_req.hasMethod(HttpRequest::PUT)) {
+        		_res.setResponse(HttpResponse::HTTP_201);
+        		_res.setHeader("Content-Location", _req.path());
+        		_res.send("");
+        		v.second->parse(_req.body());
+        		_res.reset();
+        		return true;
+        	}
         }
     }
 

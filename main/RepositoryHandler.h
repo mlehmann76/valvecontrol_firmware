@@ -31,12 +31,12 @@ class RepositoryHandler : public RequestHandlerBase {
     /*
      *
      */
-    void add(const std::string &name, const repository &rep) {
+    void add(const std::string &name, repository &rep) {
         m_repositories[name] = &rep;
     }
 
   private:
-    std::map<std::string, const repository *> m_repositories;
+    std::map<std::string, repository *> m_repositories;
 };
 
 } /* namespace http */
