@@ -39,10 +39,11 @@ esp_err_t MqttWorker::mqtt_event_handler(esp_mqtt_event_handle_t event) {
                            MQTT_CONNECTED_BIT);
         for (auto _s : mqtt->subTopics()) {
             msg_id = esp_mqtt_client_subscribe(client, _s.c_str(), 1);
-            log_inst.debug(TAG, "sent subscribe {} successful, msg_id={:d}", _s.c_str(),
-                     msg_id);
+            log_inst.debug(TAG, "sent subscribe {} successful, msg_id={:d}",
+                           _s.c_str(), msg_id);
         }
         mqtt->isMqttConnected = true;
+        mqttConf.setConnected(true);
         break;
     case MQTT_EVENT_DISCONNECTED:
         xEventGroupClearBits(MainClass::instance()->eventGroup(),
@@ -50,12 +51,15 @@ esp_err_t MqttWorker::mqtt_event_handler(esp_mqtt_event_handle_t event) {
         log_inst.debug(TAG, "MQTT_EVENT_DISCONNECTED");
         mqtt->isMqttConnected = false;
         mqtt->isMqttInit = false;
+        mqttConf.setConnected(false);
         break;
     case MQTT_EVENT_SUBSCRIBED:
-        log_inst.debug(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id={:d}", event->msg_id);
+        log_inst.debug(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id={:d}",
+                       event->msg_id);
         break;
     case MQTT_EVENT_UNSUBSCRIBED:
-        log_inst.debug(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id={:d}", event->msg_id);
+        log_inst.debug(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id={:d}",
+                       event->msg_id);
         break;
     case MQTT_EVENT_PUBLISHED:
         log_inst.debug(TAG, "MQTT_EVENT_PUBLISHED, msg_id={:d}", event->msg_id);
@@ -83,17 +87,19 @@ void MqttWorker::send(MqttQueueType rx) {
 }
 
 void MqttWorker::handle(esp_mqtt_event_handle_t event) {
-//    if (event->topic != nullptr && event->data != nullptr) {
-//        if (event->data_len < 64) {
-//            log_inst.debug(
-//                TAG, "Topic received!: ({:d}) {} ({:d}) {}", event->topic_len,
-//                std::string(event->topic, event->topic_len), event->data_len,
-//                std::string(event->data, event->data_len));
-//        } else {
-//            log_inst.debug(TAG, "Topic received!: ({:d}) {}", event->topic_len,
-//                           std::string(event->topic, event->topic_len));
-//        }
-//    }
+    //    if (event->topic != nullptr && event->data != nullptr) {
+    //        if (event->data_len < 64) {
+    //            log_inst.debug(
+    //                TAG, "Topic received!: ({:d}) {} ({:d}) {}",
+    //                event->topic_len, std::string(event->topic,
+    //                event->topic_len), event->data_len,
+    //                std::string(event->data, event->data_len));
+    //        } else {
+    //            log_inst.debug(TAG, "Topic received!: ({:d}) {}",
+    //            event->topic_len,
+    //                           std::string(event->topic, event->topic_len));
+    //        }
+    //    }
 
     int ret = 0;
     // provide message to last handler for accelerated test
@@ -123,17 +129,18 @@ void MqttWorker::addHandle(AbstractMqttReceiver *_a) {
             int msg_id =
                 esp_mqtt_client_subscribe(client, _a->topic().c_str(), 1);
             log_inst.debug(TAG, "sent subscribe {} successful, msg_id={:d}",
-                     _a->topic(), msg_id);
+                           _a->topic(), msg_id);
         }
     } else {
         log_inst.debug(TAG, "addHandle, topic {} already registered",
-                 _a->topic());
+                       _a->topic());
     }
 }
 
 void MqttWorker::send(mqttMessage *rxData) {
     if ((client != NULL) && isMqttConnected) {
-        //log_inst.debug(TAG, "publish {:s} : {:s}",rxData->m_topic,rxData->m_data);
+        // log_inst.debug(TAG, "publish {:s} :
+        // {:s}",rxData->m_topic,rxData->m_data);
         int msg_id = esp_mqtt_client_publish(client, rxData->m_topic.c_str(),
                                              rxData->m_data.c_str(),
                                              rxData->m_data.length() + 1, 1, 0);
@@ -143,9 +150,10 @@ void MqttWorker::send(mqttMessage *rxData) {
 
 void MqttWorker::init(void) {
 
-    m_server = Config::repo().get<std::string>("mqtt", "server");
-    m_user = Config::repo().get<std::string>("mqtt", "user");
-    m_pass = Config::repo().get<std::string>("mqtt", "pass");
+    m_server =
+        Config::repo().get<std::string>("/network/mqtt/config", "server");
+    m_user = Config::repo().get<std::string>("/network/mqtt/config", "user");
+    m_pass = Config::repo().get<std::string>("/network/mqtt/config", "pass");
 
     esp_mqtt_client_config_t mqtt_cfg;
     memset(&mqtt_cfg, 0, sizeof(mqtt_cfg));

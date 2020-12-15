@@ -15,8 +15,10 @@ property &property::reg(const std::string &name, repository &_repo) {
 }
 
 property &property::set(const property_base &p) {
+    property _temp(p);
+    _temp.m_name = this->m_name;
     if (write_hook != nullptr) {
-        write_hook(p);
+        write_hook(_temp);
     }
 
     for (auto &v : p) {

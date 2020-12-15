@@ -11,20 +11,19 @@
 #include "freertos/FreeRTOS.h"
 #include "sdkconfig.h"
 #include <chrono>
-#include <logger.h>
 #include <circular_policy.h>
+#include <logger.h>
 
-using logType = logger::Logger<
-		logger::severity_type::debug,
-		logger::ColoredTerminal,
-		logger::CircularLogPolicy<32>>;
+using logType =
+    logger::Logger<logger::severity_type::info, logger::ColoredTerminal,
+                   logger::CircularLogPolicy<4>>;
 
-extern logType log_inst ;
+extern logType log_inst;
 
 #define LED_GPIO_PIN /*(GPIO_NUM_27)*/
 #define LED_GPIO_BIT /*(GPIO_SEL_27)*/
-#define LED_ON()     /*while(0) {gpio_set_level(LED_GPIO_PIN,0);}*/
-#define LED_OFF()    /*while(0) {gpio_set_level(LED_GPIO_PIN,1);}*/
+#define LED_ON() /*while(0) {gpio_set_level(LED_GPIO_PIN,0);}*/
+#define LED_OFF() /*while(0) {gpio_set_level(LED_GPIO_PIN,1);}*/
 #define LED_TOGGLE() /*while(0)                                                \
                         {gpio_set_level(LED_GPIO_PIN,gpio_get_level(LED_GPIO_PIN)?0:1);}*/
 

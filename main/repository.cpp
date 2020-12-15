@@ -7,9 +7,13 @@
 
 #include "repository.h"
 #include "json.hpp"
+#include "logger.h"
 #include "utilities.h"
+#include <config_user.h>
 #include <sstream>
 #include <string>
+
+#define TAG "repository"
 
 struct both_slashes {
     bool operator()(char a, char b) const { return a == '/' && b == '/'; }
@@ -47,17 +51,32 @@ class JsonVisitor {
         m_parts = utilities::split(name, "/");
     }
 
-    template <typename T> void operator()(const T &i) const {
-        assert(m_parts.size() > 0);
-        if (m_parts.size() == 1) {
-            m_json[m_parts[0]][m_key] = i;
-        } else if (m_parts.size() == 2) {
-            m_json[m_parts[0]][m_parts[1]][m_key] = i;
-        } else if (m_parts.size() == 3) {
-            m_json[m_parts[0]][m_parts[1]][m_parts[2]][m_key] = i;
-        } else if (m_parts.size() == 4) {
-            m_json[m_parts[0]][m_parts[1]][m_parts[2]][m_parts[3]][m_key] = i;
+    template <typename T>
+    void _setKey(size_t index, nlohmann::json &_p, const T &key) const {
+        if (index == m_parts.size()) {
+            _p[m_key] = key;
+        } else {
+            _setKey(index + 1, _p[m_parts[index]], key);
         }
+    }
+
+    template <typename T> void operator()(const T &value) const {
+        assert(m_parts.size() > 0);
+#if 0
+        switch (m_parts.size()) {
+        	case 1: m_json[m_parts[0]][m_key] = value; break;
+        	case 2: m_json[m_parts[0]][m_parts[1]][m_key] = value; break;
+        	case 3: m_json[m_parts[0]][m_parts[1]][m_parts[2]][m_key] = value; break;
+        	case 4: m_json[m_parts[0]][m_parts[1]][m_parts[2]][m_parts[3]][m_key] = value; break;
+        	case 5: m_json[m_parts[0]][m_parts[1]][m_parts[2]][m_parts[3]][m_parts[4]][m_key] = value; break;
+        	case 6: m_json[m_parts[0]][m_parts[1]][m_parts[2]][m_parts[3]][m_parts[4]][m_parts[5]][m_key] = value; break;
+        	default:
+        		log_inst.error(TAG, "wrong number of name parts");
+        		break;
+        }
+#else
+        _setKey(0, m_json, value);
+#endif
     }
 
   private:
@@ -83,9 +102,11 @@ void recursive_iterate(const nlohmann::json &j, std::string path,
 repository::mapType repository::partial(const std::string &_part) {
     mapType ret;
     std::string part = propName(_part);
-    for (mapType::iterator it = m_properties.begin(), end = m_properties.end();
-         it != end; ++it) {
-        if (it->first.substr(0, part.length()) == part) {
+    StringMatch smatch(_part);
+    auto it = m_properties.begin();
+    const auto end = m_properties.end();
+    for (; it != end; ++it) {
+        if (smatch.match(it->first)) {
             ret.emplace(it->first, it->second);
         }
     }
@@ -121,9 +142,10 @@ std::string repository::stringify(const mapType &_m) const {
 }
 
 std::string repository::propName(const std::string &name) const {
-    std::string path = name.substr(0, m_repName.length()) != m_repName
-                           ? m_repName + "/" + name
-                           : name;
+    //    std::string path = name.substr(0, m_repName.length()) != m_repName
+    //                           ? m_repName + "/" + name
+    //                           : name;
+    std::string path = name;
     path.erase(std::unique(path.begin(), path.end(), both_slashes()),
                path.end());
     return path;
@@ -176,10 +198,13 @@ property &repository::create(const std::string &name, const property &_cp) {
     std::string cname = propName(name);
     std::pair<mapType::iterator, bool> ret =
         m_properties.emplace(cname, nullptr);
+
     if (true == ret.second) {
         ret.first->second = std::make_shared<property>(_cp);
         ret.first->second->set(name, *this); // TODO name or cname
+        log_inst.debug(TAG, "create {}", ret.first->second->name());
     }
+
     return *ret.first->second;
 }
 
@@ -203,8 +228,12 @@ void repository::parse(const std::string &c) {
             re, path,
             [this](std::string ipath, nlohmann::json::const_iterator it) {
                 std::string propPath = propName(ipath);
-                // FIXME std::cout << propPath << " : " << it.key() << " < "
-                // << it.value() << "\n";
+                std::stringstream ss;
+                ss << it.value();
+                log_inst.debug(TAG, "{} : {} < {}", propPath, it.key(),
+                               ss.str());
+                // std::cout << propPath << " : " << it.key() << " < " <<
+                // it.value() << "\n";
                 if (it.value().is_boolean()) {
                     create(propPath, property())[it.key()] = it->get<bool>();
                 } else if (it.value().is_number_integer()) {
@@ -220,7 +249,7 @@ void repository::parse(const std::string &c) {
             });
 #if (defined(__cpp_exceptions))
     } catch (const std::exception &e) {
-        // FIXME std::cout << "exception on parse " << e.what() << "\n";
+        log_inst.error(TAG, "exception on parse {}\n", e.what());
     };
 #else
     }
@@ -233,4 +262,27 @@ property &repository::operator[](const std::string &key) {
 
 property &repository::operator[](std::string &&key) {
     return create(key, property());
+}
+
+bool repository::StringMatch::match(const std::string str) {
+    bool ret = true;
+    std::vector<std::string> m_parts = utilities::split(str, "/");
+    for (size_t i = 0; (i < m_keys.size()) && (i < m_parts.size()); i++) {
+        if ((m_keys[i][0] == '*') || (m_keys[i].length() == 0) ||
+            (m_keys[i] == m_parts[i])) {
+            continue;
+        } else {
+            ret = false;
+            break;
+        }
+    }
+    return ret;
+}
+
+repository::StringMatch::StringMatch(const std::string &key) {
+    m_keys = utilities::split(key, "/");
+}
+
+repository::StringMatch::StringMatch(std::string &&key) {
+    m_keys = utilities::split(key, "/");
 }

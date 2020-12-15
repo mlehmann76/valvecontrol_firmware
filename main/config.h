@@ -58,8 +58,10 @@ class MqttConfig : public configBase {
     esp_err_t init();
 
     std::string getPubMsg() const { return mqtt_pub_msg; }
-
     std::string getDevName() const { return mqtt_device_name; }
+    void setConnected(bool isCon) {
+        repo()["/network/mqtt/state"]["connected"] = isCon;
+    }
 
   private:
     std::string mqtt_pub_msg;

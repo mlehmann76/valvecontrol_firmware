@@ -48,9 +48,13 @@ class property {
 
         operator mapped_type() const { return m_p.get().at(m_n); }
 #if (defined(__cpp_exceptions))
-        template <typename T> T get() const { return m_p.get().at(m_n).get<T>(); }
+        template <typename T> T get() const {
+            return m_p.get().at(m_n).get<T>();
+        }
 #else
-        template <typename T> T get() const { return m_p.get().at(m_n).get_unchecked<T>(); }
+        template <typename T> T get() const {
+            return m_p.get().at(m_n).get_unchecked<T>();
+        }
 #endif
     };
 

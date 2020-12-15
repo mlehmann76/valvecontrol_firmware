@@ -15,12 +15,11 @@
 #include <string>
 #include <thread>
 
-#include "logger.h"
+#include "FileHandler.h"
 #include "HttpAuth.h"
 #include "HttpServer.h"
-#include "FileHandler.h"
-#include "RepositoryHandler.h"
 #include "MqttRepAdapter.h"
+#include "RepositoryHandler.h"
 #include "channelAdapter.h"
 #include "channelFactory.h"
 #include "config.h"
@@ -32,6 +31,7 @@
 #include "esp_task_wdt.h"
 #include "esp_wifi.h"
 #include "esp_wps.h"
+#include "logger.h"
 #include "nvs_flash.h"
 #include "otaHandler.h"
 #include "repository.h"
@@ -41,49 +41,38 @@
 
 using namespace std::string_literals;
 
-logType log_inst({},{}) ;
+logType log_inst({}, {});
 
 #define TAG "MAIN"
 
 MainClass::MainClass()
-    : _sntp(std::make_shared<SntpSupport>()), _stateRepository(),
-      _controlRepository(), _http(), _mqttOtaHandler(), _controlRepAdapter(),
+    : _sntp(std::make_shared<SntpSupport>()), _http(), _mqttOtaHandler(),
       _configRepAdapter(), _channels(4),
       _cex(std::make_shared<ExclusiveAdapter>())
 
-{
-    mqttConf.init();
-    _stateRepository = (std::make_shared<StatusRepository>(
-        "/state", mqttUser, fmt::format("{}state", mqttConf.getDevName()),
-        tag<DefaultLinkPolicy>{}));
+{}
 
-    _controlRepository =
-        (std::make_shared<repository>("/control", tag<DefaultLinkPolicy>{}));
+void MainClass::setup() {
+
+    log_inst.setLogSeverity("I2C", logger::severity_type::warning);
+    log_inst.setLogSeverity("repository", logger::severity_type::warning);
+
+    mqttConf.init();
 
     _http = (std::make_shared<http::HttpServer>(80));
 
     _jsonHandler = std::make_shared<http::RepositoryHandler>("GET", "/json");
-    _spiffsHandler = std::make_shared<http::FileHandler>("GET" , "/", "/spiffs");
+    _spiffsHandler = std::make_shared<http::FileHandler>("GET", "/", "/spiffs");
 
     _mqttOtaHandler = (std::make_shared<MqttOtaHandler>(
         otaWorker, mqttUser, fmt::format("{}ota/#", mqttConf.getDevName()),
         fmt::format("{}ota/$implementation/binary", mqttConf.getDevName())));
 
-    _controlRepAdapter = (std::make_shared<MqttRepAdapter>(
-        *_controlRepository.get(), mqttUser,
-        fmt::format("{}control", mqttConf.getDevName())));
-
     _configRepAdapter = (std::make_shared<MqttRepAdapter>(
         Config::repo(), mqttUser,
         fmt::format("{}config", mqttConf.getDevName())));
 
-    _tasks = std::make_shared<Tasks>(Config::repo(), *_stateRepository,
-                                     *_controlRepository);
-}
-
-void MainClass::setup() {
-
-	log_inst.setLogSeverity("I2C", logger::severity_type::warning);
+    _tasks = std::make_shared<Tasks>(Config::repo());
 
     spiffsInit();
 
@@ -94,17 +83,16 @@ void MainClass::setup() {
     wifitask.addConnectionObserver(_http->obs());
     wifitask.addConnectionObserver(mqttUser.obs());
 
-    _jsonHandler->add("/json/state.json", *_stateRepository);
-    _jsonHandler->add("/json/config.json", Config::repo());
-    _jsonHandler->add("/json/command.json", *_controlRepository);
+    _jsonHandler->add("/json", Config::repo());
 
     _http->addPathHandler(_spiffsHandler);
 
     http::HttpAuth::AuthToken _token;
     _token.pass = "admin";
     _token.user = "admin";
-//    _http->addPathHandler(std::make_shared<http::HttpAuth>(
-//        _jsonHandler.get(), _token, http::HttpAuth::DIGEST_AUTH_SHA256_MD5));
+    //    _http->addPathHandler(std::make_shared<http::HttpAuth>(
+    //        _jsonHandler.get(), _token,
+    //        http::HttpAuth::DIGEST_AUTH_SHA256_MD5));
 
     _http->addPathHandler(_jsonHandler);
 
@@ -112,11 +100,12 @@ void MainClass::setup() {
         _channels[i] = std::shared_ptr<ChannelBase>(
             LedcChannelFactory::channel(i, chanConf.getTime(i)));
         _cex->setChannel(&*_channels[i]);
-        _stateRepository->create("actors/" + _channels[i]->name(),
-                                 {{{"value", "OFF"s}}});
+        Config::repo().create("/actors/" + _channels[i]->name() + "/state",
+                              {{{"value", "OFF"s}}});
 
-        _controlRepository
-            ->create("actors/" + _channels[i]->name(), {{{"value", "OFF"s}}})
+        Config::repo()
+            .create("/actors/" + _channels[i]->name() + "/control",
+                    {{{"value", "OFF"s}}})
             .set([=](const property &p) {
                 auto it = p.find("value");
                 if (it != p.end() && it->second.is<StringType>()) {
@@ -128,12 +117,12 @@ void MainClass::setup() {
 
         _channels[i]->add([=](ChannelBase *b) { _cex->onNotify(b); });
         _channels[i]->add([=](ChannelBase *b) {
-            _stateRepository->set("actors/" + b->name(),
-                                  {{"value", b->get() ? "ON"s : "OFF"s}});
+            Config::repo().set("/actors/" + b->name() + "/state",
+                               {{"value", b->get() ? "ON"s : "OFF"s}});
         });
     }
 
-    sht1x.regProperty(_stateRepository.get(), "sensors/sht1x");
+    sht1x.regProperty(&Config::repo(), "/sensors/sht1x/state");
 }
 
 void MainClass::spiffsInit(void) {
@@ -150,12 +139,12 @@ void MainClass::spiffsInit(void) {
 
     if (ret != ESP_OK) {
         if (ret == ESP_FAIL) {
-        	log_inst.error(TAG, "Failed to mount or format filesystem");
+            log_inst.error(TAG, "Failed to mount or format filesystem");
         } else if (ret == ESP_ERR_NOT_FOUND) {
-        	log_inst.error(TAG, "Failed to find SPIFFS partition");
+            log_inst.error(TAG, "Failed to find SPIFFS partition");
         } else {
-        	log_inst.error(TAG, "Failed to initialize SPIFFS {}",
-                     esp_err_to_name(ret));
+            log_inst.error(TAG, "Failed to initialize SPIFFS {}",
+                           esp_err_to_name(ret));
         }
         return;
     }
@@ -163,10 +152,11 @@ void MainClass::spiffsInit(void) {
     size_t total = 0, used = 0;
     ret = esp_spiffs_info(NULL, &total, &used);
     if (ret != ESP_OK) {
-    	log_inst.error(TAG, "Failed to get SPIFFS partition information {}",
-                 esp_err_to_name(ret));
+        log_inst.error(TAG, "Failed to get SPIFFS partition information {}",
+                       esp_err_to_name(ret));
     } else {
-    	log_inst.info(TAG, "Partition size: total: {:d}, used: {:d}", total, used);
+        log_inst.info(TAG, "Partition size: total: {:d}, used: {:d}", total,
+                      used);
     }
 }
 
@@ -187,8 +177,9 @@ int MainClass::loop() {
         if (0 == count) {
             if (esp_get_free_heap_size() != heapFree) {
                 heapFree = esp_get_free_heap_size();
-                //vTaskGetRunTimeStats(pcWriteBuffer.get());
-                log_inst.info(TAG, "[APP] Free memory: {:d} bytes", esp_get_free_heap_size());
+                // vTaskGetRunTimeStats(pcWriteBuffer.get());
+                log_inst.info(TAG, "[APP] Free memory: {:d} bytes",
+                              esp_get_free_heap_size());
                 // ESP_LOGI(TAG,
                 // "%s\n", _controlRepository->debug().c_str());
                 // ESP_LOGI(TAG, "%s\n", _stateRepository->debug().c_str());

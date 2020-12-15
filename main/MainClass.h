@@ -28,9 +28,9 @@ class Tasks;
 class SntpSupport;
 
 namespace http {
-	class FileHandler;
-	class RepositoryHandler;
-}
+class FileHandler;
+class RepositoryHandler;
+} // namespace http
 
 class MainClass {
     WifiTask wifitask;
@@ -38,13 +38,10 @@ class MainClass {
     Ota::OtaWorker otaWorker;
     mqtt::MqttWorker mqttUser;
     std::shared_ptr<SntpSupport> _sntp;
-    std::shared_ptr<repository> _stateRepository;
-    std::shared_ptr<repository> _controlRepository;
     std::shared_ptr<http::HttpServer> _http;
     std::shared_ptr<http::RepositoryHandler> _jsonHandler;
     std::shared_ptr<http::FileHandler> _spiffsHandler;
     std::shared_ptr<MqttOtaHandler> _mqttOtaHandler;
-    std::shared_ptr<MqttRepAdapter> _controlRepAdapter;
     std::shared_ptr<MqttRepAdapter> _configRepAdapter;
     std::vector<std::shared_ptr<ChannelBase>> _channels;
     std::shared_ptr<ExclusiveAdapter> _cex; // only one channel should be active

@@ -42,10 +42,11 @@ esp_err_t configBase::init() {
     char *nvs_json_config;
     esp_err_t ret = ESP_OK;
 
-    repo().create("system", {{{"user", "admin"s}, {"password", "admin"s}}});
-    repo().create("sntp", {{{"zone", ""s}, {"server", ""s}}});
+    repo().create("/system/auth/config",
+                  {{{"user", "admin"s}, {"password", "admin"s}}});
+    repo().create("/network/sntp/config", {{{"zone", ""s}, {"server", ""s}}});
     repo().create(
-        "mqtt",
+        "/network/mqtt/config",
         {{{"server", ""s}, {"user", ""s}, {"pass", ""s}, {"device", ""s}}});
 
     esp_err_t err = nvs_flash_init();
@@ -61,7 +62,8 @@ esp_err_t configBase::init() {
 
     err = nvs_open("storage", NVS_READWRITE, &my_handle);
     if (err != ESP_OK) {
-        log_inst.error(TAG, "nvs_open storage failed ({})", esp_err_to_name(err));
+        log_inst.error(TAG, "nvs_open storage failed ({})",
+                       esp_err_to_name(err));
     }
 #if 0
 	//try opening saved json config
@@ -82,7 +84,7 @@ esp_err_t configBase::init() {
     repo().parse(config_json_start);
 #endif
     m_isInitialized = true;
-    //log_inst.debug(TAG, "repo ({})", repo().debug());
+    // log_inst.debug(TAG, "repo ({})", repo().debug());
 
     return ret;
 }
@@ -105,7 +107,7 @@ esp_err_t configBase::readStr(nvs_handle *pHandle, const char *pName,
 }
 
 repository &repo() {
-    static repository s_repository("/config", tag<ReplaceLinkPolicy>{});
+    static repository s_repository("", tag<ReplaceLinkPolicy>{});
     return s_repository;
 }
 
@@ -123,7 +125,8 @@ esp_err_t MqttConfig::init() {
     }
     /* read mqtt device name */
 
-    mqtt_device_name = Config::repo().get<std::string>("mqtt", "device");
+    mqtt_device_name =
+        Config::repo().get<std::string>("/network/mqtt/config", "device");
 
     if (mqtt_device_name == "") {
         /* set default device name */
@@ -157,7 +160,7 @@ esp_err_t ChannelConfig::init() {
 
 std::stringstream ChannelConfig::channelName(unsigned ch) {
     std::stringstream _name;
-    _name << "channel" << ch + 1;
+    _name << "/actors/channel" << ch + 1 << "/config";
     return _name;
 }
 
@@ -179,19 +182,19 @@ std::chrono::seconds ChannelConfig::getTime(unsigned ch) {
 }
 
 std::string SysConfig::getTimeServer() {
-    return repo().get<std::string>("sntp", "server");
+    return repo().get<std::string>("/network/sntp/config", "server");
 }
 
 std::string SysConfig::getTimeZone() {
-    return repo().get<std::string>("sntp", "zone");
+    return repo().get<std::string>("/network/sntp/config", "zone");
 }
 
 std::string SysConfig::getPass() {
-    return repo().get<std::string>("system", "password");
+    return repo().get<std::string>("/system/auth/config", "password");
 }
 
 std::string SysConfig::getUser() {
-    return repo().get<std::string>("system", "user");
+    return repo().get<std::string>("/system/auth/config", "user");
 }
 
 } /* namespace Config */

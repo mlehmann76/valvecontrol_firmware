@@ -62,8 +62,8 @@ class TaskConfig {
 
   private:
     bool readTask(const std::string &name);
-    void readTaskDetail(const std::string &name, Task &_t);
-    Task::TasksItem readTaskItemDetail(const std::string &_next);
+    void readTaskDetail(const std::string &name, Task &_t) const;
+    Task::TasksItem readTaskItemDetail(const std::string &_next) const;
 
     taskListType m_tasks;
     repository &m_repo;
@@ -80,30 +80,20 @@ class TaskThread {
  */
 class TaskState {
   public:
-    TaskState(repository &state);
+    TaskState(repository &state, std::string &&taskId);
     void regStateVariables();
     void update(bool run, const std::chrono::system_clock::time_point &_start);
-    void update(const TaskConfig::Task &task,
+    void update(const detail::TaskConfig::Task &task,
                 const TaskConfig::Task::TasksItem &item);
     void update(std::chrono::seconds time, std::chrono::seconds remain);
-
-    std::string name() { return m_state["name"].get<StringType>(); }
-    bool running() { return m_state["running"].get<BoolType>(); }
+    bool running() const;
     repository &repo() const { return m_stateRep; }
 
   private:
     repository &m_stateRep;
-    property m_state;
+    const std::string m_taskId;
 };
 
-class TaskControl {
-  public:
-    TaskControl(Tasks &task, repository &ctrl);
-    repository &repo() const { return m_repo; }
-
-  private:
-    repository &m_repo;
-};
 } // namespace detail
 /**
  *
@@ -114,7 +104,7 @@ class Tasks {
     using listIterator = detail::TaskConfig::Task::itemListType::iterator;
 
   public:
-    Tasks(repository &config, repository &state, repository &ctrl);
+    Tasks(repository &config);
     ~Tasks();
     void setup();
     void onControl(const property &p);
@@ -129,10 +119,13 @@ class Tasks {
     bool checkWeekDay(const std::string &d);
     bool checkTimePoint(const std::string &d);
     std::chrono::system_clock::time_point toTimePoint(const std::string &d);
+    void setChannel(const std::string &c, bool isOn);
+    std::string activeTaskName();
+    void regTaskControl(const std::string &name);
 
+    repository &m_repo;
     std::shared_ptr<detail::TaskConfig> m_config;
-    std::shared_ptr<detail::TaskState> m_state;
-    std::shared_ptr<detail::TaskControl> m_control;
+    std::map<std::string, std::shared_ptr<detail::TaskState>> m_states;
     std::string m_nextRequest;
     detail::TaskConfig::Task *m_activeTask;
     detail::TaskConfig::Task::TasksItem *m_activeItem;

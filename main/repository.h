@@ -34,6 +34,13 @@ class repository {
         constexpr bool operator()() const { return value; }
     };
 
+    struct StringMatch {
+        std::vector<std::string> m_keys;
+        StringMatch(const std::string &key);
+        StringMatch(std::string &&key);
+        bool match(const std::string str);
+    };
+
   public:
     using iterator = mapType::iterator;
     using const_iterator = mapType::const_iterator;
