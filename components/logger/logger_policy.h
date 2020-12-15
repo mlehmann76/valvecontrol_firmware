@@ -76,7 +76,7 @@ inline void FileLogPolicy::open() { out_stream->open(_name, std::ios::out); }
 inline void FileLogPolicy::close() { out_stream->close(); }
 
 inline void FileLogPolicy::write(severity_type, const std::string &msg) {
-    out_stream->write(msg.c_str(), msg.length());
+    out_stream->write(msg.c_str(), static_cast<std::streamsize>(msg.length()));
 }
 
 } // namespace logger

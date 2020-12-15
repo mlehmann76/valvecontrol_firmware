@@ -55,11 +55,17 @@ class repository {
     /* link a existing property in the repository */
     property &link(const keyType &_name, property &_p);
 
+    /* unlink the property */
+    bool unlink(const keyType &_name);
+
     /* create a new property with starting value */
     property &create(const keyType &_name, const property &_cp = {});
 
-    /* unlink the property */
-    bool unlink(const keyType &_name);
+    /* create properties from json string */
+    void append(const std::string& _json);
+
+    /* delete properties from json string */
+    void remove(const std::string& _json);
 
     /* set the property */
     virtual bool set(const keyType &name, const property::property_base &p);

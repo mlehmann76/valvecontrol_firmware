@@ -62,21 +62,7 @@ class JsonVisitor {
 
     template <typename T> void operator()(const T &value) const {
         assert(m_parts.size() > 0);
-#if 0
-        switch (m_parts.size()) {
-        	case 1: m_json[m_parts[0]][m_key] = value; break;
-        	case 2: m_json[m_parts[0]][m_parts[1]][m_key] = value; break;
-        	case 3: m_json[m_parts[0]][m_parts[1]][m_parts[2]][m_key] = value; break;
-        	case 4: m_json[m_parts[0]][m_parts[1]][m_parts[2]][m_parts[3]][m_key] = value; break;
-        	case 5: m_json[m_parts[0]][m_parts[1]][m_parts[2]][m_parts[3]][m_parts[4]][m_key] = value; break;
-        	case 6: m_json[m_parts[0]][m_parts[1]][m_parts[2]][m_parts[3]][m_parts[4]][m_parts[5]][m_key] = value; break;
-        	default:
-        		log_inst.error(TAG, "wrong number of name parts");
-        		break;
-        }
-#else
         _setKey(0, m_json, value);
-#endif
     }
 
   private:
@@ -155,8 +141,6 @@ bool repository::set(const std::string &_name,
                      const property::property_base &p) {
     std::lock_guard<std::mutex> lock(m_lock);
     /*set works w/wo omitting repository name */
-    // FIXME std::cout << "rep:" << name() << " -> " << _name << " set " <<
-    // "\n";
     return set(find(propName(_name)), p);
 }
 
@@ -214,12 +198,56 @@ bool repository::unlink(const std::string &name) {
 }
 
 void repository::parse(const std::string &c) {
-    // FIXME std::cout << "parsing : " << c << "\n";
+	append(c);
+}
+
+void repository::append(const std::string& _json) {
+	#if (defined(__cpp_exceptions))
+	    try {
+	        nlohmann::json re = nlohmann::json::parse(_json);
+	#else
+	    nlohmann::json re = nlohmann::json::parse(_json, nullptr, false, true);
+	    // allow_exceptions=false, ignore_comments = true
+	    if (!re.is_discarded()) {
+	#endif
+	        std::string path;
+	        recursive_iterate(
+	            re, path,
+	            [this](std::string ipath, nlohmann::json::const_iterator it) {
+	                std::string propPath = propName(ipath);
+	                std::stringstream ss;
+	                ss << it.value();
+	                log_inst.debug(TAG, "{} : {} < {}", propPath, it.key(),
+	                               ss.str());
+	                property &_p = create(propPath, property());
+
+	                if (it.value().is_boolean()) {
+	                    _p[it.key()] = it->get<bool>();
+	                } else if (it.value().is_number_integer()) {
+	                    _p[it.key()] = it->get<int>();
+	                } else if (it.value().is_number_float()) {
+	                    _p[it.key()] = it->get<double>();
+	                } else if (it.value().is_string()) {
+	                    _p[it.key()] = it->get<std::string>();
+	                } else {
+	                    assert(false);
+	                }
+	            });
+	#if (defined(__cpp_exceptions))
+	    } catch (const std::exception &e) {
+	        log_inst.error(TAG, "exception on create {}\n", e.what());
+	    };
+	#else
+	    }
+	#endif
+}
+
+void repository::remove(const std::string& _json) {
 #if (defined(__cpp_exceptions))
     try {
-        nlohmann::json re = nlohmann::json::parse(c);
+        nlohmann::json re = nlohmann::json::parse(_json);
 #else
-    nlohmann::json re = nlohmann::json::parse(c, nullptr, false, true);
+    nlohmann::json re = nlohmann::json::parse(_json, nullptr, false, true);
     // allow_exceptions=false, ignore_comments = true
     if (!re.is_discarded()) {
 #endif
@@ -228,32 +256,18 @@ void repository::parse(const std::string &c) {
             re, path,
             [this](std::string ipath, nlohmann::json::const_iterator it) {
                 std::string propPath = propName(ipath);
-                std::stringstream ss;
-                ss << it.value();
-                log_inst.debug(TAG, "{} : {} < {}", propPath, it.key(),
-                               ss.str());
-                // std::cout << propPath << " : " << it.key() << " < " <<
-                // it.value() << "\n";
-                if (it.value().is_boolean()) {
-                    create(propPath, property())[it.key()] = it->get<bool>();
-                } else if (it.value().is_number_integer()) {
-                    create(propPath, property())[it.key()] = it->get<int>();
-                } else if (it.value().is_number_float()) {
-                    create(propPath, property())[it.key()] = it->get<double>();
-                } else if (it.value().is_string()) {
-                    create(propPath, property())[it.key()] =
-                        it->get<std::string>();
-                } else {
-                    assert(false);
-                }
+
+                bool ret = unlink(propPath);
+                log_inst.debug(TAG, "delete {} : {}", propPath, ret);
             });
 #if (defined(__cpp_exceptions))
     } catch (const std::exception &e) {
-        log_inst.error(TAG, "exception on parse {}\n", e.what());
+        log_inst.error(TAG, "exception on remove {}\n", e.what());
     };
 #else
     }
 #endif
+
 }
 
 property &repository::operator[](const std::string &key) {

@@ -8,7 +8,7 @@
 #ifndef MAIN_CONFIG_USER_H_
 #define MAIN_CONFIG_USER_H_
 
-#include "freertos/FreeRTOS.h"
+//#include "freertos/FreeRTOS.h"
 #include "sdkconfig.h"
 #include <chrono>
 #include <circular_policy.h>
@@ -44,7 +44,9 @@ extern logType log_inst;
 #define WPS_LONG_BIT (1 << 4)
 #define SNTP_UPDATED (1u << 5)
 
+#ifdef CONFIG_FREERTOS_HZ
 using portTick =
     std::chrono::duration<TickType_t, std::ratio<1, CONFIG_FREERTOS_HZ>>;
+#endif
 
 #endif /* MAIN_CONFIG_USER_H_ */
