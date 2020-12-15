@@ -13,7 +13,7 @@
 
 #define TAG "MQTTOTA"
 
-//using Json = cJson::Json;
+// using Json = cJson::Json;
 using Json = nlohmann::json;
 
 MqttOtaHandler::MqttOtaHandler(Ota::OtaWorker &_o, mqtt::MqttWorker &_m,
@@ -52,17 +52,18 @@ int MqttOtaHandler::onMessage(esp_mqtt_event_handle_t event) {
     if (((event->topic_len == 0) && m_ota.isRunning()) ||
         (event->topic && event->topic == m_updatetopic)) {
         log_inst.error(TAG, "OTA update topic {}",
-                 event->data_len < 64 ? event->data : "data");
+                       event->data_len < 64 ? event->data : "data");
         Ota::OtaPacket p(event->data, event->data_len);
         ret = m_ota.handle(p);
     } else if (event->topic &&
                event->topic ==
                    m_firmwaretopic.substr(0, m_firmwaretopic.length() - 2)) {
-        log_inst.info(TAG, "{}", std::string(event->topic,event->topic_len));
+        log_inst.info(TAG, "{}", std::string(event->topic, event->topic_len));
         Json root;
 
-        //Json firmware = root.parse(event->data)["firmware"];
-        Json firmware = nlohmann::json::parse(event->data, nullptr, false, true);
+        // Json firmware = root.parse(event->data)["firmware"];
+        Json firmware =
+            nlohmann::json::parse(event->data, nullptr, false, true);
         if (!firmware.is_discarded()) {
             handleFirmwareMessage(&firmware["firmware"]);
         }
@@ -77,7 +78,7 @@ void MqttOtaHandler::handleFirmwareMessage(const Json *firmware) {
     Ota::OtaWorker::md5_update md5_update;
 
     if (firmware != nullptr && firmware->is_structured()) {
-    	auto update = readString((*firmware)["update"]);
+        auto update = readString((*firmware)["update"]);
         auto md5 = readString((*firmware)["md5"]);
         auto len = readDouble((*firmware)["len"]);
 
@@ -86,7 +87,7 @@ void MqttOtaHandler::handleFirmwareMessage(const Json *firmware) {
         }
 
         if (!error && !md5) {
-        	error = 2;
+            error = 2;
         }
 
         if (!error && (md5->length() != 32)) {
@@ -106,16 +107,18 @@ void MqttOtaHandler::handleFirmwareMessage(const Json *firmware) {
         if (error) {
             log_inst.error(TAG, "handleFirmwareMsg error {:d}", error);
         } else {
-            log_inst.debug(TAG,
-                     "fileSize :{:d} ->md5: "
-                     "{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}"
-                     "{:02x}{:02x}",
-                     md5_update.len, md5_update.md5[0], md5_update.md5[1],
-                     md5_update.md5[2], md5_update.md5[3], md5_update.md5[4],
-                     md5_update.md5[5], md5_update.md5[6], md5_update.md5[7],
-                     md5_update.md5[8], md5_update.md5[9], md5_update.md5[10],
-                     md5_update.md5[11], md5_update.md5[12], md5_update.md5[13],
-                     md5_update.md5[14], md5_update.md5[15]);
+            log_inst.debug(
+                TAG,
+                "fileSize :{:d} ->md5: "
+                "{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:"
+                "02x}{:02x}{:02x}{:02x}"
+                "{:02x}{:02x}",
+                md5_update.len, md5_update.md5[0], md5_update.md5[1],
+                md5_update.md5[2], md5_update.md5[3], md5_update.md5[4],
+                md5_update.md5[5], md5_update.md5[6], md5_update.md5[7],
+                md5_update.md5[8], md5_update.md5[9], md5_update.md5[10],
+                md5_update.md5[11], md5_update.md5[12], md5_update.md5[13],
+                md5_update.md5[14], md5_update.md5[15]);
 
             m_ota.start(md5_update);
         }
@@ -123,11 +126,16 @@ void MqttOtaHandler::handleFirmwareMessage(const Json *firmware) {
 }
 
 std::optional<std::string> MqttOtaHandler::readString(const Json &_item) {
-//	return _item.valid() ? std::optional<std::string>{_item.string()} : std::nullopt;
-	return _item.is_string() ? std::optional<std::string>{_item.get<std::string>()} : std::nullopt;
+    //	return _item.valid() ? std::optional<std::string>{_item.string()} :
+    //std::nullopt;
+    return _item.is_string()
+               ? std::optional<std::string>{_item.get<std::string>()}
+               : std::nullopt;
 }
 
 std::optional<double> MqttOtaHandler::readDouble(const Json &_item) {
-//	return _item.valid() ? std::optional<double>{_item.number()} : std::nullopt;
-	return _item.is_number_float() ? std::optional<double>{_item.get<double>()} : std::nullopt;
+    //	return _item.valid() ? std::optional<double>{_item.number()} :
+    //std::nullopt;
+    return _item.is_number_float() ? std::optional<double>{_item.get<double>()}
+                                   : std::nullopt;
 }

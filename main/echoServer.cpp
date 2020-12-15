@@ -55,7 +55,8 @@ void EchoServer::task() {
                         log_inst.debug(TAG, "Socket({:d})::noData", _s->get());
                         break;
                     case Socket::errorState:
-                        log_inst.debug(TAG, "Socket({:d})::errorState", _s->get());
+                        log_inst.debug(TAG, "Socket({:d})::errorState",
+                                       _s->get());
                         removeSocket(_s);
                         break;
                     case Socket::newData:
@@ -63,8 +64,8 @@ void EchoServer::task() {
                         bzero(buf, sizeof(buf));
                         int readSize = _s->read(buf, sizeof(buf));
                         if (readSize >= 0) {
-                            log_inst.debug(TAG, "socket({:d}) read: {:d} , {}", _s->get(),
-                                     readSize, buf);
+                            log_inst.debug(TAG, "socket({:d}) read: {:d} , {}",
+                                           _s->get(), readSize, buf);
                             _s->write(buf, readSize);
                         } else {
                             removeSocket(_s);
