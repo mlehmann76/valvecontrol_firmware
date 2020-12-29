@@ -14,10 +14,12 @@
 #include "HttpServer.h"
 #include "SemaphoreCPP.h"
 #include "TimerCPP.h"
-#include "WifiTask.h"
+#include "WifiManager.h"
 #include "mqttWorker.h"
 #include "otaWorker.h"
 #include "sht1x.h"
+#include <esp_event.h>
+#include <freertos/event_groups.h>
 
 class repository;
 class MqttOtaHandler;
@@ -33,7 +35,28 @@ class RepositoryHandler;
 } // namespace http
 
 class MainClass {
-    WifiTask wifitask;
+    static const unsigned WPS_SHORT_MS = (100 / portTICK_PERIOD_MS);
+    static const unsigned WPS_LONG_MS = (500 / portTICK_PERIOD_MS);
+
+   public:
+    void setup();
+    int loop();
+    static MainClass *instance() {
+        static MainClass _inst;
+        return &_inst;
+    }
+    mqtt::MqttWorker &mqtt() { return mqttUser; }
+    EventGroupHandle_t &eventGroup() { return (main_event_group); }
+
+  private:
+    MainClass();
+    virtual ~MainClass() = default;
+    void spiffsInit();
+    int checkWPSButton();
+
+    std::mutex mutex;
+    std::condition_variable cvInitDone;
+    std::shared_ptr<wifi::WifiManager> _wifi;
     Sht1x sht1x = {GPIO_NUM_21, GPIO_NUM_22};
     Ota::OtaWorker otaWorker;
     mqtt::MqttWorker mqttUser;
@@ -46,21 +69,7 @@ class MainClass {
     std::vector<std::shared_ptr<ChannelBase>> _channels;
     std::shared_ptr<ExclusiveAdapter> _cex; // only one channel should be active
     std::shared_ptr<Tasks> _tasks;
-
-  public:
-    void setup();
-    int loop();
-    static MainClass *instance() {
-        static MainClass _inst;
-        return &_inst;
-    }
-    EventGroupHandle_t &eventGroup() { return (wifitask.eventGroup()); }
-    mqtt::MqttWorker &mqtt() { return mqttUser; }
-
-  private:
-    MainClass();
-    virtual ~MainClass() = default;
-    void spiffsInit(void);
+    EventGroupHandle_t main_event_group = nullptr;
 };
 
 #endif /* MAIN_MAINCLASS_H_ */

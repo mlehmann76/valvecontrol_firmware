@@ -29,8 +29,6 @@
 #include "esp_spiffs.h"
 #include "esp_system.h"
 #include "esp_task_wdt.h"
-#include "esp_wifi.h"
-#include "esp_wps.h"
 #include "logger.h"
 #include "nvs_flash.h"
 #include "otaHandler.h"
@@ -38,6 +36,7 @@
 #include "sntp.h"
 #include "statusrepository.h"
 #include "tasks.h"
+#include "WifiManager.h"
 
 using namespace std::string_literals;
 
@@ -50,15 +49,26 @@ MainClass::MainClass()
       _configRepAdapter(), _channels(4),
       _cex(std::make_shared<ExclusiveAdapter>())
 
-{}
+{
+    
+}
 
 void MainClass::setup() {
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+    main_event_group = xEventGroupCreate();
 
     log_inst.setLogSeverity("I2C", logger::severity_type::warning);
     log_inst.setLogSeverity("repository", logger::severity_type::warning);
 
     mqttConf.init();
+    netConf.init();
 
+    _wifi = std::make_shared<wifi::WifiManager>(Config::repo(), mutex, cvInitDone);
+    {
+        std::unique_lock<std::mutex> lck(mutex);
+        cvInitDone.wait(lck, [this] { return _wifi->initDone(); });
+    }
     _http = (std::make_shared<http::HttpServer>(80));
 
     _jsonHandler = std::make_shared<http::RepositoryHandler>("GET", "/json");
@@ -80,16 +90,16 @@ void MainClass::setup() {
     _tasks->setup();
     mqttUser.init();
 
-    wifitask.addConnectionObserver(_http->obs());
-    wifitask.addConnectionObserver(mqttUser.obs());
+    _wifi->addConnectionObserver(_http->obs());
+    _wifi->addConnectionObserver(mqttUser.obs());
 
     _jsonHandler->add("/json", Config::repo());
 
     _http->addPathHandler(_spiffsHandler);
 
-    http::HttpAuth::AuthToken _token;
-    _token.pass = "admin";
-    _token.user = "admin";
+    // http::HttpAuth::AuthToken _token;
+    // _token.pass = "admin";
+    // _token.user = "admin";
     //    _http->addPathHandler(std::make_shared<http::HttpAuth>(
     //        _jsonHandler.get(), _token,
     //        http::HttpAuth::DIGEST_AUTH_SHA256_MD5));
@@ -160,6 +170,24 @@ void MainClass::spiffsInit(void) {
     }
 }
 
+int MainClass::checkWPSButton() {
+    static int wps_button_count = 0;
+    if ((gpio_get_level((gpio_num_t)WPS_BUTTON) == 0)) {
+        wps_button_count++;
+        if (wps_button_count > (WPS_LONG_MS / portTICK_PERIOD_MS)) {
+            xEventGroupSetBits(main_event_group, WPS_LONG_BIT);
+            _wifi->startWPS();
+            wps_button_count = 0;
+        }
+    } else {
+        if (wps_button_count > (WPS_SHORT_MS / portTICK_PERIOD_MS)) {
+            xEventGroupSetBits(main_event_group, WPS_SHORT_BIT);
+        }
+        wps_button_count = 0;
+    }
+    return wps_button_count;
+}
+
 int MainClass::loop() {
     int count = 0;
     uint32_t heapFree = 0;
@@ -167,10 +195,10 @@ int MainClass::loop() {
 
     while (1) {
         // check for time update by _sntp
-        if (!(xEventGroupGetBits(MainClass::instance()->eventGroup()) &
+        if (!(xEventGroupGetBits(eventGroup()) &
               SNTP_UPDATED) &&
             _sntp->update()) {
-            xEventGroupSetBits(MainClass::instance()->eventGroup(),
+            xEventGroupSetBits(eventGroup(),
                                SNTP_UPDATED);
         }
 
@@ -188,6 +216,9 @@ int MainClass::loop() {
         } else {
             count--;
         }
+
+        checkWPSButton();
+
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }

@@ -23,8 +23,8 @@ static const char *TAG = "sntp";
 
 void SntpSupport::init() {
     log_inst.info(TAG, "Initializing SNTP");
-    server = Config::repo().get<std::string>("/network/sntp/config", "server");
-    timeZone = Config::repo().get<std::string>("/network/sntp/config", "zone");
+    server = netConf.getTimeServer();//::repo().get<std::string>("/network/sntp/config", "server");
+    timeZone = netConf.getTimeZone();//::repo().get<std::string>("/network/sntp/config", "zone");
     log_inst.info(TAG, "sntp server ({}) ({})", server, timeZone);
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_setservername(0, server.c_str());
