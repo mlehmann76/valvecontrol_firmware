@@ -42,12 +42,9 @@ esp_err_t configBase::init() {
     char *nvs_json_config;
     esp_err_t ret = ESP_OK;
 
-    repo().create("/system/auth/config",
-                  {{{"user", "admin"s}, {"password", "admin"s}}});
-    repo().create("/network/sntp/config", {{{"zone", ""s}, {"server", ""s}}});
-    repo().create(
-        "/network/mqtt/config",
-        {{{"server", ""s}, {"user", ""s}, {"pass", ""s}, {"device", ""s}}});
+    repo().create("/system/auth/config", {{                    //
+                                           {"user", "admin"s}, //
+                                           {"password", "admin"s}}});
 
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES ||
@@ -142,6 +139,68 @@ esp_err_t MqttConfig::init() {
     return ESP_OK;
 }
 
+esp_err_t NetConfig::init() {
+    if (!isInitialized()) {
+        configBase::init();
+    }
+    repo().create("/network/sntp/config", {{               //
+                                            {"zone", ""s}, //
+                                            {"server", ""s}}});
+    repo().create("/network/mqtt/config", {{                    //
+                                            {"enabled", false}, //
+                                            {"server", ""s},    //
+                                            {"user", ""s},      //
+                                            {"pass", ""s},      //
+                                            {"device", ""s}}});
+    repo().create("/network/wifi/config", {{                            //
+                                            {"hostname", "espressif"s}, //
+                                            {"mode", 1}}});
+    repo().create("/network/wifi/config/AP", {{                          //
+                                               {"ssid", "espressifAP"s}, //
+                                               {"pass", "espressif"s},   //
+                                               {"channel", 1}}});
+    repo().create("/network/wifi/config/STA", {{               //
+                                                {"ssid", ""s}, //
+                                                {"pass", ""s}}});
+    return ESP_OK;
+}
+
+std::string NetConfig::getTimeServer() const {
+    return repo().get<std::string>("/network/sntp/config", "server");
+}
+
+std::string NetConfig::getTimeZone() const {
+    return repo().get<std::string>("/network/sntp/config", "zone");
+}
+
+std::string NetConfig::getHostname() const {
+    return repo().get<std::string>("/network/wifi/config", "hostname");
+}
+
+std::string NetConfig::getApSSID() const {
+    return repo().get<std::string>("/network/wifi/config/AP", "ssid");
+}
+
+std::string NetConfig::getApPass() const {
+    return repo().get<std::string>("/network/wifi/config/AP", "pass");
+}
+
+unsigned NetConfig::getApChannel() const {
+    return repo().get<IntType>("/network/wifi/config/AP", "channel");
+}
+
+std::string NetConfig::getStaSSID() const {
+    return repo().get<std::string>("/network/wifi/config/STA", "ssid");
+}
+
+std::string NetConfig::getStaPass() const {
+    return repo().get<std::string>("/network/wifi/config/STA", "pass");
+}
+
+unsigned NetConfig::getMode() const {
+    return repo().get<IntType>("/network/wifi/config", "mode", 1);
+}
+
 ChannelConfig::ChannelConfig() : configBase("channels"), m_channelCount(0) {}
 
 esp_err_t ChannelConfig::init() {
@@ -181,14 +240,6 @@ std::chrono::seconds ChannelConfig::getTime(unsigned ch) {
         repo().get<int>(channelName(ch).str(), "maxTime"));
 }
 
-std::string SysConfig::getTimeServer() {
-    return repo().get<std::string>("/network/sntp/config", "server");
-}
-
-std::string SysConfig::getTimeZone() {
-    return repo().get<std::string>("/network/sntp/config", "zone");
-}
-
 std::string SysConfig::getPass() {
     return repo().get<std::string>("/system/auth/config", "password");
 }
@@ -203,3 +254,4 @@ std::string SysConfig::getUser() {
 Config::MqttConfig mqttConf;
 Config::SysConfig sysConf;
 Config::ChannelConfig chanConf;
+Config::NetConfig netConf;

@@ -43,8 +43,6 @@ class SysConfig : public configBase {
 
     std::string getUser();
     std::string getPass();
-    std::string getTimeZone();
-    std::string getTimeServer();
 
   private:
 };
@@ -68,6 +66,21 @@ class MqttConfig : public configBase {
     std::string mqtt_device_name;
 };
 
+class NetConfig : public configBase {
+  public:
+    NetConfig() : configBase("network") {}
+    esp_err_t init();
+    std::string getTimeZone() const;
+    std::string getTimeServer() const;
+    std::string getHostname() const;
+    std::string getApSSID() const;
+    std::string getApPass() const;
+    unsigned    getApChannel() const;
+    std::string getStaSSID() const;
+    std::string getStaPass() const;
+    unsigned getMode() const;
+};
+
 class ChannelConfig : public configBase {
   public:
     ChannelConfig();
@@ -87,6 +100,7 @@ class ChannelConfig : public configBase {
 
 extern Config::MqttConfig mqttConf;
 extern Config::SysConfig sysConf;
+extern Config::NetConfig netConf;
 extern Config::ChannelConfig chanConf;
 
 #endif /* MAIN_CONFIG_H_ */
