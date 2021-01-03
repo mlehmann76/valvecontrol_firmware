@@ -12,6 +12,7 @@
 #include <initializer_list>
 #include <mapbox/variant.hpp>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 
 struct monostate {};
@@ -30,8 +31,8 @@ class property {
                                               FloatType, StringType>;
     using property_base = std::unordered_map<key_type, mapped_type>;
 
-    using write_hook_t = std::function<void(const property &p)>;
-    using read_hook_t = std::function<property &()>;
+    using write_hook_t = std::function<std::optional<property>(const property &p)>;
+    using read_hook_t = std::function<property (const property &p)>;
     using iterator = property_base::iterator;
     using const_iterator = property_base::const_iterator;
 
@@ -88,7 +89,7 @@ class property {
     property &reg(const std::string &name, repository &_repo);
 
     property_base get() const {
-        return read_hook ? read_hook().m_pProperty : m_pProperty;
+        return read_hook ? read_hook(*this).m_pProperty : m_pProperty;
     }
 
     property &set(const property_base &p);

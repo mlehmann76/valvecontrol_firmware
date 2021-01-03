@@ -20,6 +20,7 @@
 #include "HttpServer.h"
 #include "MqttRepAdapter.h"
 #include "RepositoryHandler.h"
+#include "WifiManager.h"
 #include "channelAdapter.h"
 #include "channelFactory.h"
 #include "config.h"
@@ -30,13 +31,13 @@
 #include "esp_system.h"
 #include "esp_task_wdt.h"
 #include "logger.h"
+#include "mqttWorker.h"
 #include "nvs_flash.h"
 #include "otaHandler.h"
 #include "repository.h"
 #include "sntp.h"
-#include "statusrepository.h"
+#include "statusnotifyer.h"
 #include "tasks.h"
-#include "WifiManager.h"
 
 using namespace std::string_literals;
 
@@ -45,15 +46,13 @@ logType log_inst({}, {});
 #define TAG "MAIN"
 
 MainClass::MainClass()
-    : _sntp(std::make_shared<SntpSupport>()), _http(), _mqttOtaHandler(),
-      _configRepAdapter(), _channels(4),
-      _cex(std::make_shared<ExclusiveAdapter>())
-
-{
-    
-}
+    : _sntp(std::make_shared<SntpSupport>()), _channels(4),
+      _cex(std::make_shared<ExclusiveAdapter>()) {}
 
 void MainClass::setup() {
+
+    ESP_ERROR_CHECK(esp_netif_init());
+
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     main_event_group = xEventGroupCreate();
@@ -64,23 +63,36 @@ void MainClass::setup() {
     mqttConf.init();
     netConf.init();
 
-    _wifi = std::make_shared<wifi::WifiManager>(Config::repo(), mutex, cvInitDone);
+    _wifi =
+        std::make_shared<wifi::WifiManager>(Config::repo(), mutex, cvInitDone);
     {
         std::unique_lock<std::mutex> lck(mutex);
         cvInitDone.wait(lck, [this] { return _wifi->initDone(); });
     }
-    _http = (std::make_shared<http::HttpServer>(80));
 
-    _jsonHandler = std::make_shared<http::RepositoryHandler>("GET", "/json");
-    _spiffsHandler = std::make_shared<http::FileHandler>("GET", "/", "/spiffs");
+    if (mqttConf.enabled()) {
+        _mqttUser = std::make_shared<mqtt::MqttWorker>();
 
-    _mqttOtaHandler = (std::make_shared<MqttOtaHandler>(
-        otaWorker, mqttUser, fmt::format("{}ota/#", mqttConf.getDevName()),
-        fmt::format("{}ota/$implementation/binary", mqttConf.getDevName())));
+        _mqttOtaHandler = (std::make_shared<MqttOtaHandler>(
+            _otaWorker, *_mqttUser,
+            fmt::format("{}ota/#", mqttConf.getDevName()),
+            fmt::format("{}ota/$implementation/binary",
+                        mqttConf.getDevName())));
 
-    _configRepAdapter = (std::make_shared<MqttRepAdapter>(
-        Config::repo(), mqttUser,
-        fmt::format("{}config", mqttConf.getDevName())));
+        _configRepAdapter = (std::make_shared<MqttRepAdapter>(
+            Config::repo(), *_mqttUser,
+            fmt::format("{}config", mqttConf.getDevName())));
+
+        _wifi->addConnectionObserver(_mqttUser->obs());
+
+        _mqttUser->init();
+
+        _statusNotifyer = std::make_shared<StatusNotifyer>(
+            Config::repo(), *_mqttUser,
+            fmt::format("{}state", mqttConf.getDevName()));
+
+        Config::repo().addNotify("/*/*/state", onStateNotify(*_statusNotifyer));
+    }
 
     _tasks = std::make_shared<Tasks>(Config::repo());
 
@@ -88,10 +100,13 @@ void MainClass::setup() {
 
     _sntp->init();
     _tasks->setup();
-    mqttUser.init();
 
-    _wifi->addConnectionObserver(_http->obs());
-    _wifi->addConnectionObserver(mqttUser.obs());
+    //_wifi->addConnectionObserver(_http->obs());
+    _http = (std::make_shared<http::HttpServer>(80));
+    _http->start();
+
+    _jsonHandler = std::make_shared<http::RepositoryHandler>("GET", "/json");
+    _spiffsHandler = std::make_shared<http::FileHandler>("GET", "/", "/spiffs");
 
     _jsonHandler->add("/json", Config::repo());
 
@@ -116,23 +131,29 @@ void MainClass::setup() {
         Config::repo()
             .create("/actors/" + _channels[i]->name() + "/control",
                     {{{"value", "OFF"s}}})
-            .set([=](const property &p) {
+            .set([=](const property &p) -> std::optional<property> {
                 auto it = p.find("value");
                 if (it != p.end() && it->second.is<StringType>()) {
                     std::string s = it->second.get_unchecked<StringType>();
                     _channels[i]->set(s == "on" || s == "ON" || s == "On",
                                       chanConf.getTime(i));
                 }
+                return {};
             });
 
-        _channels[i]->add([=](ChannelBase *b) { _cex->onNotify(b); });
-        _channels[i]->add([=](ChannelBase *b) {
+        _channels[i]->add([=](ChannelBase *b) -> std::optional<property> {
+            _cex->onNotify(b);
+            return {};
+        });
+        _channels[i]->add([=](ChannelBase *b) -> std::optional<property> {
             Config::repo().set("/actors/" + b->name() + "/state",
                                {{"value", b->get() ? "ON"s : "OFF"s}});
+            return {};
         });
     }
 
     sht1x.regProperty(&Config::repo(), "/sensors/sht1x/state");
+    Config::repo().addNotify("/*/*/config", Config::onConfigNotify(baseConf));
 }
 
 void MainClass::spiffsInit(void) {
@@ -195,11 +216,9 @@ int MainClass::loop() {
 
     while (1) {
         // check for time update by _sntp
-        if (!(xEventGroupGetBits(eventGroup()) &
-              SNTP_UPDATED) &&
+        if (!(xEventGroupGetBits(eventGroup()) & SNTP_UPDATED) &&
             _sntp->update()) {
-            xEventGroupSetBits(eventGroup(),
-                               SNTP_UPDATED);
+            xEventGroupSetBits(eventGroup(), SNTP_UPDATED);
         }
 
         if (0 == count) {

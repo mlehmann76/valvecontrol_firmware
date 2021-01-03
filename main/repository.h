@@ -27,6 +27,8 @@ class repository {
     using keyType = std::string;
     using mappedType = std::shared_ptr<property>;
     using mapType = std::map<keyType, mappedType>;
+    using notifyFuncType = std::function<void(const std::string &s)>;
+    using notifyType = std::pair<std::string, notifyFuncType>;
 
     struct link_policy_t {
         const bool value = false;
@@ -58,7 +60,8 @@ class repository {
     /* unlink the property */
     bool unlink(const keyType &_name);
 
-    /* create a new property with starting value */
+    /* create a new property with starting value, if property already exists
+     * this will return the existing property and do noting!!! */
     property &create(const keyType &_name, const property &_cp = {});
 
     /* create properties from json string */
@@ -100,7 +103,9 @@ class repository {
     void parse(const std::string &c);
 
     /* notify */
-    virtual void onSetNotify(const std::string &) {}
+    void onSetNotify(const std::string &);
+    void addNotify(const std::string& key, notifyFuncType &&func);
+    //TODO void remNotify(const std::string& key);
 
     std::string name() const { return m_repName; }
 
@@ -127,6 +132,7 @@ class repository {
     mapType m_properties;
     link_policy_t link_policy;
     std::mutex m_lock;
+    std::vector<notifyType> m_notify;
 };
 
 #endif /* MAIN_REPOSITORY_H_ */

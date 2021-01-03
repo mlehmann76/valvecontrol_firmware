@@ -304,5 +304,8 @@ void Tasks::setChannel(const std::string &c, bool isOn) {
 void Tasks::regTaskControl(const std::string &name) {
     std::string _taskId = name + "/control";
     m_repo[_taskId]["value"] = "OFF"s;
-    m_repo[_taskId].set([this](const property &p) { onControl(p); });
+    m_repo[_taskId].set([this](const property &p) -> std::optional<property> {
+        onControl(p);
+        return {};
+    });
 }

@@ -163,12 +163,7 @@ property &repository::link(const std::string &name, property &_p) {
     if (false == ret.second) {
         // insert failed, set existing entry if allowed by link policy
         if (true == link_policy()) {
-            // FIXME std::cout << cname << " found in repository, setting" <<
-            // "\n";
-            set(ret.first, _p);
-        } else {
-            // FIXME std::cout << cname << " found in repository, unchanged" <<
-            // "\n";
+             set(ret.first, _p);
         }
     } else {
         ret.first->second = mappedType(&_p, [](property *) {});
@@ -299,4 +294,17 @@ repository::StringMatch::StringMatch(const std::string &key) {
 
 repository::StringMatch::StringMatch(std::string &&key) {
     m_keys = utilities::split(key, "/");
+}
+
+void repository::onSetNotify(const std::string &s) {
+	for (auto &i : m_notify) {
+		StringMatch m(i.first);
+		if (m.match(s)) {
+			i.second(s);
+		}
+	}
+}
+
+void repository::addNotify(const keyType& key, notifyFuncType &&func) {
+	m_notify.emplace_back(key, func);
 }

@@ -16,6 +16,7 @@
 #include "nvs_flash.h"
 #include "sdkconfig.h"
 
+#include "Cipher.h"
 #include "config.h"
 #include "config_user.h"
 #include "repository.h"
@@ -29,21 +30,30 @@ extern const char config_json_start[] asm("_binary_config_json_start");
 
 namespace Config {
 
-bool configBase::m_isInitialized = false;
+bool ConfigBase::m_isInitialized = false;
+bool ConfigBase::m_keyReset = false;
+AES128Key ConfigBase::m_key = {};
+
 const char MqttConfig::MQTT_PUB_MESSAGE_FORMAT[] =
     "%s%02X%02X%02X%02X%02X%02X%s";
 
-configBase::configBase(const char *_name) : my_handle() {
-    m_isInitialized = false;
+
+repository &repo() {
+    static repository s_repository("", tag<ReplaceLinkPolicy>{});
+    return s_repository;
 }
 
-esp_err_t configBase::init() {
+ConfigBase::ConfigBase() : my_handle() {
+    m_isInitialized = false;
+    m_keyReset = false;
+}
+
+esp_err_t ConfigBase::init() {
 
     char *nvs_json_config;
     esp_err_t ret = ESP_OK;
 
-    repo().create("/system/auth/config", {{                    //
-                                           {"user", "admin"s}, //
+    repo().create("/system/auth/config", {{{"user", "admin"s}, //
                                            {"password", "admin"s}}});
 
     esp_err_t err = nvs_flash_init();
@@ -80,13 +90,33 @@ esp_err_t configBase::init() {
 #else
     repo().parse(config_json_start);
 #endif
+
+    char *pKey;
+    err = readStr(&my_handle, "config_key2",
+                  &pKey); // FIXME wrong "key" needed until config is saved
+    if (ESP_OK != err) {
+        log_inst.error(TAG, "config_key read failed ({})",
+                       esp_err_to_name(err));
+        auto key = AES128Key::genRandomKey("my esspressif key");
+        if (key) {
+            m_keyReset = true;
+            m_key = *key;
+            ESP_ERROR_CHECK(
+                writeStr(&my_handle, "config_key", key->to_string().c_str()));
+        } else {
+            log_inst.error(TAG, "config_key gen failed");
+        }
+    } else {
+        m_key = {std::string(pKey, 16)};
+    }
+    log_inst.debug(TAG, "key:{}", m_key.to_hex());
+
     m_isInitialized = true;
-    // log_inst.debug(TAG, "repo ({})", repo().debug());
 
     return ret;
 }
 
-esp_err_t configBase::readStr(nvs_handle *pHandle, const char *pName,
+esp_err_t ConfigBase::readStr(nvs_handle *pHandle, const char *pName,
                               char **dest) {
     size_t required_size;
     char *temp;
@@ -103,22 +133,21 @@ esp_err_t configBase::readStr(nvs_handle *pHandle, const char *pName,
     return err;
 }
 
-repository &repo() {
-    static repository s_repository("", tag<ReplaceLinkPolicy>{});
-    return s_repository;
-}
-
-esp_err_t configBase::writeStr(nvs_handle *pHandle, const char *pName,
+esp_err_t ConfigBase::writeStr(nvs_handle *pHandle, const char *pName,
                                const char *str) {
     return nvs_set_str(*pHandle, pName, str);
+}
+
+void ConfigBase::onConfigNotify(const std::string& s) {
+	//TODO
 }
 
 esp_err_t MqttConfig::init() {
 
     static char *MQTT_DEVICE = (char *)"esp32/";
 
-    if (!isInitialized()) {
-        configBase::init();
+    if (!m_base.isInitialized()) {
+        m_base.init();
     }
     /* read mqtt device name */
 
@@ -140,8 +169,8 @@ esp_err_t MqttConfig::init() {
 }
 
 esp_err_t NetConfig::init() {
-    if (!isInitialized()) {
-        configBase::init();
+    if (!m_base.isInitialized()) {
+        m_base.init();
     }
     repo().create("/network/sntp/config", {{               //
                                             {"zone", ""s}, //
@@ -154,7 +183,7 @@ esp_err_t NetConfig::init() {
                                             {"device", ""s}}});
     repo().create("/network/wifi/config", {{                            //
                                             {"hostname", "espressif"s}, //
-                                            {"mode", 1}}});
+                                            {"mode", 2}}});
     repo().create("/network/wifi/config/AP", {{                          //
                                                {"ssid", "espressifAP"s}, //
                                                {"pass", "espressif"s},   //
@@ -162,7 +191,31 @@ esp_err_t NetConfig::init() {
     repo().create("/network/wifi/config/STA", {{               //
                                                 {"ssid", ""s}, //
                                                 {"pass", ""s}}});
+
+    // saving password will encrypt it
+    repo()["/network/wifi/config/AP"].set(doEncrypt(*this, "pass"));
+
+    // saving password will encrypt it
+    repo()["/network/wifi/config/STA"].set(doEncrypt(*this, "pass"));
+
+    if (m_base.isKeyReset()) {
+        Cipher ciph(m_base.key());
+        repo()["/network/wifi/config/AP"]["pass"] = "espressif"s;
+    }
+
     return ESP_OK;
+}
+
+std::optional<property> NetConfig::doEncrypt::operator()(const property &p) {
+	auto it = p.find(key);
+	if (it != p.end() && it->second.is<StringType>()) {
+		Cipher ciph(net.key());
+		auto temp = p;
+		temp[key] =
+			toHex(ciph.encrypt(it->second.get_unchecked<StringType>()));
+		return temp;
+	}
+	return {};
 }
 
 std::string NetConfig::getTimeServer() const {
@@ -178,15 +231,18 @@ std::string NetConfig::getHostname() const {
 }
 
 std::string NetConfig::getApSSID() const {
-    return repo().get<std::string>("/network/wifi/config/AP", "ssid");
+    return repo().get<std::string>("/network/wifi/config/AP", "ssid",
+                                   "espressifAP");
 }
 
 std::string NetConfig::getApPass() const {
-    return repo().get<std::string>("/network/wifi/config/AP", "pass");
+    Cipher cipher = {key()};
+    return cipher.decrypt(
+        fromHex(repo().get<std::string>("/network/wifi/config/AP", "pass")));
 }
 
 unsigned NetConfig::getApChannel() const {
-    return repo().get<IntType>("/network/wifi/config/AP", "channel");
+    return repo().get<IntType>("/network/wifi/config/AP", "channel", 1);
 }
 
 std::string NetConfig::getStaSSID() const {
@@ -194,19 +250,19 @@ std::string NetConfig::getStaSSID() const {
 }
 
 std::string NetConfig::getStaPass() const {
-    return repo().get<std::string>("/network/wifi/config/STA", "pass");
+    Cipher cipher = {key()};
+    return cipher.decrypt(
+        fromHex(repo().get<std::string>("/network/wifi/config/STA", "pass")));
 }
 
 unsigned NetConfig::getMode() const {
     return repo().get<IntType>("/network/wifi/config", "mode", 1);
 }
 
-ChannelConfig::ChannelConfig() : configBase("channels"), m_channelCount(0) {}
-
 esp_err_t ChannelConfig::init() {
     esp_err_t ret = ESP_FAIL;
-    if (!isInitialized()) {
-        ret = configBase::init();
+    if (!m_base.isInitialized()) {
+        ret = m_base.init();
     }
     for (unsigned i = 0; i < 4; i++) {
         repo().create(channelName(i).str(), {{{"name", "no name"s},
@@ -248,10 +304,13 @@ std::string SysConfig::getUser() {
     return repo().get<std::string>("/system/auth/config", "user");
 }
 
+
 } /* namespace Config */
 
 // Globals
-Config::MqttConfig mqttConf;
-Config::SysConfig sysConf;
-Config::ChannelConfig chanConf;
-Config::NetConfig netConf;
+Config::ConfigBase baseConf;
+Config::MqttConfig mqttConf(baseConf);
+Config::SysConfig sysConf(baseConf);
+Config::ChannelConfig chanConf(baseConf);
+Config::NetConfig netConf(baseConf);
+

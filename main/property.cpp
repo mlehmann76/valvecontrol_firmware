@@ -7,6 +7,7 @@
 
 #include "property.h"
 #include "repository.h"
+#include <optional>
 
 property &property::reg(const std::string &name, repository &_repo) {
     set(name, _repo);
@@ -17,14 +18,19 @@ property &property::reg(const std::string &name, repository &_repo) {
 property &property::set(const property_base &p) {
     property _temp(p);
     _temp.m_name = this->m_name;
+    std::optional<property> ret = {};
+
     if (write_hook != nullptr) {
-        write_hook(_temp);
+        ret = write_hook(_temp);
     }
 
-    for (auto &v : p) {
-        m_pProperty.emplace(v.first, v.second).first->second = v.second;
+    if (ret) {
+        for (auto &v : *ret)
+            m_pProperty.emplace(v.first, v.second).first->second = v.second;
+    } else {
+        for (auto &v : p)
+            m_pProperty.emplace(v.first, v.second).first->second = v.second;
     }
-
     notify();
 
     return *this;

@@ -40,17 +40,13 @@ WifiManager::WifiManager(repository &_repo, std::mutex &m,
     cfg.thread_name = "wifi task";
     esp_pthread_set_cfg(&cfg);
     m_thread = std::thread([this]() { this->task(); });
-    _repo.create("/network/wifi/control/scan", {{{"start", false}}})
-        .set([this](const property &) { this->startScan(); });
-    _repo.create("/network/wifi/control/wps", {{{"start", false}}})
-        .set([this](const property &) { this->startWPS(); });
 }
 
 struct EventVisitor {
     EventVisitor(detail::WifiMode &_p) : m_mode(_p) {}
 
     template <typename T> detail::WifiMode operator()(const T &event) const {
-        return std::visit([event](auto &&mode) { return mode.handle(event); },
+        return mapbox::util::apply_visitor([event](auto &&mode) { return mode.handle(event); },
                           m_mode);
     }
     detail::WifiMode &m_mode;
@@ -69,27 +65,34 @@ void WifiManager::init() {
             IP_EVENT, IP_EVENT_STA_GOT_IP, &WifiManager::got_ip_event_handler_s,
             this, &instance_got_ip));
 
-        // Init wifi stack and hostname
-        ESP_ERROR_CHECK(esp_netif_init());
+        // Init wifi
         ESP_ERROR_CHECK(esp_wifi_init(&m_config.wificfg));
         // set hostname
-        esp_netif_t *pnetcfg = esp_netif_create_default_wifi_sta();
-        esp_err_t ret =
-            esp_netif_set_hostname(pnetcfg, netConf.getHostname().c_str());
-        if (ret != ESP_OK) {
-            log_inst.error(TAG, "failed to set hostname: {:d}", ret);
-        } else {
-            log_inst.debug(TAG, "hostname set to {:s}",
-                           netConf.getHostname().c_str());
-        }
+        esp_netif_t *pStaCfg = esp_netif_create_default_wifi_sta();
+        esp_netif_t *pAPCfg = esp_netif_create_default_wifi_ap();
+        ESP_ERROR_CHECK(
+            esp_netif_set_hostname(pStaCfg, netConf.getHostname().c_str()));
+        ESP_ERROR_CHECK(
+            esp_netif_set_hostname(pAPCfg, netConf.getHostname().c_str()));
         // go to disconnect state
         detail::Events event =
             detail::TransitionEvent{this, detail::DisconnectState{this}};
 
-        m_mode = std::visit(EventVisitor(m_mode), event);
+        m_mode = mapbox::util::apply_visitor(EventVisitor(m_mode), event);
         m_initDone = true;
     }
     cvInitDone.notify_one();
+
+    m_repo.create("/network/wifi/control/scan", {{{"start", false}}})
+        .set([this](const property &) -> std::optional<property> {
+            this->startScan();
+            return {};
+        });
+    m_repo.create("/network/wifi/control/wps", {{{"start", false}}})
+        .set([this](const property &) -> std::optional<property> {
+            this->startWPS();
+            return {};
+        });
 }
 
 void WifiManager::task() {
@@ -100,14 +103,7 @@ void WifiManager::task() {
         if (!m_events.empty()) {
             auto event = m_events.front();
             m_events.pop_front();
-            m_mode = std::visit(EventVisitor(m_mode), event);
-            // m_mode = std::visit(
-            //     [this](auto &&event) {
-            //         return std::visit(
-            //             [event](auto &&mode) { return mode.handle(event); },
-            //             this->m_mode);
-            //     },
-            //     event);
+            m_mode = mapbox::util::apply_visitor(EventVisitor(m_mode), event);
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
@@ -229,7 +225,7 @@ void ConnectState::onEnter() {
     log_inst.info(TAG, "ConnectState start");
     wifi_mode_t mode = static_cast<wifi_mode_t>(netConf.getMode());
 
-    if (mode == WIFI_MODE_AP) {
+    if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA) {
         wifi_config_t wifi_config;
         memset(&wifi_config, 0, sizeof(wifi_config));
 
@@ -239,21 +235,40 @@ void ConnectState::onEnter() {
         wifi_config.ap.ssid_len = len;
         wifi_config.ap.channel = netConf.getApChannel();
 
-        const size_t lenp = netConf.getApPass().length();
-        memcpy(wifi_config.ap.password, netConf.getApPass().c_str(),
+        const std::string _pass = netConf.getApPass();
+        const size_t lenp = _pass.length();
+        memcpy(wifi_config.ap.password, _pass.c_str(),
                lenp > 64 ? 64 : lenp);
 
+        log_inst.debug(TAG, "ssid {}, pw {}", netConf.getApSSID(), _pass);
         wifi_config.ap.max_connection = 1; // TODO
         wifi_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
 
-        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+        ESP_ERROR_CHECK(esp_wifi_set_mode(mode));
         ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config));
-        ESP_ERROR_CHECK(esp_wifi_start());
-    } else {
-        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-        ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
-        ESP_ERROR_CHECK(esp_wifi_start());
-        ESP_ERROR_CHECK(esp_wifi_connect());
+    }
+
+    if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA) {
+        wifi_config_t wifi_config;
+        memset(&wifi_config, 0, sizeof(wifi_config));
+
+        const std::string ssid = netConf.getStaSSID();
+        const size_t len = ssid.length();
+        memcpy(wifi_config.ap.ssid, ssid.c_str(),
+               len > 32 ? 32 : len);
+        wifi_config.ap.ssid_len = len;
+
+        const std::string _pass = netConf.getStaPass();
+        const size_t lenp = _pass.length();
+        memcpy(wifi_config.ap.password, _pass.c_str(),
+               lenp > 64 ? 64 : lenp);
+        ESP_ERROR_CHECK(esp_wifi_set_mode(mode));
+        ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
+    }
+
+    ESP_ERROR_CHECK(esp_wifi_start());
+
+    if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA) {
         m_parent->m_timeout.start(
             std::chrono::seconds(10),
             detail::TransitionEvent{m_parent,
@@ -266,8 +281,11 @@ void ConnectState::onLeave() { ESP_ERROR_CHECK(esp_wifi_disconnect()); }
 template <> WifiMode ConnectState::handle(const WifiEvent &e) {
     switch (e.m_id) {
     case WIFI_EVENT_WIFI_READY: /**< ESP32 WiFi ready */
-    case WIFI_EVENT_STA_START:  /**< ESP32 station start */
-    case WIFI_EVENT_STA_STOP:   /**< ESP32 station stop */
+        break;
+    case WIFI_EVENT_STA_START: /**< ESP32 station start */
+        ESP_ERROR_CHECK(esp_wifi_connect());
+        break;
+    case WIFI_EVENT_STA_STOP: /**< ESP32 station stop */
         break;
     case WIFI_EVENT_STA_CONNECTED: /**< ESP32 station connected to AP */
         // do not notify here, we have no ip ! m_parent->notifyConnect();
@@ -288,8 +306,10 @@ template <> WifiMode ConnectState::handle(const WifiEvent &e) {
                                             ESP32 station changed */
         break;
     case WIFI_EVENT_AP_START: /**< ESP32 soft-AP start */
+        log_inst.debug(TAG, "soft-ap start");
         break;
     case WIFI_EVENT_AP_STOP: /**< ESP32 soft-AP stop */
+        log_inst.debug(TAG, "soft-ap stop");
         break;
     case WIFI_EVENT_AP_STACONNECTED: /**< a station connected to ESP32 soft-AP
                                       */
