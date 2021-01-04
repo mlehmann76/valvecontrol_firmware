@@ -1,208 +1,167 @@
 {
-   "network":{
-      "mqtt":{
-         "config":{
-            "server":"mqtt://raspberrypi.fritz.box:1883",
-            "user":"user",
-            "pass":"pass",
-            "enabled":true
-         },
-         "state":{
-            "connected":false
-         }
-      },
-      "sntp":{
-         "config":{
-            "server":"pool.ntp.org",
-            "zone":"CET-1CEST,M3.5.0,M10.5.0/3"
-         },
-         "state":{
-            "connected":false
-         }
-      }
-   },
-   "system":{
-		"auth" : {
-			"config":{
-				"user":"admin",
-				"password":"admin"
-			},
-			"state":{
-				"tries" : 0
-			}
-		}
-	},
-   "actors":{
-      "channel1":{
-         "config":{
-            "name":"channel1",
-            "alt":"channel1",
-            "enabled":true,
-            "maxTime":1800
-         },
-         "state":{
-            "value":"OFF"
-         }
-      },
-      "channel2":{
-         "config":{
-            "name":"channel2",
-            "alt":"channel2",
-            "enabled":true,
-            "maxTime":1800
-         },
-         "state":{
-            "value":"OFF"
-         }
-      },
-      "channel3":{
-         "config":{
-            "name":"channel3",
-            "alt":"channel3",
-            "enabled":true,
-            "maxTime":1800
-         },
-         "state":{
-            "value":"OFF"
-         }
-      },
-      "channel4":{
-         "config":{
-            "name":"channel4",
-            "alt":"channel4",
-            "enabled":true,
-            "maxTime":1800
-         },
-         "state":{
-            "value":"OFF"
-         }
-      }
-   },
-   "tasks":{
-      "task1":{
-         "config":{
-            "name":"task1",
-            "alt-name":"",
-            "enabled":false,
-            "auto":false,
-            "starttime":"",
-            "first":"/tasks/task1/config/node1",
-            "node1":{
-               "name":"channel1",
-               "next":"",
-               "time":1800
+    "actors": {
+        "channel1": {
+            "config": {
+                "alt": "channel1",
+                "enabled": true,
+                "maxTime": 1800,
+                "name": "channel1"
             }
-         },
-         "state":{
-            "running":false,
-            "time":0,
-            "remain":0,
-            "channel":"",
-            "starttime":""
-         }
-      },
-      "task2":{
-         "config":{
-            "name":"task2",
-            "alt-name":"",
-            "enabled":false,
-            "auto":false,
-            "starttime":"",
-            "first":"/tasks/task2/config/node1",
-            "node1":{
-               "name":"channel2",
-               "next":"",
-               "time":1800
+        },
+        "channel2": {
+            "config": {
+                "alt": "channel2",
+                "enabled": true,
+                "maxTime": 1800,
+                "name": "channel2"
             }
-         },
-         "state":{
-            "running":false,
-            "time":0,
-            "remain":0,
-            "channel":"",
-            "starttime":""
-         }
-      },
-      "task3":{
-         "config":{
-            "name":"task3",
-            "alt-name":"",
-            "enabled":false,
-            "auto":false,
-            "starttime":"",
-            "first":"/tasks/task3/config/node1",
-            "node1":{
-               "name":"channel3",
-               "next":"",
-               "time":1800
+        },
+        "channel3": {
+            "config": {
+                "alt": "channel3",
+                "enabled": true,
+                "maxTime": 1800,
+                "name": "channel3"
             }
-         },
-         "state":{
-            "running":false,
-            "time":0,
-            "remain":0,
-            "channel":"",
-            "starttime":""
-         }
-      },
-      "task4":{
-         "config":{
-            "name":"task4",
-            "alt-name":"",
-            "enabled":false,
-            "auto":false,
-            "starttime":"",
-            "first":"/tasks/task4/config/node1",
-            "node1":{
-               "name":"channel1",
-               "next":"",
-               "time":1800
+        },
+        "channel4": {
+            "config": {
+                "alt": "channel4",
+                "enabled": true,
+                "maxTime": 1800,
+                "name": "channel4"
             }
-         },
-         "state":{
-            "running":false,
-            "time":0,
-            "remain":0,
-            "channel":"",
-            "starttime":""
-         }
-      },
-      "task5":{
-         "config":{
-            "name":"task5",
-            "alt-name":"",
-            "enabled":false,
-            "auto":false,
-            "starttime":"",
-            "first":"/tasks/task5/config/node1",
-            "node1":{
-               "name":"channel1",
-               "next":"/tasks/task5/config/node2",
-               "time":10
-            },
-            "node2":{
-               "name":"channel2",
-               "next":"/tasks/task5/config/node3",
-               "time":15
-            },
-            "node3":{
-               "name":"channel3",
-               "next":"/tasks/task5/config/node4",
-               "time":10
-            },
-            "node4":{
-               "name":"channel4",
-               "next":"",
-               "time":5
+        }
+    },
+    "network": {
+        "mqtt": {
+            "config": {
+                "enabled": false,
+                "pass": "pass",
+                "server": "mqtt://raspberrypi.fritz.box:1883",
+                "user": "user"
             }
-         },
-         "state":{
-            "running":false,
-            "time":0,
-            "remain":0,
-            "channel":"",
-            "starttime":""
-         }
-      }
-   }
+        },
+        "sntp": {
+            "config": {
+                "server": "pool.ntp.org",
+                "zone": "CET-1CEST,M3.5.0,M10.5.0/3"
+            }
+        },
+        "wifi": {
+            "config": {
+                "AP": {
+                    "channel": 1,
+                    "pass": "63B53E9EF4B74D9E43FCAAC1E31451F2",
+                    "ssid": "espressifAP"
+                },
+                "STA": {
+                    "pass": "",
+                    "ssid": ""
+                },
+                "hostname": "espressif",
+                "mode": 2
+            }
+        }
+    },
+    "system": {
+        "auth": {
+            "config": {
+                "password": "admin",
+                "user": "admin"
+            }
+        }
+    },
+    "tasks": {
+        "task1": {
+            "config": {
+                "alt-name": "",
+                "auto": false,
+                "enabled": false,
+                "first": "/tasks/task1/config/node1",
+                "name": "task1",
+                "node1": {
+                    "name": "channel1",
+                    "next": "",
+                    "time": 1800
+                },
+                "starttime": ""
+            }
+        },
+        "task2": {
+            "config": {
+                "alt-name": "",
+                "auto": false,
+                "enabled": false,
+                "first": "/tasks/task2/config/node1",
+                "name": "task2",
+                "node1": {
+                    "name": "channel2",
+                    "next": "",
+                    "time": 1800
+                },
+                "starttime": ""
+            }
+        },
+        "task3": {
+            "config": {
+                "alt-name": "",
+                "auto": false,
+                "enabled": false,
+                "first": "/tasks/task3/config/node1",
+                "name": "task3",
+                "node1": {
+                    "name": "channel3",
+                    "next": "",
+                    "time": 1800
+                },
+                "starttime": ""
+            }
+        },
+        "task4": {
+            "config": {
+                "alt-name": "",
+                "auto": false,
+                "enabled": false,
+                "first": "/tasks/task4/config/node1",
+                "name": "task4",
+                "node1": {
+                    "name": "channel1",
+                    "next": "",
+                    "time": 1800
+                },
+                "starttime": ""
+            }
+        },
+        "task5": {
+            "config": {
+                "alt-name": "",
+                "auto": false,
+                "enabled": false,
+                "first": "/tasks/task5/config/node1",
+                "name": "task5",
+                "node1": {
+                    "name": "channel1",
+                    "next": "/tasks/task5/config/node2",
+                    "time": 10
+                },
+                "node2": {
+                    "name": "channel2",
+                    "next": "/tasks/task5/config/node3",
+                    "time": 15
+                },
+                "node3": {
+                    "name": "channel3",
+                    "next": "/tasks/task5/config/node4",
+                    "time": 10
+                },
+                "node4": {
+                    "name": "channel4",
+                    "next": "",
+                    "time": 5
+                },
+                "starttime": ""
+            }
+        }
+    }
 }

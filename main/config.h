@@ -8,6 +8,7 @@
 #ifndef MAIN_CONFIG_H_
 #define MAIN_CONFIG_H_
 
+#include "TimerCPP.h"
 #include "Cipher.h"
 #include "nvs.h"
 #include "repository.h"
@@ -25,6 +26,7 @@ class ConfigBase {
     static bool m_isInitialized;
     static AES128Key m_key;
     static bool m_keyReset;
+    enum forceErase_t { NoForceErase, ForceErase };
 
   public:
     ConfigBase();
@@ -39,13 +41,21 @@ class ConfigBase {
   private:
     esp_err_t readStr(nvs_handle *pHandle, const char *pName, char **dest);
     esp_err_t writeStr(nvs_handle *pHandle, const char *pName, const char *str);
+    esp_err_t readKey();
+    esp_err_t genKey();
+    void initNVSFlash(forceErase_t);
+    void writeConfig();
+
     nvs_handle_t my_handle;
+    TimerMember<ConfigBase> m_timeout;
+    std::mutex m_lock;
+
 };
 
 struct onConfigNotify {
     onConfigNotify(ConfigBase &b) : m_base(b) {}
     void operator()(const std::string &s) { m_base.onConfigNotify(s); }
-    ConfigBase m_base;
+    ConfigBase &m_base;
 };
 
 class SysConfig {

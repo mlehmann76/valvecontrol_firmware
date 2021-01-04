@@ -6,6 +6,7 @@
  */
 #include <fmt/printf.h>
 #include <memory>
+#include <mutex>
 #include <sstream>
 #include <stdlib.h>
 #include <string>
@@ -33,87 +34,92 @@ namespace Config {
 bool ConfigBase::m_isInitialized = false;
 bool ConfigBase::m_keyReset = false;
 AES128Key ConfigBase::m_key = {};
+std::mutex mutex;
 
 const char MqttConfig::MQTT_PUB_MESSAGE_FORMAT[] =
     "%s%02X%02X%02X%02X%02X%02X%s";
-
 
 repository &repo() {
     static repository s_repository("", tag<ReplaceLinkPolicy>{});
     return s_repository;
 }
 
-ConfigBase::ConfigBase() : my_handle() {
+ConfigBase::ConfigBase()
+    : my_handle(), m_timeout("ConfigTimer", this, &ConfigBase::writeConfig,
+                             (1000 / portTICK_PERIOD_MS), false) {
     m_isInitialized = false;
     m_keyReset = false;
 }
 
 esp_err_t ConfigBase::init() {
-
-    char *nvs_json_config;
+    std::lock_guard<std::mutex> lck(mutex);
     esp_err_t ret = ESP_OK;
+    if (!m_isInitialized) {
+        char *nvs_json_config;
 
-    repo().create("/system/auth/config", {{{"user", "admin"s}, //
-                                           {"password", "admin"s}}});
+        repo().create("/system/auth/config", {{{"user", "admin"s}, //
+                                               {"password", "admin"s}}});
+        initNVSFlash(NoForceErase);
 
+        if (ESP_OK != readKey() ||
+            ESP_OK != readStr(&my_handle, "config_json", &nvs_json_config)) {
+            // FIXME initNVSFlash(ForceErase);
+            genKey();
+            repo().parse(config_json_start);
+            // FIXME writeConfig();
+        } else {
+            repo().parse(nvs_json_config);
+        }
+
+        m_isInitialized = true;
+    }
+
+    return ret;
+}
+
+void ConfigBase::initNVSFlash(forceErase_t f) {
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES ||
-        err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        err == ESP_ERR_NVS_NEW_VERSION_FOUND || ForceErase == f) {
         // NVS partition was truncated and needs to be erased
         // Retry nvs_flash_init
+        log_inst.info(TAG, "erasing nvs_flash");
         ESP_ERROR_CHECK(nvs_flash_erase());
         err = nvs_flash_init();
     }
-
     ESP_ERROR_CHECK(err);
-
     err = nvs_open("storage", NVS_READWRITE, &my_handle);
     if (err != ESP_OK) {
         log_inst.error(TAG, "nvs_open storage failed ({})",
                        esp_err_to_name(err));
     }
-#if 0
-	//try opening saved json config
-	err = readStr(&my_handle, "config_json", &nvs_json_config);
-	if (ESP_OK != err) {
-		log_inst.error(TAG, "config_json read failed ({})", esp_err_to_name(err));
-//		pConfig = cJSON_Parse(config_json_start);
-		repo().parse(config_json_start);
-	} else {
-//		pConfig = cJSON_Parse(config_json_start);
-//		cJSON *patch = NULL;
-//		patch = cJSON_Parse(nvs_json_config);
-//		pConfig = cJSONUtils_MergePatch(pConfig, patch);
-//		cJSON_Delete(patch);
-		repo().parse(nvs_json_config);
-	}
-#else
-    repo().parse(config_json_start);
-#endif
+}
 
+esp_err_t ConfigBase::readKey() {
     char *pKey;
-    err = readStr(&my_handle, "config_key2",
-                  &pKey); // FIXME wrong "key" needed until config is saved
-    if (ESP_OK != err) {
+    // FIXME wrong "key" needed until config is saved
+    esp_err_t err = readStr(&my_handle, "config_key2", &pKey);
+    if (ESP_OK == err) {
+        m_key = {std::string(pKey, m_key.size())};
+        log_inst.debug(TAG, "key:{}", m_key.to_hex());
+    } else {
         log_inst.error(TAG, "config_key read failed ({})",
                        esp_err_to_name(err));
-        auto key = AES128Key::genRandomKey("my esspressif key");
-        if (key) {
-            m_keyReset = true;
-            m_key = *key;
-            ESP_ERROR_CHECK(
-                writeStr(&my_handle, "config_key", key->to_string().c_str()));
-        } else {
-            log_inst.error(TAG, "config_key gen failed");
-        }
-    } else {
-        m_key = {std::string(pKey, 16)};
     }
-    log_inst.debug(TAG, "key:{}", m_key.to_hex());
+    return err;
+}
 
-    m_isInitialized = true;
-
-    return ret;
+esp_err_t ConfigBase::genKey() {
+    esp_err_t err = ESP_OK;
+    auto key = AES128Key::genRandomKey("my esspressif key");
+    if (key) {
+        m_keyReset = true;
+        m_key = *key;
+        err = writeStr(&my_handle, "config_key", key->to_string().c_str());
+    } else {
+        log_inst.error(TAG, "config_key gen failed");
+    }
+    return err;
 }
 
 esp_err_t ConfigBase::readStr(nvs_handle *pHandle, const char *pName,
@@ -138,8 +144,20 @@ esp_err_t ConfigBase::writeStr(nvs_handle *pHandle, const char *pName,
     return nvs_set_str(*pHandle, pName, str);
 }
 
-void ConfigBase::onConfigNotify(const std::string& s) {
-	//TODO
+void ConfigBase::onConfigNotify(const std::string &s) {
+    std::lock_guard<std::mutex> lock(m_lock);
+    m_timeout.start();
+}
+
+void ConfigBase::writeConfig() {
+    std::lock_guard<std::mutex> lock(m_lock);
+    log_inst.info(TAG, "writeConfig called");
+    esp_err_t err = ESP_OK;
+    // FIXME err = writeStr(&my_handle, "config_json",
+    //    		repo().stringify(repo().partial("/*/*/config")));
+    if (ESP_OK != err) {
+        log_inst.error(TAG, "writeConfig failed ({})", esp_err_to_name(err));
+    }
 }
 
 esp_err_t MqttConfig::init() {
@@ -207,15 +225,14 @@ esp_err_t NetConfig::init() {
 }
 
 std::optional<property> NetConfig::doEncrypt::operator()(const property &p) {
-	auto it = p.find(key);
-	if (it != p.end() && it->second.is<StringType>()) {
-		Cipher ciph(net.key());
-		auto temp = p;
-		temp[key] =
-			toHex(ciph.encrypt(it->second.get_unchecked<StringType>()));
-		return temp;
-	}
-	return {};
+    auto it = p.find(key);
+    if (it != p.end() && it->second.is<StringType>()) {
+        Cipher ciph(net.key());
+        auto temp = p;
+        temp[key] = toHex(ciph.encrypt(it->second.get_unchecked<StringType>()));
+        return temp;
+    }
+    return {};
 }
 
 std::string NetConfig::getTimeServer() const {
@@ -304,7 +321,6 @@ std::string SysConfig::getUser() {
     return repo().get<std::string>("/system/auth/config", "user");
 }
 
-
 } /* namespace Config */
 
 // Globals
@@ -313,4 +329,3 @@ Config::MqttConfig mqttConf(baseConf);
 Config::SysConfig sysConf(baseConf);
 Config::ChannelConfig chanConf(baseConf);
 Config::NetConfig netConf(baseConf);
-
