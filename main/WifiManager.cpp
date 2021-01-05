@@ -46,8 +46,8 @@ struct EventVisitor {
     EventVisitor(detail::WifiMode &_p) : m_mode(_p) {}
 
     template <typename T> detail::WifiMode operator()(const T &event) const {
-        return mapbox::util::apply_visitor([event](auto &&mode) { return mode.handle(event); },
-                          m_mode);
+        return mapbox::util::apply_visitor(
+            [event](auto &&mode) { return mode.handle(event); }, m_mode);
     }
     detail::WifiMode &m_mode;
 };
@@ -123,8 +123,8 @@ void WifiManager::got_ip_event_handler_s(void *arg, esp_event_base_t event_base,
 
 void WifiManager::event_handler(esp_event_base_t event_base, int32_t event_id,
                                 void *event_data) {
-    m_events.push_back(
-        detail::WifiEvent{this, static_cast<wifi_event_t>(event_id)});
+    m_events.push_back(detail::WifiEvent{
+        this, static_cast<wifi_event_t>(event_id), event_data});
 }
 
 void WifiManager::got_ip_event_handler(esp_event_base_t event_base,
@@ -237,8 +237,7 @@ void ConnectState::onEnter() {
 
         const std::string _pass = netConf.getApPass();
         const size_t lenp = _pass.length();
-        memcpy(wifi_config.ap.password, _pass.c_str(),
-               lenp > 64 ? 64 : lenp);
+        memcpy(wifi_config.ap.password, _pass.c_str(), lenp > 64 ? 64 : lenp);
 
         log_inst.debug(TAG, "ssid {}, pw {}", netConf.getApSSID(), _pass);
         wifi_config.ap.max_connection = 1; // TODO
@@ -254,14 +253,12 @@ void ConnectState::onEnter() {
 
         const std::string ssid = netConf.getStaSSID();
         const size_t len = ssid.length();
-        memcpy(wifi_config.ap.ssid, ssid.c_str(),
-               len > 32 ? 32 : len);
+        memcpy(wifi_config.ap.ssid, ssid.c_str(), len > 32 ? 32 : len);
         wifi_config.ap.ssid_len = len;
 
         const std::string _pass = netConf.getStaPass();
         const size_t lenp = _pass.length();
-        memcpy(wifi_config.ap.password, _pass.c_str(),
-               lenp > 64 ? 64 : lenp);
+        memcpy(wifi_config.ap.password, _pass.c_str(), lenp > 64 ? 64 : lenp);
         ESP_ERROR_CHECK(esp_wifi_set_mode(mode));
         ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
     }
@@ -276,7 +273,7 @@ void ConnectState::onEnter() {
     }
 }
 
-void ConnectState::onLeave() { ESP_ERROR_CHECK(esp_wifi_disconnect()); }
+void ConnectState::onLeave() { esp_wifi_disconnect(); }
 
 template <> WifiMode ConnectState::handle(const WifiEvent &e) {
     switch (e.m_id) {
@@ -434,17 +431,26 @@ template <> WifiMode WPSMode::handle(const WifiEvent &e) {
     switch (e.m_id) {
     case WIFI_EVENT_STA_WPS_ER_SUCCESS: /**< ESP32 station wps succeeds in
                                        enrollee mode */
+    {
         log_inst.info(TAG, "SYSTEM_EVENT_STA_WPS_ER_SUCCESS");
-        /*
-         * If only one AP credential is received from WPS, there will be no
-         * event data and esp_wifi_set_config() is already called by WPS modules
-         * for backward compatibility with legacy apps. So directly attempt
-         * connection here.
-         */
-        // FIXME
+        wifi_event_sta_wps_er_success_t *evt =
+            (wifi_event_sta_wps_er_success_t *)e.event_data;
+        if (evt && evt->ap_cred_cnt) {
+            /* If multiple AP credentials are received from WPS, connect with
+             * first one */
+            char *ssid = reinterpret_cast<char *>(evt->ap_cred[0].ssid);
+            char *pass = reinterpret_cast<char *>(evt->ap_cred[0].passphrase);
+            Config::repo()["/network/wifi/config/STA"]["ssid"] = std::string( //
+                ssid, strnlen(ssid, MAX_SSID_LEN));
+            Config::repo()["/network/wifi/config/STA"]["pass"] = std::string( //
+                pass, strnlen(pass, MAX_PASSPHRASE_LEN));
+
+            log_inst.debug(TAG, "Connecting to SSID: {}, Passphrase: {}", ssid,
+                           pass);
+        }
         m_parent->m_events.push_back(detail::TransitionEvent{
             this->m_parent, detail::ConnectState(this->m_parent)});
-        break;
+    } break;
     case WIFI_EVENT_STA_WPS_ER_FAILED: /**< ESP32 station wps fails in enrollee
                                           mode */
         log_inst.info(TAG, "SYSTEM_EVENT_STA_WPS_ER_FAILED");
@@ -462,14 +468,9 @@ template <> WifiMode WPSMode::handle(const WifiEvent &e) {
     case WIFI_EVENT_STA_WPS_ER_PIN: /**< ESP32 station wps pin code in enrollee
                                        mode */
         log_inst.info(TAG, "SYSTEM_EVENT_STA_WPS_ER_PIN");
-        /*show the PIN code here*/
-        // log_inst.info(
-        //     TAG, "WPS_PIN = " PINSTR,
-        //     PIN2STR(((wifi_event_sta_wps_er_pin_t *)event_data)->pin_code));
         break;
     case WIFI_EVENT_STA_WPS_ER_PBC_OVERLAP: /**< ESP32 station wps overlap in
                                                enrollee mode */
-
         break;
     default:
         break;

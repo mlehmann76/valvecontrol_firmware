@@ -100,9 +100,11 @@ struct TransitionEvent {
 };
 
 struct WifiEvent {
-    WifiEvent(WifiManager *_p, wifi_event_t _id) : m_parent(_p), m_id(_id) {}
+    WifiEvent(WifiManager *_p, wifi_event_t _id, void *_event_data) :
+    	m_parent(_p), m_id(_id), event_data(_event_data) {}
     WifiManager *m_parent;
     wifi_event_t m_id;
+    void *event_data;
 };
 
 using Events = mapbox::util::variant<TimeOutEvent, TransitionEvent, WifiEvent>;

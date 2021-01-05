@@ -105,7 +105,7 @@ void MainClass::setup() {
     _http = (std::make_shared<http::HttpServer>(80));
     _http->start();
 
-    _jsonHandler = std::make_shared<http::RepositoryHandler>("GET", "/json");
+    _jsonHandler = std::make_shared<http::RepositoryHandler>("GET,POST", "/json");
     _spiffsHandler = std::make_shared<http::FileHandler>("GET", "/", "/spiffs");
 
     _jsonHandler->add("/json", Config::repo());
@@ -153,7 +153,6 @@ void MainClass::setup() {
     }
 
     sht1x.regProperty(&Config::repo(), "/sensors/sht1x/state");
-    Config::repo().addNotify("/*/*/config", Config::onConfigNotify(baseConf));
 }
 
 void MainClass::spiffsInit(void) {

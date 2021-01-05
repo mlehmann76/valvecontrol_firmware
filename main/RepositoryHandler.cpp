@@ -43,7 +43,7 @@ bool RepositoryHandler::handle(const HttpRequest &_req, HttpResponse &_res) {
                 _res.setResponse(HttpResponse::HTTP_201);
                 _res.setHeader("Content-Location", _req.path());
                 _res.send("");
-                v.second->create(_req.body());
+                v.second->append(_req.body());
                 _res.reset();
                 return true;
             }

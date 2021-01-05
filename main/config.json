@@ -39,7 +39,8 @@
                 "enabled": false,
                 "pass": "pass",
                 "server": "mqtt://raspberrypi.fritz.box:1883",
-                "user": "user"
+                "user": "user",
+                "device": ""
             }
         },
         "sntp": {

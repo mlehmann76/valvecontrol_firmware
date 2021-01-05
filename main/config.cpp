@@ -71,6 +71,8 @@ esp_err_t ConfigBase::init() {
             repo().parse(nvs_json_config);
         }
 
+        Config::repo().addNotify("/*/*/config", Config::onConfigNotify(baseConf));
+
         m_isInitialized = true;
     }
 
