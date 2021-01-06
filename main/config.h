@@ -111,7 +111,13 @@ class NetConfig {
     std::string getApPass() const;
     unsigned getApChannel() const;
     std::string getStaSSID() const;
+    void setStaSSID(const std::string& s) {
+    	repo()["/network/wifi/config/STA"]["ssid"] = s;
+    }
     std::string getStaPass() const;
+    void setStaPass(const std::string& s) {
+    	repo()["/network/wifi/config/STA"]["pass"] = s;
+    }
     unsigned getMode() const;
     AES128Key key() const { return m_base.key(); }
 

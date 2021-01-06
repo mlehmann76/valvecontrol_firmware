@@ -440,10 +440,10 @@ template <> WifiMode WPSMode::handle(const WifiEvent &e) {
              * first one */
             char *ssid = reinterpret_cast<char *>(evt->ap_cred[0].ssid);
             char *pass = reinterpret_cast<char *>(evt->ap_cred[0].passphrase);
-            Config::repo()["/network/wifi/config/STA"]["ssid"] = std::string( //
-                ssid, strnlen(ssid, MAX_SSID_LEN));
-            Config::repo()["/network/wifi/config/STA"]["pass"] = std::string( //
-                pass, strnlen(pass, MAX_PASSPHRASE_LEN));
+            netConf.setStaSSID(//
+            		std::string(ssid, strnlen(ssid, MAX_SSID_LEN)));
+            netConf.setStaPass(//
+            		std::string(pass, strnlen(pass, MAX_PASSPHRASE_LEN)));
 
             log_inst.debug(TAG, "Connecting to SSID: {}, Passphrase: {}", ssid,
                            pass);
