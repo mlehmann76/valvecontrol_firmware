@@ -226,6 +226,7 @@ void ConnectState::onEnter() {
     wifi_mode_t mode = static_cast<wifi_mode_t>(netConf.getMode());
 
     if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA) {
+        log_inst.debug(TAG, "ap ssid {}", netConf.getApSSID());
         wifi_config_t wifi_config;
         memset(&wifi_config, 0, sizeof(wifi_config));
 
@@ -239,7 +240,6 @@ void ConnectState::onEnter() {
         const size_t lenp = _pass.length();
         memcpy(wifi_config.ap.password, _pass.c_str(), lenp > 64 ? 64 : lenp);
 
-        log_inst.debug(TAG, "ssid {}, pw {}", netConf.getApSSID(), _pass);
         wifi_config.ap.max_connection = 1; // TODO
         wifi_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
 
@@ -248,19 +248,26 @@ void ConnectState::onEnter() {
     }
 
     if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA) {
-        wifi_config_t wifi_config;
-        memset(&wifi_config, 0, sizeof(wifi_config));
-
         const std::string ssid = netConf.getStaSSID();
-        const size_t len = ssid.length();
-        memcpy(wifi_config.ap.ssid, ssid.c_str(), len > 32 ? 32 : len);
-        wifi_config.ap.ssid_len = len;
+        if (ssid != "") {
+            log_inst.debug(TAG, "trying ssid {}", ssid);
+            wifi_config_t wifi_config;
+            memset(&wifi_config, 0, sizeof(wifi_config));
 
-        const std::string _pass = netConf.getStaPass();
-        const size_t lenp = _pass.length();
-        memcpy(wifi_config.ap.password, _pass.c_str(), lenp > 64 ? 64 : lenp);
-        ESP_ERROR_CHECK(esp_wifi_set_mode(mode));
-        ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
+            const size_t len = ssid.length();
+            memcpy(wifi_config.ap.ssid, ssid.c_str(), len > 32 ? 32 : len);
+            wifi_config.ap.ssid_len = len;
+
+            const std::string _pass = netConf.getStaPass();
+            const size_t lenp = _pass.length();
+            memcpy(wifi_config.ap.password, _pass.c_str(),
+                   lenp > 64 ? 64 : lenp);
+            ESP_ERROR_CHECK(esp_wifi_set_mode(mode));
+            ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
+        } else {
+            ESP_ERROR_CHECK(esp_wifi_set_mode(mode));
+            ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
+        }
     }
 
     ESP_ERROR_CHECK(esp_wifi_start());
@@ -435,6 +442,10 @@ template <> WifiMode WPSMode::handle(const WifiEvent &e) {
         log_inst.info(TAG, "SYSTEM_EVENT_STA_WPS_ER_SUCCESS");
         wifi_event_sta_wps_er_success_t *evt =
             (wifi_event_sta_wps_er_success_t *)e.event_data;
+        /*
+         * For only one AP credential don't sned event data, wps_finish() has already set
+         * the config. This is for backward compatibility.
+         */
         if (evt && evt->ap_cred_cnt) {
             /* If multiple AP credentials are received from WPS, connect with
              * first one */
@@ -447,6 +458,10 @@ template <> WifiMode WPSMode::handle(const WifiEvent &e) {
 
             log_inst.debug(TAG, "Connecting to SSID: {}, Passphrase: {}", ssid,
                            pass);
+        } else {
+        	/*clear config, sta connect then will use system saved values*/
+        	netConf.setStaSSID("");
+        	netConf.setStaPass("");
         }
         m_parent->m_events.push_back(detail::TransitionEvent{
             this->m_parent, detail::ConnectState(this->m_parent)});
