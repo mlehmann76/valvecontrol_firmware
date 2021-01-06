@@ -45,6 +45,7 @@ class ConfigBase {
     esp_err_t genKey();
     void initNVSFlash(forceErase_t);
     void writeConfig();
+    void spiffsInit();
 
     nvs_handle_t my_handle;
     TimerMember<ConfigBase> m_timeout;

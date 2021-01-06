@@ -55,7 +55,6 @@ class MainClass {
   private:
     MainClass();
     virtual ~MainClass() = default;
-    void spiffsInit();
     int checkWPSButton();
 
     std::mutex mutex;

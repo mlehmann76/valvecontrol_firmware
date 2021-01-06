@@ -12,6 +12,7 @@
 #include <string>
 
 #include "esp_err.h"
+#include "esp_spiffs.h"
 #include "esp_system.h"
 #include "nvs.h"
 #include "nvs_flash.h"
@@ -55,6 +56,9 @@ esp_err_t ConfigBase::init() {
     std::lock_guard<std::mutex> lck(mutex);
     esp_err_t ret = ESP_OK;
     if (!m_isInitialized) {
+
+    	spiffsInit();
+
         char *nvs_json_config;
 
         repo().create("/system/auth/config", {{{"user", "admin"s}, //
@@ -63,10 +67,10 @@ esp_err_t ConfigBase::init() {
 
         if (ESP_OK != readKey() ||
             ESP_OK != readStr(&my_handle, "config_json", &nvs_json_config)) {
-            // FIXME initNVSFlash(ForceErase);
+        	//FIXME initNVSFlash(ForceErase);
             genKey();
             repo().parse(config_json_start);
-            // FIXME writeConfig();
+            //FIXME writeConfig();
         } else {
             repo().parse(nvs_json_config);
         }
@@ -99,8 +103,7 @@ void ConfigBase::initNVSFlash(forceErase_t f) {
 
 esp_err_t ConfigBase::readKey() {
     char *pKey;
-    // FIXME wrong "key" needed until config is saved
-    esp_err_t err = readStr(&my_handle, "config_key2", &pKey);
+    esp_err_t err = readStr(&my_handle, "config_key", &pKey);
     if (ESP_OK == err) {
         m_key = {std::string(pKey, m_key.size())};
         log_inst.debug(TAG, "key:{}", m_key.to_hex());
@@ -118,6 +121,7 @@ esp_err_t ConfigBase::genKey() {
         m_keyReset = true;
         m_key = *key;
         err = writeStr(&my_handle, "config_key", key->to_string().c_str());
+        nvs_commit(my_handle);
     } else {
         log_inst.error(TAG, "config_key gen failed");
     }
@@ -156,11 +160,48 @@ void ConfigBase::writeConfig() {
     log_inst.info(TAG, "writeConfig called");
     esp_err_t err = ESP_OK;
     // FIXME err = writeStr(&my_handle, "config_json",
-    //    		repo().stringify(repo().partial("/*/*/config")));
+    // repo().stringify(repo().partial("/*/*/config")).c_str());
     if (ESP_OK != err) {
         log_inst.error(TAG, "writeConfig failed ({})", esp_err_to_name(err));
     }
+    nvs_commit(my_handle);
 }
+
+void ConfigBase::spiffsInit(void) {
+    log_inst.info(TAG, "Initializing SPIFFS");
+
+    esp_vfs_spiffs_conf_t conf = {.base_path = "/spiffs",
+                                  .partition_label = NULL,
+                                  .max_files = 5,
+                                  .format_if_mount_failed = false};
+
+    // Use settings defined above to initialize and mount SPIFFS filesystem.
+    // Note: esp_vfs_spiffs_register is an all-in-one convenience function.
+    esp_err_t ret = esp_vfs_spiffs_register(&conf);
+
+    if (ret != ESP_OK) {
+        if (ret == ESP_FAIL) {
+            log_inst.error(TAG, "Failed to mount or format filesystem");
+        } else if (ret == ESP_ERR_NOT_FOUND) {
+            log_inst.error(TAG, "Failed to find SPIFFS partition");
+        } else {
+            log_inst.error(TAG, "Failed to initialize SPIFFS {}",
+                           esp_err_to_name(ret));
+        }
+        return;
+    }
+
+    size_t total = 0, used = 0;
+    ret = esp_spiffs_info(NULL, &total, &used);
+    if (ret != ESP_OK) {
+        log_inst.error(TAG, "Failed to get SPIFFS partition information {}",
+                       esp_err_to_name(ret));
+    } else {
+        log_inst.info(TAG, "Partition size: total: {:d}, used: {:d}", total,
+                      used);
+    }
+}
+
 
 esp_err_t MqttConfig::init() {
 
