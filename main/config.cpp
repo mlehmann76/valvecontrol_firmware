@@ -10,6 +10,8 @@
 #include <sstream>
 #include <stdlib.h>
 #include <string>
+#include <iostream>
+#include <fstream>
 
 #include "esp_err.h"
 #include "esp_spiffs.h"
@@ -46,7 +48,7 @@ repository &repo() {
 }
 
 ConfigBase::ConfigBase()
-    : my_handle(), m_timeout("ConfigTimer", this, &ConfigBase::writeConfig,
+    : my_handle(), m_timeout("ConfigTimer", this, &ConfigBase::onTimeout,
                              (1000 / portTICK_PERIOD_MS), false) {
     m_isInitialized = false;
     m_keyReset = false;
@@ -59,20 +61,19 @@ esp_err_t ConfigBase::init() {
 
     	spiffsInit();
 
-        char *nvs_json_config;
-
         repo().create("/system/auth/config", {{{"user", "admin"s}, //
                                                {"password", "admin"s}}});
         initNVSFlash(NoForceErase);
+        std::string str;
 
         if (ESP_OK != readKey() ||
-            ESP_OK != readStr(&my_handle, "config_json", &nvs_json_config)) {
+            ESP_OK != readConfig(str)) {
         	//FIXME initNVSFlash(ForceErase);
             genKey();
             repo().parse(config_json_start);
-            //FIXME writeConfig();
+            writeConfig();
         } else {
-            repo().parse(nvs_json_config);
+            repo().parse(str);
         }
 
         Config::repo().addNotify("/*/*/config", Config::onConfigNotify(baseConf));
@@ -155,16 +156,40 @@ void ConfigBase::onConfigNotify(const std::string &s) {
     m_timeout.start();
 }
 
-void ConfigBase::writeConfig() {
+void ConfigBase::onTimeout() {
+	writeConfig();
+}
+
+esp_err_t ConfigBase::writeConfig() {
     std::lock_guard<std::mutex> lock(m_lock);
     log_inst.info(TAG, "writeConfig called");
     esp_err_t err = ESP_OK;
-    // FIXME err = writeStr(&my_handle, "config_json",
-    // repo().stringify(repo().partial("/*/*/config")).c_str());
-    if (ESP_OK != err) {
-        log_inst.error(TAG, "writeConfig failed ({})", esp_err_to_name(err));
+    std::ofstream ofs("/spiffs/config.json");
+    if (ofs) {
+    	ofs << repo().stringify({"/*/*/config"},0);
+        ofs.close();
+    } else {
+        log_inst.error(TAG, "writeConfig failed");
+        err = ESP_FAIL;
     }
-    nvs_commit(my_handle);
+    return err;
+}
+
+esp_err_t ConfigBase::readConfig(std::string& str) {
+    std::ifstream ifs("/spiffs/config.json");
+    if (ifs) {
+        // get length of file:
+        ifs.seekg(0, ifs.end);
+        str.reserve(ifs.tellg());
+        ifs.seekg(0, ifs.beg);
+
+        str.assign((std::istreambuf_iterator<char>(ifs)),
+                    std::istreambuf_iterator<char>());
+
+        ifs.close();
+        return ESP_OK;
+    }
+    return ESP_FAIL;
 }
 
 void ConfigBase::spiffsInit(void) {

@@ -115,7 +115,7 @@ std::string repository::debug(const mapType &_m) {
     return _ss.str();
 }
 
-std::string repository::stringify(const mapType &_m) const {
+std::string repository::stringify(const mapType &_m, size_t spaces) const {
     nlohmann::json root;
     for (mapType::const_iterator it = _m.begin(), end = _m.end(); it != end;
          ++it) {
@@ -124,7 +124,22 @@ std::string repository::stringify(const mapType &_m) const {
                                         v.second);
         }
     }
-    return root.dump(4);
+    return root.dump(spaces);
+}
+
+std::string repository::stringify(const repository::StringMatch &_m,
+                                  size_t spaces) const {
+    nlohmann::json root;
+    for (auto it = m_properties.begin(), end = m_properties.end();
+    		it != end; ++it) {
+        if (_m.match(it->first)) {
+            for (auto &v : it->second->get()) {
+                mapbox::util::apply_visitor(
+                    JsonVisitor(it->first, v.first, root), v.second);
+            }
+        }
+    }
+    return root.dump(spaces);
 }
 
 std::string repository::propName(const std::string &name) const {
@@ -273,7 +288,7 @@ property &repository::operator[](std::string &&key) {
     return create(key, property());
 }
 
-bool repository::StringMatch::match(const std::string str) {
+bool repository::StringMatch::match(const std::string str) const{
     bool ret = true;
     std::vector<std::string> m_parts = utilities::split(str, "/");
     for (size_t i = 0; (i < m_keys.size()) && (i < m_parts.size()); i++) {

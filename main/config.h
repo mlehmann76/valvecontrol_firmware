@@ -44,7 +44,9 @@ class ConfigBase {
     esp_err_t readKey();
     esp_err_t genKey();
     void initNVSFlash(forceErase_t);
-    void writeConfig();
+    void onTimeout();
+    esp_err_t writeConfig();
+    esp_err_t readConfig(std::string&);
     void spiffsInit();
 
     nvs_handle_t my_handle;

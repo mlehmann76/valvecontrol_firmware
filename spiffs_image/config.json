@@ -53,7 +53,7 @@
             "config": {
                 "AP": {
                     "channel": 1,
-                    "pass": "",
+                    "pass": "78DAF59708E9CF018F84AAD141696EC4",
                     "ssid": "espressifAP"
                 },
                 "STA": {
