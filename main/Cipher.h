@@ -80,7 +80,6 @@ private:
 	AES128Key m_key;
 };
 
-std::string toHex(const std::string& in) ;
-std::string fromHex(const std::string& in) ;
+
 
 #endif /* MAIN_CIPHER_H_ */

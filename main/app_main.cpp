@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "config_user.h"
+#include "config.h"
 
 #include "MainClass.h"
 

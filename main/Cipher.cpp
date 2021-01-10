@@ -121,28 +121,6 @@ std::optional<AES128Key> AES128Key::genRandomKey(const std::string &pers) {
 	return {key};
 }
 
-std::string toHex(const std::string &in) {
-	std::stringstream _s;
-	for (const auto &e : in) {
-		_s << std::uppercase << std::setfill('0') << std::setw(2) << std::hex
-				<< unsigned(e);
-	}
-	return _s.str();
-}
-
-std::string fromHex(const std::string &in) {
-	assert(in.length() % 2 == 0);
-	std::string _out;
-	for (size_t i = 0; i < in.length() / 2; i++) {
-		unsigned x;
-		std::stringstream ss;
-		ss << std::hex << in.substr(2 * i, 2);
-		ss >> x;
-		_out += x;
-	}
-	return _out;
-}
-
 std::string Cipher::toString(const block_type &in) {
 	return std::string(std::begin(in), std::end(in));
 }

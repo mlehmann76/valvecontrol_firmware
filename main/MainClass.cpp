@@ -58,7 +58,8 @@ void MainClass::setup() {
     log_inst.setLogSeverity("I2C", logger::severity_type::warning);
     log_inst.setLogSeverity("repository", logger::severity_type::warning);
 
-    mqttConf.init();
+	baseConf.init();
+	mqttConf.init();
     netConf.init();
 
     _wifi =

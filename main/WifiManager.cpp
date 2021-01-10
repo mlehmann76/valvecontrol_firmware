@@ -221,6 +221,35 @@ template <> WifiMode ConnectState::handle(const TransitionEvent &e) {
     return transition(*this, e.m_next);
 }
 
+void ConnectState::setAPConfig(wifi_config_t &wifi_config) {
+    memset(&wifi_config, 0, sizeof(wifi_config));
+    const size_t len = netConf.getApSSID().length();
+    memcpy(wifi_config.ap.ssid, netConf.getApSSID().c_str(),
+           len > 32 ? 32 : len);
+    wifi_config.ap.ssid_len = len;
+    wifi_config.ap.channel = netConf.getApChannel();
+    /* prevent ap error if password shorter then 8 */
+    if (netConf.getApPass().length() < 8) {
+        netConf.setApPass("espressif"); // FIXME make configurable
+    }
+    const std::string _pass = netConf.getApPass();
+    const size_t lenp = _pass.length();
+    memcpy(wifi_config.ap.password, _pass.c_str(), lenp > 64 ? 64 : lenp);
+    wifi_config.ap.max_connection = 1; // TODO
+    wifi_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
+}
+
+void ConnectState::setSTAConfig(const std::string &ssid,
+                                wifi_config_t &wifi_config) {
+    memset(&wifi_config, 0, sizeof(wifi_config));
+    const size_t len = ssid.length();
+    memcpy(wifi_config.ap.ssid, ssid.c_str(), len > 32 ? 32 : len);
+    wifi_config.ap.ssid_len = len;
+    const std::string _pass = netConf.getStaPass();
+    const size_t lenp = _pass.length();
+    memcpy(wifi_config.ap.password, _pass.c_str(), lenp > 64 ? 64 : lenp);
+}
+
 void ConnectState::onEnter() {
     log_inst.info(TAG, "ConnectState start");
     wifi_mode_t mode = static_cast<wifi_mode_t>(netConf.getMode());
@@ -228,21 +257,7 @@ void ConnectState::onEnter() {
     if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA) {
         log_inst.debug(TAG, "ap ssid {}", netConf.getApSSID());
         wifi_config_t wifi_config;
-        memset(&wifi_config, 0, sizeof(wifi_config));
-
-        const size_t len = netConf.getApSSID().length();
-        memcpy(wifi_config.ap.ssid, netConf.getApSSID().c_str(),
-               len > 32 ? 32 : len);
-        wifi_config.ap.ssid_len = len;
-        wifi_config.ap.channel = netConf.getApChannel();
-
-        const std::string _pass = netConf.getApPass();
-        const size_t lenp = _pass.length();
-        memcpy(wifi_config.ap.password, _pass.c_str(), lenp > 64 ? 64 : lenp);
-
-        wifi_config.ap.max_connection = 1; // TODO
-        wifi_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
-
+        setAPConfig(wifi_config);
         ESP_ERROR_CHECK(esp_wifi_set_mode(mode));
         ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config));
     }
@@ -252,16 +267,7 @@ void ConnectState::onEnter() {
         if (ssid != "") {
             log_inst.debug(TAG, "trying ssid {}", ssid);
             wifi_config_t wifi_config;
-            memset(&wifi_config, 0, sizeof(wifi_config));
-
-            const size_t len = ssid.length();
-            memcpy(wifi_config.ap.ssid, ssid.c_str(), len > 32 ? 32 : len);
-            wifi_config.ap.ssid_len = len;
-
-            const std::string _pass = netConf.getStaPass();
-            const size_t lenp = _pass.length();
-            memcpy(wifi_config.ap.password, _pass.c_str(),
-                   lenp > 64 ? 64 : lenp);
+            setSTAConfig(ssid, wifi_config);
             ESP_ERROR_CHECK(esp_wifi_set_mode(mode));
             ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
         } else {

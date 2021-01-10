@@ -150,10 +150,9 @@ void MqttWorker::send(mqttMessage *rxData) {
 
 void MqttWorker::init(void) {
 
-    m_server =
-        Config::repo().get<std::string>("/network/mqtt/config", "server");
-    m_user = Config::repo().get<std::string>("/network/mqtt/config", "user");
-    m_pass = Config::repo().get<std::string>("/network/mqtt/config", "pass");
+    m_server = mqttConf.getServer();
+    m_user = mqttConf.getUser();
+    m_pass = mqttConf.getPass();
 
     esp_mqtt_client_config_t mqtt_cfg;
     memset(&mqtt_cfg, 0, sizeof(mqtt_cfg));

@@ -196,7 +196,7 @@ property &repository::create(const std::string &name, const property &_cp) {
     if (true == ret.second) {
         ret.first->second = std::make_shared<property>(_cp);
         ret.first->second->set(name, *this); // TODO name or cname
-        log_inst.debug(TAG, "create {}", ret.first->second->name());
+        //FIXME log_inst.debug(TAG, "create {}", ret.first->second->name());
     }
 
     return *ret.first->second;

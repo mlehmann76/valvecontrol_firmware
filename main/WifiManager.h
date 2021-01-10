@@ -54,6 +54,10 @@ struct ConnectState {
     void onEnter();
     void onLeave();
     WifiManager *m_parent;
+
+  private:
+    void setAPConfig(wifi_config_t &wifi_config);
+    void setSTAConfig(const std::string &ssid, wifi_config_t &wifi_config);
 };
 
 struct ScanMode {

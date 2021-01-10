@@ -47,6 +47,16 @@ repository &repo() {
     return s_repository;
 }
 
+
+std::string bin2String(std::string s) {
+	return std::move(utilities::base64_encode(std::move(s)));
+}
+
+std::string string2Bin(std::string s) {
+	return std::move(utilities::base64_decode(std::move(s)));
+}
+
+
 ConfigBase::ConfigBase()
     : my_handle(), m_timeout("ConfigTimer", this, &ConfigBase::onTimeout,
                              (1000 / portTICK_PERIOD_MS), false) {
@@ -66,10 +76,11 @@ esp_err_t ConfigBase::init() {
         initNVSFlash(NoForceErase);
         std::string str;
 
-        if (ESP_OK != readKey() ||
-            ESP_OK != readConfig(str)) {
-        	//FIXME initNVSFlash(ForceErase);
+        if (ESP_OK != readKey()) {
             genKey();
+        }
+
+        if (ESP_OK != readConfig(str) || isKeyReset()) {
             repo().parse(config_json_start);
             writeConfig();
         } else {
@@ -117,7 +128,7 @@ esp_err_t ConfigBase::readKey() {
 
 esp_err_t ConfigBase::genKey() {
     esp_err_t err = ESP_OK;
-    auto key = AES128Key::genRandomKey("my esspressif key");
+    auto key = AES128Key::genRandomKey("my esspressif key"); //FIXME
     if (key) {
         m_keyReset = true;
         m_key = *key;
@@ -160,12 +171,18 @@ void ConfigBase::onTimeout() {
 	writeConfig();
 }
 
+std::string ConfigBase::configFileName() const {
+	Cipher ciph{m_key};
+	return std::move("/spiffs/"+bin2String(ciph.encrypt("config.json")));
+}
+
 esp_err_t ConfigBase::writeConfig() {
     std::lock_guard<std::mutex> lock(m_lock);
-    log_inst.info(TAG, "writeConfig called");
+	const std::string fname = configFileName();
     esp_err_t err = ESP_OK;
-    std::ofstream ofs("/spiffs/config.json");
-    if (ofs) {
+    log_inst.info(TAG, "writeConfig called {}", fname);
+    std::ofstream ofs(fname, std::ios::out | std::ios::trunc);
+    if (ofs.is_open()) {
     	ofs << repo().stringify({"/*/*/config"},0);
         ofs.close();
     } else {
@@ -176,19 +193,24 @@ esp_err_t ConfigBase::writeConfig() {
 }
 
 esp_err_t ConfigBase::readConfig(std::string& str) {
-    std::ifstream ifs("/spiffs/config.json");
-    if (ifs) {
+	const std::string fname = configFileName();
+    std::ifstream ifs(fname, std::ifstream::in);
+    log_inst.info(TAG, "readConfig called {}", fname);
+    if (ifs.is_open()) {
         // get length of file:
         ifs.seekg(0, ifs.end);
-        str.reserve(ifs.tellg());
+        size_t len = ifs.tellg();
+        str.reserve(len);
+        log_inst.info(TAG, "readConfig length {:d}", len);
         ifs.seekg(0, ifs.beg);
 
         str.assign((std::istreambuf_iterator<char>(ifs)),
                     std::istreambuf_iterator<char>());
 
         ifs.close();
-        return ESP_OK;
+        return len > 0 ? ESP_OK : ESP_FAIL;
     }
+    log_inst.info(TAG, "readConfig failed {}", fname);
     return ESP_FAIL;
 }
 
@@ -227,7 +249,6 @@ void ConfigBase::spiffsInit(void) {
     }
 }
 
-
 esp_err_t MqttConfig::init() {
 
     static char *MQTT_DEVICE = (char *)"esp32/";
@@ -254,6 +275,12 @@ esp_err_t MqttConfig::init() {
     return ESP_OK;
 }
 
+std::string MqttConfig::getPass() const {
+    Cipher cipher = {key()};
+    return cipher.decrypt(
+        bin2String(repo().get<std::string>("/network/mqtt/config", "pass")));
+}
+
 esp_err_t NetConfig::init() {
     if (!m_base.isInitialized()) {
         m_base.init();
@@ -278,30 +305,22 @@ esp_err_t NetConfig::init() {
                                                 {"ssid", ""s}, //
                                                 {"pass", ""s}}});
 
+	// saving password will encrypt it
+	repo()["/network/mqtt/config"].set(doEncrypt(*this, "pass"));
+
     // saving password will encrypt it
     repo()["/network/wifi/config/AP"].set(doEncrypt(*this, "pass"));
 
     // saving password will encrypt it
-    repo()["/network/wifi/config/STA"].set(doEncrypt(*this, "pass"));
+	repo()["/network/wifi/config/STA"].set(doEncrypt(*this, "pass"));
 
     if (m_base.isKeyReset()) {
-        Cipher ciph(m_base.key());
-        repo()["/network/wifi/config/AP"]["pass"] = "espressif"s;
+        setApPass("espressif"); //FIXME make configurable
     }
 
     return ESP_OK;
 }
 
-std::optional<property> NetConfig::doEncrypt::operator()(const property &p) {
-    auto it = p.find(key);
-    if (it != p.end() && it->second.is<StringType>()) {
-        Cipher ciph(net.key());
-        auto temp = p;
-        temp[key] = toHex(ciph.encrypt(it->second.get_unchecked<StringType>()));
-        return temp;
-    }
-    return {};
-}
 
 std::string NetConfig::getTimeServer() const {
     return repo().get<std::string>("/network/sntp/config", "server");
@@ -323,8 +342,14 @@ std::string NetConfig::getApSSID() const {
 std::string NetConfig::getApPass() const {
     Cipher cipher = {key()};
     return cipher.decrypt(
-        fromHex(repo().get<std::string>("/network/wifi/config/AP", "pass")));
+        string2Bin(repo().get<std::string>("/network/wifi/config/AP", "pass")));
 }
+
+void NetConfig::setApPass(std::string s) {
+	Cipher ciph(m_base.key());
+	repo()["/network/wifi/config/AP"]["pass"] = std::move(s);
+}
+
 
 unsigned NetConfig::getApChannel() const {
     return repo().get<IntType>("/network/wifi/config/AP", "channel", 1);
@@ -337,7 +362,7 @@ std::string NetConfig::getStaSSID() const {
 std::string NetConfig::getStaPass() const {
     Cipher cipher = {key()};
     return cipher.decrypt(
-        fromHex(repo().get<std::string>("/network/wifi/config/STA", "pass")));
+    	string2Bin(repo().get<std::string>("/network/wifi/config/STA", "pass")));
 }
 
 unsigned NetConfig::getMode() const {
@@ -352,7 +377,7 @@ esp_err_t ChannelConfig::init() {
     for (unsigned i = 0; i < 4; i++) {
         repo().create(channelName(i).str(), {{{"name", "no name"s},
                                               {"alt", "alt name"s},
-                                              {"enabled", BoolType(false)},
+                                              {"enabled", false},
                                               {"maxTime", 0}}});
     }
     return ret;
@@ -382,7 +407,9 @@ std::chrono::seconds ChannelConfig::getTime(unsigned ch) {
 }
 
 std::string SysConfig::getPass() {
-    return repo().get<std::string>("/system/auth/config", "password");
+    Cipher cipher = {key()};
+    return cipher.decrypt(
+    	string2Bin(repo().get<std::string>("/system/auth/config", "password")));
 }
 
 std::string SysConfig::getUser() {

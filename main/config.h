@@ -15,12 +15,35 @@
 #include <chrono>
 #include <memory>
 #include <string>
+#include "utilities.h"
 
 class repository;
 
 namespace Config {
 
 repository &repo();
+
+std::string bin2String(std::string s);
+std::string string2Bin(std::string s);
+
+template <typename T>
+struct doEncrypt {
+    doEncrypt(const T &_net, std::string _key)
+        : net(_net), key(std::move(_key)) {}
+    std::optional<property> operator()(const property &p) {
+        auto it = p.find(key);
+        if (it != p.end() && it->second.is<StringType>()) {
+            Cipher ciph(net.key());
+            property temp;
+            temp[key] = std::move(bin2String(
+                ciph.encrypt(it->second.get_unchecked<StringType>())));
+            return temp;
+        }
+        return {};
+    }
+    const T &net;
+    const std::string key;
+};
 
 class ConfigBase {
     static bool m_isInitialized;
@@ -48,6 +71,7 @@ class ConfigBase {
     esp_err_t writeConfig();
     esp_err_t readConfig(std::string&);
     void spiffsInit();
+    std::string configFileName() const;
 
     nvs_handle_t my_handle;
     TimerMember<ConfigBase> m_timeout;
@@ -67,6 +91,7 @@ class SysConfig {
 
     std::string getUser();
     std::string getPass();
+    AES128Key key() const { return m_base.key(); }
 
   private:
     ConfigBase &m_base;
@@ -82,12 +107,21 @@ class MqttConfig {
 
     std::string getPubMsg() const { return mqtt_pub_msg; }
     std::string getDevName() const { return mqtt_device_name; }
+    std::string getPass() const;
+    std::string getUser() const {
+    	return repo().get<std::string>("/network/mqtt/config", "user");
+    }
+    std::string getServer() const {
+    	return repo().get<std::string>("/network/mqtt/config", "server");
+    }
+
     void setConnected(bool isCon) {
         repo()["/network/mqtt/state"]["connected"] = isCon;
     }
     bool enabled() const {
         return repo()["/network/mqtt/config"]["enabled"].get<BoolType>();
     }
+    AES128Key key() const { return m_base.key(); }
 
   private:
     ConfigBase &m_base;
@@ -96,14 +130,6 @@ class MqttConfig {
 };
 
 class NetConfig {
-    struct doEncrypt {
-        doEncrypt(NetConfig &_net, std::string _key)
-            : net(_net), key(std::move(_key)) {}
-        std::optional<property> operator()(const property &p);
-        const NetConfig &net;
-        const std::string key;
-    };
-
   public:
     NetConfig(ConfigBase &base) : m_base(base) {}
     esp_err_t init();
@@ -112,6 +138,7 @@ class NetConfig {
     std::string getHostname() const;
     std::string getApSSID() const;
     std::string getApPass() const;
+    void setApPass(std::string s);
     unsigned getApChannel() const;
     std::string getStaSSID() const;
     void setStaSSID(const std::string& s) {
