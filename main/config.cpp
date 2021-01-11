@@ -36,7 +36,7 @@ namespace Config {
 
 bool ConfigBase::m_isInitialized = false;
 bool ConfigBase::m_keyReset = false;
-AES128Key ConfigBase::m_key = {};
+Cipher ConfigBase::m_crypt = {AES128Key{}};
 std::mutex mutex;
 
 const char MqttConfig::MQTT_PUB_MESSAGE_FORMAT[] =
@@ -117,8 +117,8 @@ esp_err_t ConfigBase::readKey() {
     char *pKey;
     esp_err_t err = readStr(&my_handle, "config_key", &pKey);
     if (ESP_OK == err) {
-        m_key = {std::string(pKey, m_key.size())};
-        log_inst.debug(TAG, "key:{}", m_key.to_hex());
+        m_crypt = {AES128Key{std::string(pKey, AES128Key::size())}};
+        log_inst.debug(TAG, "key:{}", m_crypt.key().to_hex());
     } else {
         log_inst.error(TAG, "config_key read failed ({})",
                        esp_err_to_name(err));
@@ -131,7 +131,7 @@ esp_err_t ConfigBase::genKey() {
     auto key = AES128Key::genRandomKey("my esspressif key"); //FIXME
     if (key) {
         m_keyReset = true;
-        m_key = *key;
+        m_crypt = {*key};
         err = writeStr(&my_handle, "config_key", key->to_string().c_str());
         nvs_commit(my_handle);
     } else {
@@ -172,8 +172,7 @@ void ConfigBase::onTimeout() {
 }
 
 std::string ConfigBase::configFileName() const {
-	Cipher ciph{m_key};
-	return std::move("/spiffs/"+bin2String(ciph.encrypt("config.json")));
+	return std::move("/spiffs/"+bin2String(m_crypt.encrypt("config.json")));
 }
 
 esp_err_t ConfigBase::writeConfig() {
@@ -181,7 +180,7 @@ esp_err_t ConfigBase::writeConfig() {
 	const std::string fname = configFileName();
     esp_err_t err = ESP_OK;
     log_inst.info(TAG, "writeConfig called {}", fname);
-    std::ofstream ofs(fname, std::ios::out | std::ios::trunc);
+    std::ofstream ofs(fname, std::ios::out |std::ios::binary | std::ios::trunc);
     if (ofs.is_open()) {
     	ofs << repo().stringify({"/*/*/config"},0);
         ofs.close();
@@ -194,7 +193,7 @@ esp_err_t ConfigBase::writeConfig() {
 
 esp_err_t ConfigBase::readConfig(std::string& str) {
 	const std::string fname = configFileName();
-    std::ifstream ifs(fname, std::ifstream::in);
+    std::ifstream ifs(fname, std::ios::in|std::ios::binary);
     log_inst.info(TAG, "readConfig called {}", fname);
     if (ifs.is_open()) {
         // get length of file:
@@ -276,8 +275,7 @@ esp_err_t MqttConfig::init() {
 }
 
 std::string MqttConfig::getPass() const {
-    Cipher cipher = {key()};
-    return cipher.decrypt(
+    return crypt().decrypt(
         bin2String(repo().get<std::string>("/network/mqtt/config", "pass")));
 }
 
@@ -340,13 +338,11 @@ std::string NetConfig::getApSSID() const {
 }
 
 std::string NetConfig::getApPass() const {
-    Cipher cipher = {key()};
-    return cipher.decrypt(
+    return crypt().decrypt(
         string2Bin(repo().get<std::string>("/network/wifi/config/AP", "pass")));
 }
 
 void NetConfig::setApPass(std::string s) {
-	Cipher ciph(m_base.key());
 	repo()["/network/wifi/config/AP"]["pass"] = std::move(s);
 }
 
@@ -360,8 +356,7 @@ std::string NetConfig::getStaSSID() const {
 }
 
 std::string NetConfig::getStaPass() const {
-    Cipher cipher = {key()};
-    return cipher.decrypt(
+    return crypt().decrypt(
     	string2Bin(repo().get<std::string>("/network/wifi/config/STA", "pass")));
 }
 
@@ -407,8 +402,7 @@ std::chrono::seconds ChannelConfig::getTime(unsigned ch) {
 }
 
 std::string SysConfig::getPass() {
-    Cipher cipher = {key()};
-    return cipher.decrypt(
+    return crypt().decrypt(
     	string2Bin(repo().get<std::string>("/system/auth/config", "password")));
 }
 

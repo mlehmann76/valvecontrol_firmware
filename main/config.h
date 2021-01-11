@@ -33,10 +33,9 @@ struct doEncrypt {
     std::optional<property> operator()(const property &p) {
         auto it = p.find(key);
         if (it != p.end() && it->second.is<StringType>()) {
-            Cipher ciph(net.key());
             property temp;
             temp[key] = std::move(bin2String(
-                ciph.encrypt(it->second.get_unchecked<StringType>())));
+                net.crypt().encrypt(it->second.get_unchecked<StringType>())));
             return temp;
         }
         return {};
@@ -47,7 +46,7 @@ struct doEncrypt {
 
 class ConfigBase {
     static bool m_isInitialized;
-    static AES128Key m_key;
+    static Cipher m_crypt;
     static bool m_keyReset;
     enum forceErase_t { NoForceErase, ForceErase };
 
@@ -58,7 +57,7 @@ class ConfigBase {
 
     bool isInitialized() const { return m_isInitialized; }
     bool isKeyReset() const { return m_keyReset; }
-    AES128Key key() const { return m_key; }
+    const Cipher& crypt() const { return m_crypt; }
     void onConfigNotify(const std::string &s);
 
   private:
@@ -91,7 +90,7 @@ class SysConfig {
 
     std::string getUser();
     std::string getPass();
-    AES128Key key() const { return m_base.key(); }
+    const Cipher& crypt() const { return m_base.crypt(); }
 
   private:
     ConfigBase &m_base;
@@ -121,7 +120,7 @@ class MqttConfig {
     bool enabled() const {
         return repo()["/network/mqtt/config"]["enabled"].get<BoolType>();
     }
-    AES128Key key() const { return m_base.key(); }
+    const Cipher& crypt() const { return m_base.crypt(); }
 
   private:
     ConfigBase &m_base;
@@ -149,7 +148,7 @@ class NetConfig {
     	repo()["/network/wifi/config/STA"]["pass"] = s;
     }
     unsigned getMode() const;
-    AES128Key key() const { return m_base.key(); }
+    const Cipher& crypt() const { return m_base.crypt(); }
 
   private:
     ConfigBase &m_base;

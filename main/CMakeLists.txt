@@ -22,3 +22,6 @@ idf_component_register(SRCS "base85.c"
                             "Cipher.cpp" INCLUDE_DIRS
                             "." REQUIRES FreeRTOScpp mqtt http variant nvs_flash
                                 json njson app_update pthread logger spiffs fmt)
+
+target_compile_options(${COMPONENT_LIB} PRIVATE -fstack-usage -Wstack-usage=64)
+                                

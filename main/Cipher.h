@@ -47,7 +47,7 @@ public:
 
 	std::string to_hex() const;
 
-	size_t size() const { return 16; }
+	static constexpr size_t size() { return 16; }
 	static std::optional<AES128Key> genRandomKey(const std::string& pers);
 private:
 	key_type m_key;
@@ -69,6 +69,8 @@ public:
 	std::string encrypt(std::string _text) const;
 	//
 	std::string decrypt(std::string _crypt) const;
+	//
+	const AES128Key& key() const { return m_key; }
 
 private:
 
