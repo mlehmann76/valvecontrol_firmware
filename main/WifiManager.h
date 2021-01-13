@@ -53,6 +53,7 @@ struct ConnectState {
     template <class T> WifiMode handle(const T &);
     void onEnter();
     void onLeave();
+    wifi_mode_t mode() const;
     WifiManager *m_parent;
 
   private:

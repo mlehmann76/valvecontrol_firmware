@@ -99,6 +99,7 @@ void WifiManager::task() {
     init();
     while (1) {
         if (m_timeout.active && m_timeout.expired()) {
+        	m_events.push_back(m_timeout.event);
         }
         if (!m_events.empty()) {
             auto event = m_events.front();
@@ -138,6 +139,7 @@ void WifiManager::got_ip_event_handler(esp_event_base_t event_base,
                       IP2STR(&event->ip_info.ip));
         // FIXME xEventGroupSetBits(main_event_group, CONNECTED_BIT);
         notifyConnect();
+        m_timeout.stop();
         break;
     case IP_EVENT_STA_LOST_IP:
         notifyDisconnect();
@@ -242,51 +244,64 @@ void ConnectState::setAPConfig(wifi_config_t &wifi_config) {
 void ConnectState::setSTAConfig(const std::string &ssid,
                                 wifi_config_t &wifi_config) {
     memset(&wifi_config, 0, sizeof(wifi_config));
-    const size_t len = ssid.length();
-    memcpy(wifi_config.ap.ssid, ssid.c_str(), len > 32 ? 32 : len);
-    wifi_config.ap.ssid_len = len;
-    const std::string _pass = netConf.getStaPass();
-    const size_t lenp = _pass.length();
-    memcpy(wifi_config.ap.password, _pass.c_str(), lenp > 64 ? 64 : lenp);
+    strcpy((char*)wifi_config.sta.ssid, ssid.c_str());
+    strcpy((char*)wifi_config.sta.password, netConf.getStaPass().c_str());
 }
 
 void ConnectState::onEnter() {
     log_inst.info(TAG, "ConnectState start");
     wifi_mode_t mode = static_cast<wifi_mode_t>(netConf.getMode());
+    wifi_config_t wifi_config;
 
     if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA) {
         log_inst.debug(TAG, "ap ssid {}", netConf.getApSSID());
-        wifi_config_t wifi_config;
         setAPConfig(wifi_config);
         ESP_ERROR_CHECK(esp_wifi_set_mode(mode));
         ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config));
+        ESP_ERROR_CHECK(esp_wifi_start());
     }
 
     if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA) {
         const std::string ssid = netConf.getStaSSID();
         if (ssid != "") {
-            log_inst.debug(TAG, "trying ssid {}", ssid);
-            wifi_config_t wifi_config;
             setSTAConfig(ssid, wifi_config);
+            //log_inst.debug(TAG, "trying ssid {} {}", wifi_config.sta.ssid, wifi_config.sta.password);
+            log_inst.debug(TAG, "trying ssid {}", wifi_config.sta.ssid);
+
             ESP_ERROR_CHECK(esp_wifi_set_mode(mode));
             ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
         } else {
             ESP_ERROR_CHECK(esp_wifi_set_mode(mode));
             ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
         }
-    }
-
-    ESP_ERROR_CHECK(esp_wifi_start());
-
-    if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA) {
+    	/* TODO fallback, if two many tries ? */
+        ESP_ERROR_CHECK(esp_wifi_start());
+        ESP_ERROR_CHECK(esp_wifi_connect());
         m_parent->m_timeout.start(
-            std::chrono::seconds(10),
+            std::chrono::seconds(60),
             detail::TransitionEvent{m_parent,
                                     detail::DisconnectState{m_parent}});
     }
 }
 
-void ConnectState::onLeave() { esp_wifi_disconnect(); }
+wifi_mode_t ConnectState::mode() const {
+	wifi_mode_t mode;
+	esp_err_t err = esp_wifi_get_mode(&mode);
+	return err == ESP_OK ? mode : WIFI_MODE_NULL;
+}
+
+void ConnectState::onLeave() {
+	wifi_sta_list_t sta_list;
+	wifi_mode_t _m = mode();
+	if ((_m == WIFI_MODE_AP || _m == WIFI_MODE_APSTA)) {
+		if ( ESP_OK == esp_wifi_ap_get_sta_list(&sta_list)) {
+			if(sta_list.num == 0) {
+				esp_wifi_disconnect();
+			}
+		}
+	}
+
+}
 
 template <> WifiMode ConnectState::handle(const WifiEvent &e) {
     switch (e.m_id) {
@@ -299,17 +314,18 @@ template <> WifiMode ConnectState::handle(const WifiEvent &e) {
         break;
     case WIFI_EVENT_STA_CONNECTED: /**< ESP32 station connected to AP */
         // do not notify here, we have no ip ! m_parent->notifyConnect();
-        m_parent->m_timeout.stop();
         break;
     case WIFI_EVENT_STA_DISCONNECTED: /**< ESP32 station disconnected from
                                        * AP
                                        */
-        // return to disconnect state for further processing
-        // m_parent->m_events.push_back(detail::TransitionEvent{
-        //     m_parent, detail::DisconnectState{m_parent}});
-        // ESP_ERROR_CHECK(esp_wifi_connect());
-        // xEventGroupClearBits(main_event_group, CONNECTED_BIT);
-        // m_parent->notifyDisconnect();
+        // stay in State if AP Mode
+        if (mode() == WIFI_MODE_STA) {
+            // return to disconnect state for further processing
+            m_parent->m_events.push_back(detail::TransitionEvent{
+                m_parent, detail::DisconnectState{m_parent}});
+            // xEventGroupClearBits(main_event_group, CONNECTED_BIT);
+            // m_parent->notifyDisconnect();
+        }
         break;
     case WIFI_EVENT_STA_AUTHMODE_CHANGE: /**< the auth mode of AP connected
     by
@@ -353,6 +369,10 @@ void ScanMode::onEnter() {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
     ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, false));
+    m_parent->m_timeout.start(
+                std::chrono::seconds(5),
+                detail::TransitionEvent{m_parent,
+                                        detail::DisconnectState{m_parent}});
 }
 
 template <> WifiMode ScanMode::handle(const WifiEvent &e) {
@@ -361,6 +381,7 @@ template <> WifiMode ScanMode::handle(const WifiEvent &e) {
         log_inst.info(TAG, "WIFI_EVENT_SCAN_DONE");
         onWifiScanDone();
         // return to disconnect state for further processing
+        m_parent->m_timeout.stop();
         m_parent->m_events.push_back(detail::TransitionEvent{
             m_parent, detail::DisconnectState(m_parent)});
         break;
