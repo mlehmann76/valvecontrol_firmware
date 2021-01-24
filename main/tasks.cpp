@@ -6,6 +6,7 @@
  */
 
 #include "tasks.h"
+#include "config_user.h"
 #include "repository.h"
 #include "utilities.h"
 #include <array>
@@ -13,9 +14,12 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <logger.h>
 
 using namespace std::string_literals;
 using namespace std::chrono;
+
+static const char* TAG = "tasks";
 
 namespace detail {
 
@@ -70,8 +74,6 @@ TaskState::TaskState(repository &state, std::string &&taskId)
     : m_stateRep(state), m_taskId(taskId + "/state") {}
 
 void TaskState::regStateVariables() {
-    // running, time, remain time, channel, auto,
-    // starttime
     m_stateRep[m_taskId]["running"] = false;
     m_stateRep[m_taskId]["auto"] = false;
     m_stateRep[m_taskId]["time"] = 0;
@@ -96,6 +98,7 @@ void TaskState::update(const detail::TaskConfig::Task &task,
 void TaskState::update(seconds time, seconds remain) {
     m_stateRep[m_taskId]["time"] = (IntType)time.count();
     m_stateRep[m_taskId]["remain"] = (IntType)remain.count();
+    log_inst.debug(TAG, "update {:d} {:d}", (int)time.count(), (int) remain.count());
 }
 
 bool TaskState::running() const {
@@ -164,7 +167,7 @@ void Tasks::startTask() {
             m_remain += _t->m_time;
         }
         start(m_activeTask->m_taskitems.begin());
-        m_states[activeTaskName()]->update(true, m_start);
+        m_states[activeTaskName()]->update(true, system_clock::now());
     }
 }
 
@@ -173,7 +176,7 @@ void Tasks::start(listIterator _findIter) {
     setChannel(m_activeItem->m_channel, true);
     m_states[activeTaskName()]->update(*m_activeTask, *m_activeItem);
     m_states[activeTaskName()]->update(seconds(0), m_remain);
-    m_start = system_clock::now();
+    m_start = steady_clock::now();
 }
 
 void Tasks::stopTask() {
@@ -204,23 +207,17 @@ Tasks::~Tasks() {
 }
 
 void Tasks::task() {
-    system_clock::time_point _last = system_clock::now();
+	steady_clock::time_point _last = steady_clock::now();
     while (m_aexit == false) {
         if (m_activeTask != &NoneTask) {
             std::lock_guard<std::mutex> lock(m_lock);
             // make sure, that tdiff is positive even after system clock change
-            auto tdiff = system_clock::now() > m_start
-                             ? system_clock::now() - m_start
-                             : m_start - system_clock::now();
+            auto tdiff = steady_clock::now() - m_start;
 
-            if ((system_clock::now() - _last) >= milliseconds(250)) {
-                _last = system_clock::now();
-                // std::cout << "task : " << activeTaskName() << tdiff.count()
-                // << "\n";
-                m_states[activeTaskName()]->update(
-                    duration_cast<seconds>(tdiff),
-                    duration_cast<seconds>(m_remain - tdiff));
-            }
+			m_states[activeTaskName()]->update(
+				duration_cast<seconds>(tdiff),
+				m_remain - duration_cast<seconds>(tdiff));
+            //}
             if (tdiff >= m_activeItem->m_time) {
                 m_remain -= m_activeItem->m_time;
                 setChannel(m_activeItem->m_channel, false);
@@ -242,7 +239,7 @@ void Tasks::task() {
         } else {
             checkTimeString();
         }
-        std::this_thread::sleep_for(milliseconds(200));
+        std::this_thread::sleep_for(milliseconds(500));
     } // while
 }
 

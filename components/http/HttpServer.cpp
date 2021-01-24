@@ -45,6 +45,7 @@ void HttpServer::task() {
             sem().unlock();
             return;
         }
+#if 0
         if (m_cons.size() < m_maxCons &&
             socket().hasNewConnection(std::chrono::milliseconds(10))) {
             std::unique_ptr<Socket> s(
@@ -61,6 +62,15 @@ void HttpServer::task() {
             } // if
         }     // for
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+#else
+        if (socket().hasNewConnection(std::chrono::milliseconds(100))) {
+        	std::unique_ptr<Socket> s(
+        	                socket().accept(std::chrono::milliseconds(10)));
+        	handleConnection(std::move(s));
+        } else {
+        	std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+#endif
     }
 }
 
