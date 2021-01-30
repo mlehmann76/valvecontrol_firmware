@@ -109,6 +109,7 @@ void HttpAuth::requestAuth(HTTPAuthMethod mode, const char *realm,
         }
         m_response->setHeader(WWW_Authenticate, pbrealm);
         m_response->setResponse(HttpResponse::HTTP_401);
+        m_response->setHeaderDefaults();
         m_response->endHeader();
         m_response->send(nullptr, 0);
         m_response->reset();
