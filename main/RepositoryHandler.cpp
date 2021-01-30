@@ -34,13 +34,13 @@ bool RepositoryHandler::handle(const HttpRequest &_req, HttpResponse &_res) {
             if (_req.hasMethod(HttpRequest::GET)) {
                 _res.setResponse(HttpResponse::HTTP_200);
                 _res.setContentType(HttpResponse::CT_APP_JSON);
-                _res.setHeader("Access-Control-Allow-Origin",
-                               "*"); // FIXME only for react testing
+                _res.setHeaderDefaults();
                 _res.send(v.second->stringify(v.second->partial(attr)));
                 _res.reset();
                 return true;
             } else if (_req.hasMethod(HttpRequest::POST)) {
                 _res.setResponse(HttpResponse::HTTP_201);
+                _res.setHeaderDefaults();
                 _res.setHeader("Content-Location", _req.path());
                 _res.send("");
                 v.second->append(_req.body());

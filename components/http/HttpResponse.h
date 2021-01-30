@@ -62,6 +62,7 @@ class HttpResponse {
 
     void setResponse(ResponseCode _c);
     void setHeader(const std::string &, const std::string &);
+    void setHeaderDefaults();
     void setContentType(ContentType _c);
     void setContentEncoding(ContentEncoding _e);
     ContentType nameToContentType(const std::string &_name);

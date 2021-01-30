@@ -59,6 +59,15 @@ void HttpResponse::setHeader(const std::string &s1, const std::string &s2) {
     m_headerEntries.push_back(s1 + ": " + s2);
 }
 
+void HttpResponse::setHeaderDefaults() {
+    setHeader("Accept-Charset", "iso-8859-1");
+    setHeader("Access-Control-Allow-Origin", "*"); // FIXME
+    setHeader("Connection", "keep-alive");
+    setHeader("Access-Control-Allow-Headers",
+    		"X-PINGOTHER, Content-Type, authorization");
+    setHeader("Keep-Alive", "timeout=2, max=10");
+}
+
 void HttpResponse::headerAddDate() {
     m_header.append("Date: ");
     m_header.append(getTime());
@@ -165,5 +174,6 @@ void HttpResponse::setContentEncoding(ContentEncoding _e) {
         m_headerEntries.push_back("Content-Encoding: identity");
     }
 }
+
 
 } /* namespace http */
