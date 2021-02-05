@@ -18,6 +18,7 @@
 #include "esp_system.h"
 #include "nvs.h"
 #include "nvs_flash.h"
+#include "esp_image_format.h"
 #include "sdkconfig.h"
 
 #include "Cipher.h"
@@ -25,6 +26,7 @@
 #include "config_user.h"
 #include "repository.h"
 #include "utilities.h"
+#include "version.h"
 
 using namespace std::string_literals;
 
@@ -67,12 +69,24 @@ ConfigBase::ConfigBase()
 esp_err_t ConfigBase::init() {
     std::lock_guard<std::mutex> lck(mutex);
     esp_err_t ret = ESP_OK;
-    if (!m_isInitialized) {
+	esp_chip_info_t chip_info;
+	esp_chip_info(&chip_info);
+
+	if (!m_isInitialized) {
 
     	spiffsInit();
 
-        repo().create("/system/auth/config", {{{"user", "admin"s}, //
-                                               {"password", "admin"s}}});
+        repo().create("/system/auth/config",
+                      {{{"user", "admin"s}, {"password", "admin"s}}});
+
+        repo().create("/system/version/state",
+                      {{{"date", std::string(__DATE__)},
+                        {"time", std::string(__TIME__)},
+                        {"version", std::string(VALVECONTROL_GIT_TAG)},
+                        {"idf", std::string(esp_get_idf_version())},
+                        {"cores", static_cast<IntType>(chip_info.cores)},
+                        {"rev", static_cast<IntType>(chip_info.revision)}}});
+
         initNVSFlash(NoForceErase);
         std::string str;
 
@@ -87,7 +101,8 @@ esp_err_t ConfigBase::init() {
             repo().parse(str);
         }
 
-        Config::repo().addNotify("/*/*/config", Config::onConfigNotify(baseConf));
+        Config::repo().addNotify("/*/*/config",
+        		Config::onConfigNotify(baseConf));
 
         m_isInitialized = true;
     }

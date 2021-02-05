@@ -26,6 +26,7 @@ namespace detail {
 TaskConfig::TaskConfig(repository &r) : m_repo(r) {}
 
 void TaskConfig::readTasks() {
+	m_tasks.clear();
     for (size_t i = 1; i <= 8; ++i) {
         std::stringstream _s;
         _s << "/tasks/task" << i;
@@ -57,8 +58,8 @@ bool TaskConfig::readTask(const std::string &name) {
         auto _task = std::make_shared<Task>();
         m_tasks[name] = _task;
         readTaskDetail(_taskName, *_task);
-        std::string _next = m_repo.get<StringType>(
-            _taskName, "first"); // node name is "/tasks/task1/config/node1"
+        // node name is "/tasks/task1/config/node1"
+        std::string _next = m_repo.get<StringType>(_taskName, "first");
         do {
             _task->m_taskitems.push_back(
                 std::make_shared<Task::TasksItem>(readTaskItemDetail(_next)));
@@ -98,7 +99,6 @@ void TaskState::update(const detail::TaskConfig::Task &task,
 void TaskState::update(seconds time, seconds remain) {
     m_stateRep[m_taskId]["time"] = (IntType)time.count();
     m_stateRep[m_taskId]["remain"] = (IntType)remain.count();
-    log_inst.debug(TAG, "update {:d} {:d}", (int)time.count(), (int) remain.count());
 }
 
 bool TaskState::running() const {
@@ -117,6 +117,10 @@ Tasks::Tasks(repository &config)
       m_thread([=]() { this->task(); }), m_aexit(false) {}
 
 void Tasks::setup() {
+	//for restarting setup, make sure task is not using data
+	std::lock_guard<std::mutex> lock(m_lock);
+	m_activeTask = &NoneTask;
+	m_activeItem = &NoneTaskItem;
     m_config->readTasks();
     // generate taskState for every task
     // register state variables for all tasks

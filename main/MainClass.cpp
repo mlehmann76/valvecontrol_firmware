@@ -184,13 +184,11 @@ int MainClass::loop() {
         if (0 == count) {
             if (esp_get_free_heap_size() != heapFree) {
                 heapFree = esp_get_free_heap_size();
-                // vTaskGetRunTimeStats(pcWriteBuffer.get());
-                log_inst.info(TAG, "[APP] Free memory: {:d} bytes",
-                              esp_get_free_heap_size());
-                // ESP_LOGI(TAG,
-                // "%s\n", _controlRepository->debug().c_str());
-                // ESP_LOGI(TAG, "%s\n", _stateRepository->debug().c_str());
-                count = 500;
+                vTaskGetRunTimeStats(pcWriteBuffer.get());
+                log_inst.info(TAG, "[APP] Free memory: {:d} bytes\n{:s}",
+                              esp_get_free_heap_size(),
+							  std::string(pcWriteBuffer.get()));
+                count = 50;
             }
         } else {
             count--;
@@ -198,6 +196,6 @@ int MainClass::loop() {
 
         checkWPSButton();
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
