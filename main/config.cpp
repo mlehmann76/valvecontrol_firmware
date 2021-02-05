@@ -425,6 +425,21 @@ std::string SysConfig::getUser() {
     return repo().get<std::string>("/system/auth/config", "user");
 }
 
+esp_err_t SysConfig::init() {
+    if (!m_base.isInitialized()) {
+        m_base.init();
+    }
+    // saving password will encrypt it
+	repo()["/system/auth/config"].set(doEncrypt(*this, "password"));
+
+    if (m_base.isKeyReset()) {
+    	repo()["/system/auth/config"]["user"] = "admin"s;
+    	repo()["/system/auth/config"]["password"] = "admin"s;
+    }
+
+	return ESP_OK;
+}
+
 } /* namespace Config */
 
 // Globals

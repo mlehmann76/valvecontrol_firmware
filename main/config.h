@@ -88,6 +88,7 @@ class SysConfig {
   public:
     SysConfig(ConfigBase &base) : m_base(base) {}
 
+    esp_err_t init();
     std::string getUser();
     std::string getPass();
     const Cipher& crypt() const { return m_base.crypt(); }

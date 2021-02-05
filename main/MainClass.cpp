@@ -59,6 +59,7 @@ void MainClass::setup() {
     log_inst.setLogSeverity("repository", logger::severity_type::warning);
 
 	baseConf.init();
+	sysConf.init();
 	mqttConf.init();
     netConf.init();
 
@@ -109,8 +110,7 @@ void MainClass::setup() {
 
     _http->addPathHandler(_spiffsHandler);
 
-    //http::HttpAuth::AuthToken _token = {sysConf.getUser(), sysConf.getPass()};
-    http::HttpAuth::AuthToken _token = {"admin", "admin"};
+    http::HttpAuth::AuthToken _token = {sysConf.getUser(), sysConf.getPass()};
     _http->addPathHandler(std::make_shared<http::HttpAuth>(
 		_jsonHandler.get(), _token, http::HttpAuth::BASIC_AUTH));
 
