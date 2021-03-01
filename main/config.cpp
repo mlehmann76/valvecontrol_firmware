@@ -87,6 +87,12 @@ esp_err_t ConfigBase::init() {
                         {"cores", static_cast<IntType>(chip_info.cores)},
                         {"rev", static_cast<IntType>(chip_info.revision)}}});
 
+        repo().create("/system/base/control/resetToDefaults", {{{"start", false}}})
+                    .set([this](const property &) -> std::optional<property> {
+                		this->resetToDefault();
+                        return {};
+                    });
+
         initNVSFlash(NoForceErase);
         std::string str;
 
@@ -180,6 +186,14 @@ esp_err_t ConfigBase::writeStr(nvs_handle *pHandle, const char *pName,
 void ConfigBase::onConfigNotify(const std::string &s) {
     std::lock_guard<std::mutex> lock(m_lock);
     m_timeout.start();
+}
+
+void ConfigBase::resetToDefault() {
+	//deleting the key will force reset to defaults
+	esp_err_t err =
+			nvs_erase_key(my_handle, "config_key");
+    nvs_commit(my_handle);
+    esp_restart();
 }
 
 void ConfigBase::onTimeout() {

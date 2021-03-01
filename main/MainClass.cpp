@@ -45,7 +45,7 @@ logType log_inst({}, {});
 
 MainClass::MainClass()
     : _sntp(std::make_shared<SntpSupport>()), _channels(4),
-      _cex(std::make_shared<ExclusiveAdapter>()) {}
+      _cex(std::make_shared<ExclusiveAdapter>()), doExit(false) {}
 
 void MainClass::setup() {
 
@@ -148,8 +148,17 @@ void MainClass::setup() {
     }
 
     sht1x.regProperty(&Config::repo(), "/sensors/sht1x/state");
+
+    Config::repo().create("/system/base/control/restart", {{{"start", false}}})
+        .set([this](const property &) -> std::optional<property> {
+            this->restart();
+            return {};
+        });
 }
 
+void MainClass::restart() {
+	doExit = true;
+}
 
 int MainClass::checkWPSButton() {
     static int wps_button_count = 0;
@@ -174,7 +183,7 @@ int MainClass::loop() {
     uint32_t heapFree = 0;
     std::unique_ptr<char[]> pcWriteBuffer(new char[2048]);
 
-    while (1) {
+    while (!doExit) {
         // check for time update by _sntp
         if (!(xEventGroupGetBits(eventGroup()) & SNTP_UPDATED) &&
             _sntp->update()) {
@@ -198,4 +207,5 @@ int MainClass::loop() {
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
+    return 0;
 }

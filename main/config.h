@@ -59,6 +59,7 @@ class ConfigBase {
     bool isKeyReset() const { return m_keyReset; }
     const Cipher& crypt() const { return m_crypt; }
     void onConfigNotify(const std::string &s);
+    void resetToDefault();
 
   private:
     esp_err_t readStr(nvs_handle *pHandle, const char *pName, char **dest);
@@ -75,7 +76,6 @@ class ConfigBase {
     nvs_handle_t my_handle;
     TimerMember<ConfigBase> m_timeout;
     std::mutex m_lock;
-
 };
 
 struct onConfigNotify {

@@ -43,8 +43,16 @@ class MainClass {
     static const unsigned WPS_LONG_MS = (500 / portTICK_PERIOD_MS);
 
    public:
+    MainClass();
+    MainClass(const MainClass&) = delete;
+    MainClass(MainClass&&) = delete;
+    MainClass operator=(const MainClass&) = delete;
+    MainClass operator=(MainClass&&) = delete;
+    virtual ~MainClass() = default;
+
     void setup();
     int loop();
+    void restart();
     static MainClass *instance() {
         static MainClass _inst;
         return &_inst;
@@ -53,8 +61,6 @@ class MainClass {
     EventGroupHandle_t &eventGroup() { return (main_event_group); }
 
   private:
-    MainClass();
-    virtual ~MainClass() = default;
     int checkWPSButton();
 
     std::mutex mutex;
@@ -74,6 +80,7 @@ class MainClass {
     std::shared_ptr<ExclusiveAdapter> _cex; // only one channel should be active
     std::shared_ptr<Tasks> _tasks;
     EventGroupHandle_t main_event_group = nullptr;
+    bool doExit;
 };
 
 #endif /* MAIN_MAINCLASS_H_ */
