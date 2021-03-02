@@ -100,7 +100,9 @@ esp_err_t ConfigBase::init() {
             genKey();
         }
 
-        if (ESP_OK != readConfig(str) || isKeyReset()) {
+        m_keyReset = m_keyReset | (ESP_OK != readConfig(str));
+
+        if (m_keyReset) {
             repo().parse(config_json_start);
             writeConfig();
         } else {
@@ -189,6 +191,7 @@ void ConfigBase::onConfigNotify(const std::string &s) {
 }
 
 void ConfigBase::resetToDefault() {
+    log_inst.info(TAG, "resetToDefault called");
 	//deleting the key will force reset to defaults
 	esp_err_t err =
 			nvs_erase_key(my_handle, "config_key");

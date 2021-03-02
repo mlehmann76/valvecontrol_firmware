@@ -114,6 +114,11 @@ void MainClass::setup() {
     _http->addPathHandler(std::make_shared<http::HttpAuth>(
 		_jsonHandler.get(), _token, http::HttpAuth::BASIC_AUTH));
 
+//    log_inst.info(TAG, "auth token: {} {}",
+//    		_token.user.length()>3 ? _token.user : "empty" ,
+//    				_token.pass.length()>3 ? _token.pass : "empty");
+
+
     //_http->addPathHandler(_jsonHandler);
 
     for (size_t i = 0; i < _channels.size(); i++) {
@@ -154,6 +159,7 @@ void MainClass::setup() {
             this->restart();
             return {};
         });
+    log_inst.setLogSeverity("repository", logger::severity_type::debug);
 }
 
 void MainClass::restart() {
@@ -193,10 +199,15 @@ int MainClass::loop() {
         if (0 == count) {
             if (esp_get_free_heap_size() != heapFree) {
                 heapFree = esp_get_free_heap_size();
+#if 0
                 vTaskGetRunTimeStats(pcWriteBuffer.get());
                 log_inst.info(TAG, "[APP] Free memory: {:d} bytes\n{:s}",
                               esp_get_free_heap_size(),
 							  std::string(pcWriteBuffer.get()));
+#else
+                log_inst.info(TAG, "[APP] Free memory: {:d} bytes",
+                                              esp_get_free_heap_size());
+                #endif
                 count = 50;
             }
         } else {

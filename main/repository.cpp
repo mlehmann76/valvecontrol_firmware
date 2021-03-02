@@ -225,10 +225,10 @@ void repository::append(const std::string& _json) {
 	            re, path,
 	            [this](std::string ipath, nlohmann::json::const_iterator it) {
 	                std::string propPath = propName(ipath);
-//	                std::stringstream ss;
-//	                ss << it.value();
-//	                log_inst.debug(TAG, "{} : {} < {}", propPath, it.key(),
-//	                               ss.str());
+	                std::stringstream ss;
+	                ss << it.value();
+	                log_inst.debug(TAG, "{} : {} < {}", propPath, it.key(),
+	                               ss.str());
 	                property &_p = create(propPath, property());
 
 	                if (it.value().is_boolean()) {
