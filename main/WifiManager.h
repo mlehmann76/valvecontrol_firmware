@@ -10,7 +10,6 @@
 
 #include "iConnectionObserver.h"
 #include "repository.h"
-
 #include <chrono>
 #include <condition_variable> // std::condition_variable
 #include <deque>
@@ -18,8 +17,8 @@
 #include <esp_wps.h>
 #include <mapbox/variant.hpp>
 #include <mutex> // std::mutex, std::unique_lock
-#include <thread>
 #include <vector>
+#include <thread>
 
 namespace wifi {
 class WifiManager;
@@ -181,7 +180,12 @@ class WifiManager {
   public:
     WifiManager(repository &_repo, std::mutex &mutex,
                 std::condition_variable &cvInitDone);
-    virtual ~WifiManager() {}
+    virtual ~WifiManager() {
+    	m_atexit=true;
+    	if(m_thread.joinable()){
+    		m_thread.join();
+    	}
+    }
     WifiManager &operator=(WifiManager &&other) = delete;
     WifiManager &operator=(const WifiManager &other) = delete;
     WifiManager(WifiManager &&other) = delete;
@@ -224,6 +228,7 @@ class WifiManager {
     config_t m_config;
     detail::Timeout m_timeout;
     int m_wpsRetryCnt;
+    bool m_atexit = false;
 };
 
 } // namespace wifi

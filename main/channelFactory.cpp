@@ -68,7 +68,7 @@ LedcChan::LedcChan(const char *_n, const ledc_channel_config_t _c,
     set(false, _period);
 }
 
-LedcChan::~LedcChan() { set(false, _period); }
+LedcChan::~LedcChan() { /*FIXME set(false, _period, false);*/ }
 
 void LedcChan::set(bool _b,
                    std::chrono::seconds _time = std::chrono::seconds(-1)) {

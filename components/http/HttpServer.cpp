@@ -26,7 +26,7 @@ HttpServer::HttpServer(int _port, size_t maxCons)
     m_cons.reserve(maxCons);
 }
 
-HttpServer::~HttpServer() { delete m_obs; }
+HttpServer::~HttpServer() { stop(); delete m_obs; }
 
 void HttpServer::task() {
     Socket &_s = socket();

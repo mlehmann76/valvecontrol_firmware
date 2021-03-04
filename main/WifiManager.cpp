@@ -97,7 +97,7 @@ void WifiManager::init() {
 
 void WifiManager::task() {
     init();
-    while (1) {
+    while (!m_atexit) {
         if (m_timeout.active && m_timeout.expired()) {
         	m_events.push_back(m_timeout.event);
         }
