@@ -204,7 +204,11 @@ property &repository::create(const std::string &name, const property &_cp) {
 
 bool repository::unlink(const std::string &name) {
     std::lock_guard<std::mutex> lock(m_lock);
-    return m_properties.erase(propName(name)) != 0;
+    bool isErased = m_properties.erase(propName(name)) != 0;
+    if (isErased) {
+    	notify(name);
+    }
+    return isErased;
 }
 
 void repository::parse(const std::string &c) {
@@ -311,7 +315,7 @@ repository::StringMatch::StringMatch(std::string &&key) {
     m_keys = utilities::split(key, "/");
 }
 
-void repository::onSetNotify(const std::string &s) {
+void repository::notify(const std::string &s) {
 	for (auto &i : m_notify) {
 		StringMatch m(i.first);
 		if (m.match(s)) {

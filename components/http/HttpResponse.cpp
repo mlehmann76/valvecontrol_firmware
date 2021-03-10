@@ -62,9 +62,13 @@ void HttpResponse::setHeader(const std::string &s1, const std::string &s2) {
 void HttpResponse::setHeaderDefaults() {
     setHeader("Accept-Charset", "iso-8859-1");
     setHeader("Access-Control-Allow-Origin", "*"); // FIXME
+    setHeader("Access-Control-Allow-Methods",
+    		"GET, PUT, POST, DELETE, HEAD, OPTIONS"); // FIXME
+    setHeader("Access-Control-Allow-Credentials", "true"); // FIXME
     setHeader("Connection", "keep-alive");
     setHeader("Access-Control-Allow-Headers",
-    		"X-PINGOTHER, Content-Type, authorization");
+    		"X-PINGOTHER, X-Requested-With, origin, "
+    		"content-type, accept, authorization");
     setHeader("Keep-Alive", "timeout=2, max=10");
 }
 

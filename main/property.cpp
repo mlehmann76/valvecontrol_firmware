@@ -44,5 +44,5 @@ property &property::set(const key_type &name, const repository &_rep) {
 
 void property::notify() {
     if (m_repository != nullptr)
-        m_repository->onSetNotify(m_name);
+        m_repository->notify(m_name);
 }

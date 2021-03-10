@@ -105,7 +105,7 @@ public:
     void parse(const std::string &c);
 
     /* notify */
-    void onSetNotify(const std::string &);
+    void notify(const std::string &);
     void addNotify(const std::string& key, notifyFuncType &&func);
     //TODO void remNotify(const std::string& key);
 

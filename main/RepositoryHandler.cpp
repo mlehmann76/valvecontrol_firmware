@@ -22,7 +22,7 @@ RepositoryHandler::RepositoryHandler(const std::string &_method,
     : RequestHandlerBase(_method, _path), m_repositories() {}
 
 bool RepositoryHandler::handle(const HttpRequest &_req, HttpResponse &_res) {
-    log_inst.debug(TAG, "{},  {}", _req.method(), _req.path());
+    //log_inst.debug(TAG, "{},  {}", _req.method(), _req.path());
     for (auto &v : m_repositories) {
         const std::string attr =
             std::string(_req.path()).erase(0, v.first.length());
@@ -44,6 +44,14 @@ bool RepositoryHandler::handle(const HttpRequest &_req, HttpResponse &_res) {
                 _res.setHeader("Content-Location", _req.path());
                 _res.send("");
                 v.second->append(_req.body());
+                _res.reset();
+                return true;
+            } else if (_req.hasMethod(HttpRequest::DELETE)) {
+                _res.setResponse(HttpResponse::HTTP_201);
+                _res.setHeaderDefaults();
+                _res.setHeader("Content-Location", _req.path());
+                _res.send("");
+                v.second->remove(_req.body());
                 _res.reset();
                 return true;
             }

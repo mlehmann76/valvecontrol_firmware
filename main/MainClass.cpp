@@ -57,6 +57,7 @@ void MainClass::setup() {
 
     log_inst.setLogSeverity("I2C", logger::severity_type::warning);
     log_inst.setLogSeverity("repository", logger::severity_type::warning);
+    log_inst.setLogSeverity("RepositoryHandler", logger::severity_type::warning);
 
 	baseConf.init();
 	sysConf.init();
@@ -103,7 +104,7 @@ void MainClass::setup() {
     _http = (std::make_shared<http::HttpServer>(80));
     _http->start();
 
-    _jsonHandler = std::make_shared<http::RepositoryHandler>("GET,POST", "/json");
+    _jsonHandler = std::make_shared<http::RepositoryHandler>("GET,POST,DELETE", "/json");
     _spiffsHandler = std::make_shared<http::FileHandler>("GET", "/", "/spiffs");
 
     _jsonHandler->add("/json", Config::repo());
@@ -125,7 +126,8 @@ void MainClass::setup() {
         _channels[i] = std::shared_ptr<ChannelBase>(
             LedcChannelFactory::channel(i, chanConf.getTime(i)));
         _cex->setChannel(&*_channels[i]);
-        Config::repo().create("/actors/" + _channels[i]->name() + "/state",
+        Config::repo()
+        	.create("/actors/" + _channels[i]->name() + "/state",
                               {{{"value", "OFF"s}}});
 
         Config::repo()
