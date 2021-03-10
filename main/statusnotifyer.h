@@ -48,12 +48,15 @@ class StatusNotifyer {
 };
 
 inline void StatusNotifyer::onSetNotify(const std::string &_name) {
-    std::lock_guard<std::mutex> lock(m_lock);
-    m_timeout.start();
+	std::unique_lock<std::mutex> lock1(m_lock, std::defer_lock);
+    if (lock1.try_lock()) {
+    	m_timeout.start();
+	}
 }
 
 inline void StatusNotifyer::onTimeout() {
-    std::lock_guard<std::mutex> lock(m_lock);
+	std::unique_lock<std::mutex> lock1(m_lock, std::defer_lock);
+	lock1.lock();
     updateDateTime();
     mqtt::MqttQueueType message(
         new mqtt::mqttMessage(m_topic, m_rep.stringify()));

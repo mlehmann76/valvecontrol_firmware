@@ -36,7 +36,7 @@
     "network": {
         "mqtt": {
             "config": {
-                "enabled": false,
+                "enabled": true,
                 "pass": "pass",
                 "server": "mqtt://raspberrypi.fritz.box:1883",
                 "user": "user",
@@ -61,7 +61,7 @@
                     "ssid": ""
                 },
                 "hostname": "espressif",
-                "mode": 3
+                "mode": 1
             }
         }
     },
