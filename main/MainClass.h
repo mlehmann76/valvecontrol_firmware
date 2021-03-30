@@ -75,7 +75,7 @@ class MainClass {
     std::shared_ptr<SntpSupport> _sntp;
     std::shared_ptr<http::HttpServer> _http;
     std::shared_ptr<http::RepositoryHandler> _jsonHandler;
-    std::shared_ptr<http::FileHandler> _spiffsHandler;
+    std::shared_ptr<http::FileHandler> _appFileHandler;
     std::vector<std::shared_ptr<ChannelBase>> _channels;
     std::shared_ptr<ExclusiveAdapter> _cex; // only one channel should be active
     std::shared_ptr<Tasks> _tasks;

@@ -36,12 +36,17 @@
 #include "sntp.h"
 #include "statusnotifyer.h"
 #include "tasks.h"
+#include "libespfs/espfs.h"
+#include "libespfs/vfs.h"
 
 using namespace std::string_literals;
 
 logType log_inst({}, {});
 
 #define TAG "MAIN"
+
+extern const uint8_t espfs_bin[];
+extern const size_t espfs_bin_len;
 
 MainClass::MainClass()
     : _sntp(std::make_shared<SntpSupport>()), _channels(4),
@@ -54,6 +59,23 @@ void MainClass::setup() {
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     main_event_group = xEventGroupCreate();
+
+    espfs_config_t espfs_config = {
+        .addr = espfs_bin,
+		.part_label ="espfs"
+    };
+
+    espfs_fs_t *fs = espfs_init(&espfs_config);
+    assert(fs != NULL);
+
+    esp_vfs_espfs_conf_t vfs_espfs_conf = {
+        .base_path = "/",
+		.overlay_path = "/espfs",
+        .fs = fs,
+        .max_files = 5,
+    };
+
+    ESP_ERROR_CHECK(esp_vfs_espfs_register(&vfs_espfs_conf));
 
     log_inst.setLogSeverity("I2C", logger::severity_type::warning);
     log_inst.setLogSeverity("repository", logger::severity_type::warning);
@@ -105,11 +127,11 @@ void MainClass::setup() {
     _http->start();
 
     _jsonHandler = std::make_shared<http::RepositoryHandler>("GET,POST,DELETE", "/json");
-    _spiffsHandler = std::make_shared<http::FileHandler>("GET", "/", "/spiffs");
+    _appFileHandler = std::make_shared<http::FileHandler>("GET", "/", "/espfs");
 
     _jsonHandler->add("/json", Config::repo());
 
-    _http->addPathHandler(_spiffsHandler);
+    _http->addPathHandler(_appFileHandler);
 
     http::HttpAuth::AuthToken _token = {sysConf.getUser(), sysConf.getPass()};
     _http->addPathHandler(std::make_shared<http::HttpAuth>(
