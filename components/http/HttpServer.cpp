@@ -126,7 +126,8 @@ void HttpServer::handleConnection(std::unique_ptr<Socket> _con) {
         case HttpRequest::PARSE_OK:
             for (auto _p : m_pathhandler) {
                 if (_p->match(req->method(), req->path())) {
-                    exit = !(_p->handle(*req, *resp));
+                    (_p->handle(*req, *resp));
+                    exit = true; //Force close connection
                     break;
                 }
             }

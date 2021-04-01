@@ -39,8 +39,11 @@ class HttpResponse {
         CT_APP_JSON,
         CT_APP_OCSTREAM,
         CT_APP_PDF,
-        CT_TEXT_JAVASCRIPT,
+        CT_APP_JAVASCRIPT,
+		CT_TEXT_CSS,
         CT_TEXT_HTML,
+		CT_IMAGE_ICO,
+		CT_IMAGE_PNG
     };
 
     enum ContentEncoding { CT_ENC_IDENTITY, CT_ENC_GZIP };

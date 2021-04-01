@@ -31,16 +31,22 @@ HttpResponse::ContentTypeMapType HttpResponse::s_ctMap = {
     {CT_APP_JSON, "application/json"},
     {CT_APP_OCSTREAM, "application/octet-stream"},
     {CT_APP_PDF, "application/pdf"},
-    {CT_TEXT_JAVASCRIPT, "text/javascript"},
+    {CT_APP_JAVASCRIPT, "application/javascript"},
+    {CT_TEXT_CSS, "text/css"},
     {CT_TEXT_HTML, "text/html"},
     {CT_TEXT_PLAIN, "text/plain"},
+	{CT_IMAGE_ICO, "image/vnd.microsoft.icon"},
+	{CT_IMAGE_PNG, "image/png"},
 };
 
 HttpResponse::FileContentMapType HttpResponse::s_fcmap = {
     {".html", CT_TEXT_HTML},
     {".htm", CT_TEXT_HTML},
-    {".js", CT_TEXT_JAVASCRIPT},
+    {".js", CT_APP_JAVASCRIPT},
     {".pdf", CT_APP_PDF},
+	{".css", CT_TEXT_CSS},
+	{".ico", CT_IMAGE_ICO},
+	{".png", CT_IMAGE_PNG},
 };
 
 //@formatter:on
@@ -143,7 +149,11 @@ void HttpResponse::send_chunk(const char *_buf, size_t _s) {
     if (_buf != nullptr) {
         std::string _chunkLen = fmt::sprintf("%x\r\n", _s);
         m_request->socket()->write(_chunkLen, _chunkLen.length());
-        m_request->socket()->write(_buf, _s);
+        if (_s) {
+        	m_request->socket()->write(_buf, _s);
+        } else {
+        	m_request->socket()->write("", 0);
+        }
         m_request->socket()->write(LineEnd, strlen(LineEnd));
     }
     //}
