@@ -11,6 +11,7 @@
 #include "config_user.h"
 #include "logger.h"
 
+#include "LedFlasher.h"
 #include "QueueCPP.h"
 #include "SemaphoreCPP.h"
 #include "TimerCPP.h"
@@ -34,8 +35,10 @@ const char TAG[] = "WifiManager";
 namespace wifi {
 
 WifiManager::WifiManager(repository &_repo, std::mutex &m,
-                         std::condition_variable &cv)
-    : mutex(m), cvInitDone(cv), m_mode(detail::NoMode()), m_repo(_repo) {
+                         std::condition_variable &cv,
+						 std::shared_ptr<LedFlasher> led)
+    : mutex(m), cvInitDone(cv), m_mode(detail::NoMode()), m_repo(_repo),
+	  m_led(led) {
     auto cfg = esp_pthread_get_default_config();
     cfg.thread_name = "wifi task";
     esp_pthread_set_cfg(&cfg);
@@ -79,6 +82,7 @@ void WifiManager::init() {
             detail::TransitionEvent{this, detail::DisconnectState{this}};
 
         m_mode = mapbox::util::apply_visitor(EventVisitor(m_mode), event);
+        m_led->set(LedFlasher::OFF);
         m_initDone = true;
     }
     cvInitDone.notify_one();
@@ -151,12 +155,14 @@ void WifiManager::notifyConnect() {
     for (auto _c : m_observer) {
         _c->onConnect();
     }
+    m_led->set(LedFlasher::ON);
 }
 
 void WifiManager::notifyDisconnect() {
     for (auto _c : m_observer) {
         _c->onDisconnect();
     }
+    m_led->set(LedFlasher::OFF);
 }
 
 void WifiManager::addConnectionObserver(iConnectionObserver &_obs) {
@@ -204,6 +210,9 @@ template <> WifiMode DisconnectState::handle(const TransitionEvent &e) {
 
 void DisconnectState::onEnter() {
     log_inst.debug(TAG, "DisconnectState enter");
+
+    m_parent->m_led->set(LedFlasher::OFF);
+
     // prepare transition to new mode
     if (m_parent->m_config.initialScan) {
         m_parent->m_events.push_back(
@@ -282,6 +291,9 @@ void ConnectState::onEnter() {
             detail::TransitionEvent{m_parent,
                                     detail::DisconnectState{m_parent}});
     }
+
+    //set default blinking
+    m_parent->led()->set(LedFlasher::BLINK);
 }
 
 wifi_mode_t ConnectState::mode() const {
@@ -521,6 +533,10 @@ template <> WifiMode WPSMode::handle(const WifiEvent &e) {
 }
 
 void WPSMode::onEnter() {
+	// start flashing led
+	m_parent->led()->set(LedFlasher::BLINK,
+			std::chrono::milliseconds(125), std::chrono::milliseconds(375));
+
     if (m_parent->m_wpsRetryCnt > 0) {
         m_parent->m_wpsRetryCnt--;
 

@@ -16,6 +16,7 @@
 #include <vector>
 
 class MainClass;
+class LedFlasher;
 
 namespace mqtt {
 
@@ -53,7 +54,7 @@ class MqttWorker {
     friend MqttConnectionObserver;
 
   public:
-    MqttWorker() : m_obs(this) {}
+    MqttWorker(std::shared_ptr<LedFlasher> led) : m_obs(this), m_led(led) {}
     virtual ~MqttWorker() = default;
     void init(void);
     iConnectionObserver &obs() { return m_obs; }
@@ -70,6 +71,7 @@ class MqttWorker {
     void send(mqttMessage *);
 
     MqttConnectionObserver m_obs;
+    std::shared_ptr<LedFlasher> m_led;
     std::vector<AbstractMqttReceiver *> m_mqttRec;
     AbstractMqttReceiver *m_lastMqttRec = nullptr;
     std::set<std::string> m_subtopics;

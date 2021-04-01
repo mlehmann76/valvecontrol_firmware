@@ -28,6 +28,7 @@ class ChannelBase;
 class Tasks;
 class SntpSupport;
 class StatusNotifyer;
+class LedFlasher;
 
 namespace http {
 class FileHandler;
@@ -78,6 +79,9 @@ class MainClass {
     std::vector<std::shared_ptr<ChannelBase>> _channels;
     std::shared_ptr<ExclusiveAdapter> _cex; // only one channel should be active
     std::shared_ptr<Tasks> _tasks;
+    std::shared_ptr<LedFlasher> _led1;
+    std::shared_ptr<LedFlasher> _led2;
+
     EventGroupHandle_t main_event_group = nullptr;
     bool doExit;
     int m_wpsButtonCount = 0;

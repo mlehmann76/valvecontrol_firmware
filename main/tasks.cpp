@@ -211,7 +211,7 @@ Tasks::~Tasks() {
 }
 
 void Tasks::task() {
-	steady_clock::time_point _last = steady_clock::now();
+	//steady_clock::time_point _last = steady_clock::now();
     while (m_aexit == false) {
         if (m_activeTask != &NoneTask) {
             std::lock_guard<std::mutex> lock(m_lock);

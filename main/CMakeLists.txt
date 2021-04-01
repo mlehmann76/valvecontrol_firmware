@@ -19,11 +19,13 @@ idf_component_register(SRCS "base85.c"
                             "utilities.cpp"
                             "tasks.cpp" 
                             "Cipher.cpp" 
+                            "LedFlasher.cpp"
                             INCLUDE_DIRS
                             "." REQUIRES FreeRTOScpp mqtt http variant nvs_flash
                                 json njson app_update pthread logger spiffs fmt espfs)
 
-target_compile_options(${COMPONENT_LIB} PRIVATE -fstack-usage -Wstack-usage=128)
+#target_compile_options(${COMPONENT_LIB} PRIVATE -fstack-usage -Wstack-usage=128)
+target_compile_options(${COMPONENT_LIB} PRIVATE -fstack-usage )
 
 
 find_package(Git)

@@ -79,7 +79,6 @@ int OtaWorker::handle(const OtaPacket &_p) {
             mbedtls_md5_update(&m_md5ctx, m_decodeCtx->data(), len);
         }
         task();
-        LED_TOGGLE();
         ret = 1;
     }
     return ret;

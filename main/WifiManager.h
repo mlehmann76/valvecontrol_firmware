@@ -20,6 +20,8 @@
 #include <vector>
 #include <thread>
 
+class LedFlasher;
+
 namespace wifi {
 class WifiManager;
 
@@ -179,7 +181,8 @@ class WifiManager {
 
   public:
     WifiManager(repository &_repo, std::mutex &mutex,
-                std::condition_variable &cvInitDone);
+                std::condition_variable &cvInitDone,
+				std::shared_ptr<LedFlasher> led );
     virtual ~WifiManager() {
     	m_atexit=true;
     	if(m_thread.joinable()){
@@ -202,6 +205,10 @@ class WifiManager {
     bool initDone() const { return m_initDone; }
     void startScan();
     void startWPS();
+
+    LedFlasher* led() const {
+    	return m_led.get();
+    }
 
   private:
     static void event_handler_s(void *arg, esp_event_base_t event_base,
@@ -229,6 +236,7 @@ class WifiManager {
     detail::Timeout m_timeout;
     int m_wpsRetryCnt;
     bool m_atexit = false;
+    std::shared_ptr<LedFlasher> m_led;
 };
 
 } // namespace wifi

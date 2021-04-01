@@ -20,12 +20,8 @@ using logType =
 
 extern logType log_inst;
 
-#define LED_GPIO_PIN /*(GPIO_NUM_27)*/
-#define LED_GPIO_BIT /*(GPIO_SEL_27)*/
-#define LED_ON() /*while(0) {gpio_set_level(LED_GPIO_PIN,0);}*/
-#define LED_OFF() /*while(0) {gpio_set_level(LED_GPIO_PIN,1);}*/
-#define LED_TOGGLE() /*while(0)                                                \
-                        {gpio_set_level(LED_GPIO_PIN,gpio_get_level(LED_GPIO_PIN)?0:1);}*/
+#define LED_GREEN_GPIO_PIN (GPIO_NUM_26)
+#define LED_YELLOW_GPIO_PIN (GPIO_NUM_27)
 
 #define WPS_BUTTON (GPIO_SEL_0)
 #define WPS_SHORT_MS 100

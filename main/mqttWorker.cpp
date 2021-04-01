@@ -23,6 +23,7 @@
 
 #include "MainClass.h"
 #include "otaWorker.h"
+#include "LedFlasher.h"
 
 static const char *TAG = "MQTTS";
 
@@ -35,8 +36,7 @@ esp_err_t MqttWorker::mqtt_event_handler(esp_mqtt_event_handle_t event) {
     switch (event->event_id) {
     case MQTT_EVENT_CONNECTED:
         log_inst.debug(TAG, "MQTT_EVENT_CONNECTED");
-//        xEventGroupSetBits(MainClass::instance()->eventGroup(),
-//                           MQTT_CONNECTED_BIT);
+
         for (auto _s : mqtt->subTopics()) {
             msg_id = esp_mqtt_client_subscribe(client, _s.c_str(), 1);
             log_inst.debug(TAG, "sent subscribe {} successful, msg_id={:d}",
@@ -46,8 +46,6 @@ esp_err_t MqttWorker::mqtt_event_handler(esp_mqtt_event_handle_t event) {
         mqttConf.setConnected(true);
         break;
     case MQTT_EVENT_DISCONNECTED:
-//        xEventGroupClearBits(MainClass::instance()->eventGroup(),
-//                             MQTT_CONNECTED_BIT);
         log_inst.debug(TAG, "MQTT_EVENT_DISCONNECTED");
         mqtt->isMqttConnected = false;
         mqtt->isMqttInit = false;
@@ -101,6 +99,7 @@ void MqttWorker::handle(esp_mqtt_event_handle_t event) {
     //        }
     //    }
 
+	m_led->set(LedFlasher::ON);
     int ret = 0;
     // provide message to last handler for accelerated test
     if (m_lastMqttRec != nullptr) {
@@ -117,6 +116,7 @@ void MqttWorker::handle(esp_mqtt_event_handle_t event) {
             }
         }
     }
+    m_led->set(LedFlasher::OFF);
 }
 
 void MqttWorker::addHandle(AbstractMqttReceiver *_a) {

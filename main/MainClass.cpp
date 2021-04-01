@@ -36,6 +36,7 @@
 #include "sntp.h"
 #include "statusnotifyer.h"
 #include "tasks.h"
+#include "LedFlasher.h"
 #include "libespfs/espfs.h"
 #include "libespfs/vfs.h"
 
@@ -85,15 +86,18 @@ void MainClass::setup() {
 	mqttConf.init();
     netConf.init();
 
-    _wifi =
-        std::make_shared<wifi::WifiManager>(Config::repo(), mutex, cvInitDone);
+    _led1 = std::make_shared<LedFlasher>(LED_YELLOW_GPIO_PIN, false);
+    _led2 = std::make_shared<LedFlasher>(LED_GREEN_GPIO_PIN, false);
+
+    _wifi = std::make_shared<wifi::WifiManager>
+    			(Config::repo(), mutex, cvInitDone, _led1);
     {
         std::unique_lock<std::mutex> lck(mutex);
         cvInitDone.wait(lck, [this] { return _wifi->initDone(); });
     }
 
     if (mqttConf.enabled()) {
-        _mqttUser = std::make_shared<mqtt::MqttWorker>();
+        _mqttUser = std::make_shared<mqtt::MqttWorker>(_led2);
 
         _mqttOtaHandler = (std::make_shared<MqttOtaHandler>(
             _otaWorker, *_mqttUser,
@@ -186,15 +190,9 @@ void MainClass::checkWPSButton() {
     if ((gpio_get_level((gpio_num_t)WPS_BUTTON) == 0)) {
     	m_wpsButtonCount++;
         if (m_wpsButtonCount > (WPS_LONG_MS / portTICK_PERIOD_MS)) {
-            xEventGroupSetBits(main_event_group, WPS_LONG_BIT);
             _wifi->startWPS();
             m_wpsButtonCount = 0;
         }
-    } else {
-        if (m_wpsButtonCount > (WPS_SHORT_MS / portTICK_PERIOD_MS)) {
-            xEventGroupSetBits(main_event_group, WPS_SHORT_BIT);
-        }
-        m_wpsButtonCount = 0;
     }
 }
 
@@ -246,7 +244,8 @@ int MainClass::loop() {
         checkWPSButton();
         checkRestartButton();
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        //std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::yield();
     }
     return 0;
 }
