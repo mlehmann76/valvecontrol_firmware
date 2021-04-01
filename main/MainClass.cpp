@@ -46,7 +46,6 @@ logType log_inst({}, {});
 #define TAG "MAIN"
 
 extern const uint8_t espfs_bin[];
-extern const size_t espfs_bin_len;
 
 MainClass::MainClass()
     : _sntp(std::make_shared<SntpSupport>()), _channels(4),
@@ -69,8 +68,8 @@ void MainClass::setup() {
     assert(fs != NULL);
 
     esp_vfs_espfs_conf_t vfs_espfs_conf = {
-        .base_path = "/",
-		.overlay_path = "/espfs",
+        .base_path = "/espfs",
+		.overlay_path = NULL,
         .fs = fs,
         .max_files = 5,
     };
@@ -137,13 +136,6 @@ void MainClass::setup() {
     _http->addPathHandler(std::make_shared<http::HttpAuth>(
 		_jsonHandler.get(), _token, http::HttpAuth::BASIC_AUTH));
 
-//    log_inst.info(TAG, "auth token: {} {}",
-//    		_token.user.length()>3 ? _token.user : "empty" ,
-//    				_token.pass.length()>3 ? _token.pass : "empty");
-
-
-    //_http->addPathHandler(_jsonHandler);
-
     for (size_t i = 0; i < _channels.size(); i++) {
         _channels[i] = std::shared_ptr<ChannelBase>(
             LedcChannelFactory::channel(i, chanConf.getTime(i)));
@@ -190,22 +182,35 @@ void MainClass::restart() {
 	doExit = true;
 }
 
-int MainClass::checkWPSButton() {
-    static int wps_button_count = 0;
+void MainClass::checkWPSButton() {
     if ((gpio_get_level((gpio_num_t)WPS_BUTTON) == 0)) {
-        wps_button_count++;
-        if (wps_button_count > (WPS_LONG_MS / portTICK_PERIOD_MS)) {
+    	m_wpsButtonCount++;
+        if (m_wpsButtonCount > (WPS_LONG_MS / portTICK_PERIOD_MS)) {
             xEventGroupSetBits(main_event_group, WPS_LONG_BIT);
             _wifi->startWPS();
-            wps_button_count = 0;
+            m_wpsButtonCount = 0;
         }
     } else {
-        if (wps_button_count > (WPS_SHORT_MS / portTICK_PERIOD_MS)) {
+        if (m_wpsButtonCount > (WPS_SHORT_MS / portTICK_PERIOD_MS)) {
             xEventGroupSetBits(main_event_group, WPS_SHORT_BIT);
         }
-        wps_button_count = 0;
+        m_wpsButtonCount = 0;
     }
-    return wps_button_count;
+}
+
+void MainClass::checkRestartButton() {
+#ifdef RESTART_BUTTON
+	if ((gpio_get_level((gpio_num_t)RESTART_BUTTON) == 0)) {
+		m_restartButtonCount++;
+	} else {
+		if (m_restartButtonCount > (RESTART_LONG_MS / portTICK_PERIOD_MS)) {
+			baseConf.resetToDefault();
+		} else if (m_restartButtonCount > (RESTART_SHORT_MS / portTICK_PERIOD_MS)) {
+	        restart();
+	    }
+	    m_restartButtonCount = 0;
+	}
+#endif
 }
 
 int MainClass::loop() {
@@ -239,6 +244,7 @@ int MainClass::loop() {
         }
 
         checkWPSButton();
+        checkRestartButton();
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }

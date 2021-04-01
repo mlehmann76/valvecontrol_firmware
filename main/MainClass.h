@@ -39,8 +39,6 @@ class MqttWorker;
 } //namespace mqtt
 
 class MainClass {
-    static const unsigned WPS_SHORT_MS = (100 / portTICK_PERIOD_MS);
-    static const unsigned WPS_LONG_MS = (500 / portTICK_PERIOD_MS);
 
    public:
     MainClass();
@@ -61,7 +59,8 @@ class MainClass {
     EventGroupHandle_t &eventGroup() { return (main_event_group); }
 
   private:
-    int checkWPSButton();
+    void checkWPSButton();
+    void checkRestartButton();
 
     std::mutex mutex;
     std::condition_variable cvInitDone;
@@ -81,6 +80,8 @@ class MainClass {
     std::shared_ptr<Tasks> _tasks;
     EventGroupHandle_t main_event_group = nullptr;
     bool doExit;
+    int m_wpsButtonCount = 0;
+    int m_restartButtonCount = 0;
 };
 
 #endif /* MAIN_MAINCLASS_H_ */

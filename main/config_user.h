@@ -28,6 +28,12 @@ extern logType log_inst;
                         {gpio_set_level(LED_GPIO_PIN,gpio_get_level(LED_GPIO_PIN)?0:1);}*/
 
 #define WPS_BUTTON (GPIO_SEL_0)
+#define WPS_SHORT_MS 100
+#define WPS_LONG_MS 500
+
+//#define RESTART_BUTTON
+#define RESTART_SHORT_MS 50
+#define RESTART_LONG_MS 5000
 
 #define NUM_CONTROL (4)
 #define CONTROL0_PIN (CONFIG_CHANOUTPUT1)
