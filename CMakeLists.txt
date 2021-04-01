@@ -8,8 +8,8 @@ set (My_Project_Description "")
 set (My_Project_Author "M. Lehmann")
 set (My_Project_Revised_Date "2021-XX-XX")
 set (My_Project_Version_Major 0)
-set (My_Project_Version_Minor 3)
-set (My_Project_Version_Patch X)
+set (My_Project_Version_Minor 4)
+set (My_Project_Version_Patch 0)
 
 set (My_Project_Version "${My_Project_Version_Major}.${My_Project_Version_Minor}.${My_Project_Version_Patch}")
 
