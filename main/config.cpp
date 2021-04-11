@@ -345,7 +345,13 @@ esp_err_t NetConfig::init() {
 	repo()["/network/wifi/config/STA"].set(doEncrypt(*this, "pass"));
 
     if (m_base.isKeyReset()) {
-        setApPass("espressif"); //FIXME make configurable
+        setApPass("espressif");
+        /* set default device name */
+        uint8_t mac[6] = {0};
+        esp_efuse_mac_get_default(mac);
+        repo()["/network/wifi/config/AP"]["ssid"] =  fmt::sprintf(
+        		"%s_%02X%02X%02X%02X", "espressif", //
+				mac[2], mac[3], mac[4], mac[5]);
     }
 
     return ESP_OK;
