@@ -1,7 +1,7 @@
 asset-manifest.json
 espfs.yaml
 favicon.ico
-index.html
+index.html.gz
 logo192.png
 logo512.png
 manifest.json
@@ -10,8 +10,8 @@ static
 static/css
 static/css/main.85cd5597.chunk.css.gz
 static/js
-static/js/2.21deda56.chunk.js.LICENSE.txt.gz
+static/js/2.21deda56.chunk.js.LICENSE.txt
 static/js/2.21deda56.chunk.js.gz
-static/js/3.045cb586.chunk.js.gz
-static/js/main.f84e33a6.chunk.js.gz
-static/js/runtime-main.d8f29c52.js.gz
+static/js/main.04786f8a.chunk.js.gz
+static/js/main.e235a0ef.chunk.js.gz
+static/js/runtime-main.81fa1bb6.js.gz
