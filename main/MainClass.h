@@ -37,16 +37,16 @@ class RepositoryHandler;
 
 namespace mqtt {
 class MqttWorker;
-} //namespace mqtt
+} // namespace mqtt
 
 class MainClass {
 
-   public:
+  public:
     MainClass();
-    MainClass(const MainClass&) = delete;
-    MainClass(MainClass&&) = delete;
-    MainClass operator=(const MainClass&) = delete;
-    MainClass operator=(MainClass&&) = delete;
+    MainClass(const MainClass &) = delete;
+    MainClass(MainClass &&) = delete;
+    MainClass operator=(const MainClass &) = delete;
+    MainClass operator=(MainClass &&) = delete;
     virtual ~MainClass() = default;
 
     void setup();

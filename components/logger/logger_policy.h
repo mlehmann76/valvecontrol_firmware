@@ -8,8 +8,6 @@
 #ifndef COMPONENTS_LOGGER_LOGGER_POLICY_H_
 #define COMPONENTS_LOGGER_LOGGER_POLICY_H_
 
-#include <fmt/color.h>
-#include <fmt/format.h>
 #include <fstream>
 #include <memory>
 
@@ -44,16 +42,16 @@ struct ColoredTerminal : public iLogPolicy {
     void write(severity_type s, const std::string &msg) override {
         switch (s) {
         case severity_type::debug:
-            fmt::print(fg(fmt::color::white), msg);
+            printf("\033[0;37m%s",msg.c_str());//White
             break;
         case severity_type::info:
-            fmt::print(fg(fmt::color::green), msg);
+            printf("\033[0;32m%s",msg.c_str());//Green
             break;
         case severity_type::error:
-            fmt::print(fg(fmt::color::red), msg);
+            printf("\033[0;31m%s",msg.c_str());//Red
             break;
         case severity_type::warning:
-            fmt::print(fg(fmt::color::orange), msg);
+            printf("\033[0;33m%s",msg.c_str());//Yellow
             break;
         }
     }

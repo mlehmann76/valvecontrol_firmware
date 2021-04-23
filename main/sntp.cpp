@@ -23,9 +23,12 @@ static const char *TAG = "sntp";
 
 void SntpSupport::init() {
     log_inst.info(TAG, "Initializing SNTP");
-    server = netConf.getTimeServer();//::repo().get<std::string>("/network/sntp/config", "server");
-    timeZone = netConf.getTimeZone();//::repo().get<std::string>("/network/sntp/config", "zone");
-    log_inst.info(TAG, "sntp server ({}) ({})", server, timeZone);
+    server = netConf.getTimeServer(); //::repo().get<std::string>("/network/sntp/config",
+                                      //"server");
+    timeZone = netConf.getTimeZone(); //::repo().get<std::string>("/network/sntp/config",
+                                      //"zone");
+    log_inst.info(TAG, "sntp server (%s) (%s)", server.c_str(),
+                  timeZone.c_str());
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_setservername(0, server.c_str());
     // sntp_set_time_sync_notification_cb(time_sync_notification_cb);
@@ -50,6 +53,6 @@ bool SntpSupport::update() {
     time(&now);
     localtime_r(&now, &timeinfo);
     strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-    log_inst.info(TAG, "The current date/time is: {}", strftime_buf);
+    log_inst.info(TAG, "The current date/time is: %s", strftime_buf);
     return true;
 }

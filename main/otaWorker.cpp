@@ -55,9 +55,9 @@ int B85decode::decode(const uint8_t *src, size_t len) {
             _decodePos = decRest;
             _len = decLen / 5 * 4;
             _sumLen += decLen / 5 * 4;
-            log_inst.debug(TAG, "decode {:d}", _len);
+            log_inst.debug(TAG, "decode %d", _len);
         } else {
-            log_inst.error(TAG, "decode error {:d}", ret);
+            log_inst.error(TAG, "decode error %d", ret);
         }
     }
 
@@ -89,7 +89,7 @@ void OtaWorker::otaFinish() {
     unsigned char output[16];
     mbedtls_md5_finish(&m_md5ctx, output);
     //    log_inst.debug(TAG,
-    //             "fileSize :{:d} ->md5: "
+    //             "fileSize :%d ->md5: "
     //             "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
     //             sum, output[0], output[1], output[2], output[3], output[4],
     //             output[5], output[6], output[7], output[8], output[9],
@@ -103,7 +103,7 @@ void OtaWorker::otaFinish() {
         }
         err = esp_ota_set_boot_partition(update_partition);
         if (err != ESP_OK) {
-            log_inst.error(TAG, "esp_ota_set_boot_partition failed {}!",
+            log_inst.error(TAG, "esp_ota_set_boot_partition failed %s!",
                            esp_err_to_name(err));
         }
         log_inst.info(TAG, "Prepare to restart system!");
@@ -127,16 +127,15 @@ void OtaWorker::otaStart() {
                          "(This can happen if either the OTA boot data or "
                          "preferred boot image become corrupted somehow.)");
     }
-    log_inst.info(TAG,
-                  "Running partition type {:d} subtype {:d} (offset 0x{:08x})",
+    log_inst.info(TAG, "Running partition type %d subtype %d (offset 0x{:08x})",
                   running->type, running->subtype, running->address);
     update_partition = esp_ota_get_next_update_partition(NULL);
-    log_inst.info(TAG, "Writing to partition subtype {:d} at offset 0x{:x}",
+    log_inst.info(TAG, "Writing to partition subtype %d at offset 0x%x",
                   update_partition->subtype, update_partition->address);
     assert(update_partition != NULL);
     err = esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &update_handle);
     if (err != ESP_OK) {
-        log_inst.error(TAG, "esp_ota_begin failed {}", esp_err_to_name(err));
+        log_inst.error(TAG, "esp_ota_begin failed %s", esp_err_to_name(err));
         cleanUp();
     }
     log_inst.info(TAG, "esp_ota_begin succeeded");
@@ -152,11 +151,11 @@ void OtaWorker::otaData() {
         err = esp_ota_write(update_handle, (const void *)(m_decodeCtx->data()),
                             m_decodeCtx->len());
         if (err != ESP_OK) {
-            log_inst.error(TAG, "esp_ota_write failed {}",
+            log_inst.error(TAG, "esp_ota_write failed %s",
                            esp_err_to_name(err));
             cleanUp();
         } else {
-            log_inst.info(TAG, "esp_ota_write {:d}%%",
+            log_inst.info(TAG, "esp_ota_write %d%%",
                           sum * 100 / m_md5Updata.len);
         }
         if (sum == m_md5Updata.len) {

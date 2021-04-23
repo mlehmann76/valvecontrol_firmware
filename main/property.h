@@ -31,8 +31,9 @@ class property {
                                               FloatType, StringType>;
     using property_base = std::unordered_map<key_type, mapped_type>;
 
-    using write_hook_t = std::function<std::optional<property>(const property &p)>;
-    using read_hook_t = std::function<property (const property &p)>;
+    using write_hook_t =
+        std::function<std::optional<property>(const property &p)>;
+    using read_hook_t = std::function<property(const property &p)>;
     using iterator = property_base::iterator;
     using const_iterator = property_base::const_iterator;
 

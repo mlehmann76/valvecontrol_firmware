@@ -36,7 +36,7 @@ class repository {
         constexpr bool operator()() const { return value; }
     };
 
-public:
+  public:
     struct StringMatch {
         std::vector<std::string> m_keys;
         StringMatch(const std::string &key);
@@ -66,10 +66,10 @@ public:
     property &create(const keyType &_name, const property &_cp = {});
 
     /* create properties from json string */
-    void append(const std::string& _json);
+    void append(const std::string &_json);
 
     /* delete properties from json string */
-    void remove(const std::string& _json);
+    void remove(const std::string &_json);
 
     /* set the property */
     virtual bool set(const keyType &name, const property::property_base &p);
@@ -106,8 +106,8 @@ public:
 
     /* notify */
     void notify(const std::string &);
-    void addNotify(const std::string& key, notifyFuncType &&func);
-    //TODO void remNotify(const std::string& key);
+    void addNotify(const std::string &key, notifyFuncType &&func);
+    // TODO void remNotify(const std::string& key);
 
     std::string name() const { return m_repName; }
 

@@ -5,20 +5,20 @@
  *      Author: marco
  */
 #include <fmt/printf.h>
+#include <fstream>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <sstream>
 #include <stdlib.h>
 #include <string>
-#include <iostream>
-#include <fstream>
 
 #include "esp_err.h"
+#include "esp_image_format.h"
 #include "esp_spiffs.h"
 #include "esp_system.h"
 #include "nvs.h"
 #include "nvs_flash.h"
-#include "esp_image_format.h"
 #include "sdkconfig.h"
 
 #include "Cipher.h"
@@ -49,15 +49,13 @@ repository &repo() {
     return s_repository;
 }
 
-
 std::string bin2String(std::string s) {
-	return std::move(utilities::base64_encode(std::move(s)));
+    return std::move(utilities::base64_encode(std::move(s)));
 }
 
 std::string string2Bin(std::string s) {
-	return std::move(utilities::base64_decode(std::move(s)));
+    return std::move(utilities::base64_decode(std::move(s)));
 }
-
 
 ConfigBase::ConfigBase()
     : my_handle(), m_timeout("ConfigTimer", this, &ConfigBase::onTimeout,
@@ -69,12 +67,12 @@ ConfigBase::ConfigBase()
 esp_err_t ConfigBase::init() {
     std::lock_guard<std::mutex> lck(mutex);
     esp_err_t ret = ESP_OK;
-	esp_chip_info_t chip_info;
-	esp_chip_info(&chip_info);
+    esp_chip_info_t chip_info;
+    esp_chip_info(&chip_info);
 
-	if (!m_isInitialized) {
+    if (!m_isInitialized) {
 
-    	spiffsInit();
+        spiffsInit();
 
         repo().create("/system/auth/config",
                       {{{"user", "admin"s}, {"password", "admin"s}}});
@@ -87,11 +85,13 @@ esp_err_t ConfigBase::init() {
                         {"cores", static_cast<IntType>(chip_info.cores)},
                         {"rev", static_cast<IntType>(chip_info.revision)}}});
 
-        repo().create("/system/base/control/resetToDefaults", {{{"start", false}}})
-                    .set([this](const property &) -> std::optional<property> {
-                		this->resetToDefault();
-                        return {};
-                    });
+        repo()
+            .create("/system/base/control/resetToDefaults",
+                    {{{"start", false}}})
+            .set([this](const property &) -> std::optional<property> {
+                this->resetToDefault();
+                return {};
+            });
 
         initNVSFlash(NoForceErase);
         std::string str;
@@ -110,7 +110,7 @@ esp_err_t ConfigBase::init() {
         }
 
         Config::repo().addNotify("/*/*/config",
-        		Config::onConfigNotify(baseConf));
+                                 Config::onConfigNotify(baseConf));
 
         m_isInitialized = true;
     }
@@ -131,7 +131,7 @@ void ConfigBase::initNVSFlash(forceErase_t f) {
     ESP_ERROR_CHECK(err);
     err = nvs_open("storage", NVS_READWRITE, &my_handle);
     if (err != ESP_OK) {
-        log_inst.error(TAG, "nvs_open storage failed ({})",
+        log_inst.error(TAG, "nvs_open storage failed (%s)",
                        esp_err_to_name(err));
     }
 }
@@ -141,9 +141,9 @@ esp_err_t ConfigBase::readKey() {
     esp_err_t err = readStr(&my_handle, "config_key", &pKey);
     if (ESP_OK == err) {
         m_crypt = {AES128Key{std::string(pKey, AES128Key::size())}};
-        log_inst.debug(TAG, "key:{}", m_crypt.key().to_hex());
+        log_inst.debug(TAG, "key:%s", m_crypt.key().to_hex().c_str());
     } else {
-        log_inst.error(TAG, "config_key read failed ({})",
+        log_inst.error(TAG, "config_key read failed (%s)",
                        esp_err_to_name(err));
     }
     return err;
@@ -151,7 +151,7 @@ esp_err_t ConfigBase::readKey() {
 
 esp_err_t ConfigBase::genKey() {
     esp_err_t err = ESP_OK;
-    auto key = AES128Key::genRandomKey("my esspressif key"); //FIXME
+    auto key = AES128Key::genRandomKey("my esspressif key"); // FIXME
     if (key) {
         m_keyReset = true;
         m_crypt = {*key};
@@ -192,29 +192,27 @@ void ConfigBase::onConfigNotify(const std::string &s) {
 
 void ConfigBase::resetToDefault() {
     log_inst.info(TAG, "resetToDefault called");
-	//deleting the key will force reset to defaults
-	esp_err_t err =
-			nvs_erase_key(my_handle, "config_key");
+    // deleting the key will force reset to defaults
+    nvs_erase_key(my_handle, "config_key");
     nvs_commit(my_handle);
     esp_restart();
 }
 
-void ConfigBase::onTimeout() {
-	writeConfig();
-}
+void ConfigBase::onTimeout() { writeConfig(); }
 
 std::string ConfigBase::configFileName() const {
-	return std::move("/spiffs/"+bin2String(m_crypt.encrypt("config.json")));
+    return std::move("/spiffs/" + bin2String(m_crypt.encrypt("config.json")));
 }
 
 esp_err_t ConfigBase::writeConfig() {
     std::lock_guard<std::mutex> lock(m_lock);
-	const std::string fname = configFileName();
+    const std::string fname = configFileName();
     esp_err_t err = ESP_OK;
-    log_inst.info(TAG, "writeConfig called {}", fname);
-    std::ofstream ofs(fname, std::ios::out |std::ios::binary | std::ios::trunc);
+    log_inst.info(TAG, "writeConfig called %s", fname.c_str());
+    std::ofstream ofs(fname,
+                      std::ios::out | std::ios::binary | std::ios::trunc);
     if (ofs.is_open()) {
-    	ofs << repo().stringify({"/*/*/config"},0);
+        ofs << repo().stringify({"/*/*/config"}, 0);
         ofs.close();
     } else {
         log_inst.error(TAG, "writeConfig failed");
@@ -223,25 +221,25 @@ esp_err_t ConfigBase::writeConfig() {
     return err;
 }
 
-esp_err_t ConfigBase::readConfig(std::string& str) {
-	const std::string fname = configFileName();
-    std::ifstream ifs(fname, std::ios::in|std::ios::binary);
-    log_inst.info(TAG, "readConfig called {}", fname);
+esp_err_t ConfigBase::readConfig(std::string &str) {
+    const std::string fname = configFileName();
+    std::ifstream ifs(fname, std::ios::in | std::ios::binary);
+    log_inst.info(TAG, "readConfig called %s", fname.c_str());
     if (ifs.is_open()) {
         // get length of file:
         ifs.seekg(0, ifs.end);
         size_t len = ifs.tellg();
         str.reserve(len);
-        log_inst.info(TAG, "readConfig length {:d}", len);
+        log_inst.info(TAG, "readConfig length %d", len);
         ifs.seekg(0, ifs.beg);
 
         str.assign((std::istreambuf_iterator<char>(ifs)),
-                    std::istreambuf_iterator<char>());
+                   std::istreambuf_iterator<char>());
 
         ifs.close();
         return len > 0 ? ESP_OK : ESP_FAIL;
     }
-    log_inst.info(TAG, "readConfig failed {}", fname);
+    log_inst.info(TAG, "readConfig failed %s", fname.c_str());
     return ESP_FAIL;
 }
 
@@ -263,7 +261,7 @@ void ConfigBase::spiffsInit(void) {
         } else if (ret == ESP_ERR_NOT_FOUND) {
             log_inst.error(TAG, "Failed to find SPIFFS partition");
         } else {
-            log_inst.error(TAG, "Failed to initialize SPIFFS {}",
+            log_inst.error(TAG, "Failed to initialize SPIFFS %s",
                            esp_err_to_name(ret));
         }
         return;
@@ -272,11 +270,10 @@ void ConfigBase::spiffsInit(void) {
     size_t total = 0, used = 0;
     ret = esp_spiffs_info(NULL, &total, &used);
     if (ret != ESP_OK) {
-        log_inst.error(TAG, "Failed to get SPIFFS partition information {}",
+        log_inst.error(TAG, "Failed to get SPIFFS partition information %s",
                        esp_err_to_name(ret));
     } else {
-        log_inst.info(TAG, "Partition size: total: {:d}, used: {:d}", total,
-                      used);
+        log_inst.info(TAG, "Partition size: total: %d}, used: %d", total, used);
     }
 }
 
@@ -335,28 +332,27 @@ esp_err_t NetConfig::init() {
                                                 {"ssid", ""s}, //
                                                 {"pass", ""s}}});
 
-	// saving password will encrypt it
-	repo()["/network/mqtt/config"].set(doEncrypt(*this, "pass"));
+    // saving password will encrypt it
+    repo()["/network/mqtt/config"].set(doEncrypt(*this, "pass"));
 
     // saving password will encrypt it
     repo()["/network/wifi/config/AP"].set(doEncrypt(*this, "pass"));
 
     // saving password will encrypt it
-	repo()["/network/wifi/config/STA"].set(doEncrypt(*this, "pass"));
+    repo()["/network/wifi/config/STA"].set(doEncrypt(*this, "pass"));
 
     if (m_base.isKeyReset()) {
         setApPass("espressif");
         /* set default device name */
         uint8_t mac[6] = {0};
         esp_efuse_mac_get_default(mac);
-        repo()["/network/wifi/config/AP"]["ssid"] =  fmt::sprintf(
-        		"%s_%02X%02X%02X%02X", "espressif", //
-				mac[2], mac[3], mac[4], mac[5]);
+        repo()["/network/wifi/config/AP"]["ssid"] =
+            fmt::sprintf("%s_%02X%02X%02X%02X", "espressif", //
+                         mac[2], mac[3], mac[4], mac[5]);
     }
 
     return ESP_OK;
 }
-
 
 std::string NetConfig::getTimeServer() const {
     return repo().get<std::string>("/network/sntp/config", "server");
@@ -381,9 +377,8 @@ std::string NetConfig::getApPass() const {
 }
 
 void NetConfig::setApPass(std::string s) {
-	repo()["/network/wifi/config/AP"]["pass"] = std::move(s);
+    repo()["/network/wifi/config/AP"]["pass"] = std::move(s);
 }
-
 
 unsigned NetConfig::getApChannel() const {
     return repo().get<IntType>("/network/wifi/config/AP", "channel", 1);
@@ -394,8 +389,8 @@ std::string NetConfig::getStaSSID() const {
 }
 
 std::string NetConfig::getStaPass() const {
-    return crypt().decrypt(
-    	string2Bin(repo().get<std::string>("/network/wifi/config/STA", "pass")));
+    return crypt().decrypt(string2Bin(
+        repo().get<std::string>("/network/wifi/config/STA", "pass")));
 }
 
 unsigned NetConfig::getMode() const {
@@ -441,7 +436,7 @@ std::chrono::seconds ChannelConfig::getTime(unsigned ch) {
 
 std::string SysConfig::getPass() {
     return crypt().decrypt(
-    	string2Bin(repo().get<std::string>("/system/auth/config", "password")));
+        string2Bin(repo().get<std::string>("/system/auth/config", "password")));
 }
 
 std::string SysConfig::getUser() {
@@ -453,14 +448,14 @@ esp_err_t SysConfig::init() {
         m_base.init();
     }
     // saving password will encrypt it
-	repo()["/system/auth/config"].set(doEncrypt(*this, "password"));
+    repo()["/system/auth/config"].set(doEncrypt(*this, "password"));
 
     if (m_base.isKeyReset()) {
-    	repo()["/system/auth/config"]["user"] = "admin"s;
-    	repo()["/system/auth/config"]["password"] = "admin"s;
+        repo()["/system/auth/config"]["user"] = "admin"s;
+        repo()["/system/auth/config"]["password"] = "admin"s;
     }
 
-	return ESP_OK;
+    return ESP_OK;
 }
 
 } /* namespace Config */

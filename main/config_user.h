@@ -15,7 +15,7 @@
 #include <logger.h>
 
 using logType =
-    logger::Logger<logger::severity_type::info, logger::ColoredTerminal,
+    logger::Logger<logger::severity_type::debug, logger::ColoredTerminal,
                    logger::CircularLogPolicy<4>>;
 
 extern logType log_inst;
@@ -23,7 +23,7 @@ extern logType log_inst;
 #define LED_GREEN_GPIO_PIN (GPIO_NUM_26)
 #define LED_YELLOW_GPIO_PIN (GPIO_NUM_27)
 
-#define WPS_BUTTON (GPIO_SEL_0)
+//#define WPS_BUTTON (GPIO_SEL_0)
 #define WPS_SHORT_MS 100
 #define WPS_LONG_MS 500
 

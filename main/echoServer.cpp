@@ -41,7 +41,7 @@ void EchoServer::task() {
                 Socket *_con =
                     m_sockets.front()->accept(std::chrono::microseconds(1));
                 if (_con != nullptr) {
-                    log_inst.debug(TAG, "socket({:d}) accepted", _con->get());
+                    log_inst.debug(TAG, "socket(%d) accepted", _con->get());
                     m_sockets.push_back(_con);
                 }
             }
@@ -52,19 +52,19 @@ void EchoServer::task() {
                     switch (
                         _s->pollConnectionState(std::chrono::microseconds(1))) {
                     case Socket::noData:
-                        log_inst.debug(TAG, "Socket({:d})::noData", _s->get());
+                        log_inst.debug(TAG, "Socket(%d)::noData", _s->get());
                         break;
                     case Socket::errorState:
-                        log_inst.debug(TAG, "Socket({:d})::errorState",
+                        log_inst.debug(TAG, "Socket(%d)::errorState",
                                        _s->get());
                         removeSocket(_s);
                         break;
                     case Socket::newData:
-                        log_inst.debug(TAG, "Socket({:d})::newData", _s->get());
+                        log_inst.debug(TAG, "Socket(%d)::newData", _s->get());
                         bzero(buf, sizeof(buf));
                         int readSize = _s->read(buf, sizeof(buf));
                         if (readSize >= 0) {
-                            log_inst.debug(TAG, "socket({:d}) read: {:d} , {}",
+                            log_inst.debug(TAG, "socket(%d) read: %d , %s",
                                            _s->get(), readSize, buf);
                             _s->write(buf, readSize);
                         } else {

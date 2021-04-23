@@ -36,9 +36,9 @@ namespace wifi {
 
 WifiManager::WifiManager(repository &_repo, std::mutex &m,
                          std::condition_variable &cv,
-						 std::shared_ptr<LedFlasher> led)
+                         std::shared_ptr<LedFlasher> led)
     : mutex(m), cvInitDone(cv), m_mode(detail::NoMode()), m_repo(_repo),
-	  m_led(led) {
+      m_led(led) {
     auto cfg = esp_pthread_get_default_config();
     cfg.thread_name = "wifi task";
     esp_pthread_set_cfg(&cfg);
@@ -103,7 +103,7 @@ void WifiManager::task() {
     init();
     while (!m_atexit) {
         if (m_timeout.active && m_timeout.expired()) {
-        	m_events.push_back(m_timeout.event);
+            m_events.push_back(m_timeout.event);
         }
         if (!m_events.empty()) {
             auto event = m_events.front();
@@ -139,7 +139,7 @@ void WifiManager::got_ip_event_handler(esp_event_base_t event_base,
     case IP_EVENT_STA_GOT_IP:
         log_inst.info(TAG,
                       "got ip:"
-                      "{:d}.{:d}.{:d}.{:d}",
+                      "%d.%d.%d.%d",
                       IP2STR(&event->ip_info.ip));
         // FIXME xEventGroupSetBits(main_event_group, CONNECTED_BIT);
         notifyConnect();
@@ -186,6 +186,7 @@ void WifiManager::startScan() {
 
 void WifiManager::startWPS() {
     m_wpsRetryCnt = m_config.wpsRetryCnt;
+    // FIXME check wifi mode before transition
     m_events.push_back(detail::TransitionEvent{this, detail::WPSMode{this}});
 }
 
@@ -253,8 +254,8 @@ void ConnectState::setAPConfig(wifi_config_t &wifi_config) {
 void ConnectState::setSTAConfig(const std::string &ssid,
                                 wifi_config_t &wifi_config) {
     memset(&wifi_config, 0, sizeof(wifi_config));
-    strcpy((char*)wifi_config.sta.ssid, ssid.c_str());
-    strcpy((char*)wifi_config.sta.password, netConf.getStaPass().c_str());
+    strcpy((char *)wifi_config.sta.ssid, ssid.c_str());
+    strcpy((char *)wifi_config.sta.password, netConf.getStaPass().c_str());
 }
 
 void ConnectState::onEnter() {
@@ -263,7 +264,7 @@ void ConnectState::onEnter() {
     wifi_config_t wifi_config;
 
     if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA) {
-        log_inst.debug(TAG, "ap ssid {}", netConf.getApSSID());
+        log_inst.debug(TAG, "ap ssid %s", netConf.getApSSID().c_str());
         setAPConfig(wifi_config);
         ESP_ERROR_CHECK(esp_wifi_set_mode(mode));
         ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config));
@@ -274,8 +275,9 @@ void ConnectState::onEnter() {
         const std::string ssid = netConf.getStaSSID();
         if (ssid != "") {
             setSTAConfig(ssid, wifi_config);
-            //log_inst.debug(TAG, "trying ssid {} {}", wifi_config.sta.ssid, wifi_config.sta.password);
-            log_inst.debug(TAG, "trying ssid {}", wifi_config.sta.ssid);
+            // log_inst.debug(TAG, "trying ssid {} {}", wifi_config.sta.ssid,
+            // wifi_config.sta.password);
+            log_inst.debug(TAG, "trying ssid %s", wifi_config.sta.ssid);
 
             ESP_ERROR_CHECK(esp_wifi_set_mode(mode));
             ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
@@ -283,7 +285,7 @@ void ConnectState::onEnter() {
             ESP_ERROR_CHECK(esp_wifi_set_mode(mode));
             ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
         }
-    	/* TODO fallback, if two many tries ? */
+        /* TODO fallback, if two many tries ? */
         ESP_ERROR_CHECK(esp_wifi_start());
         ESP_ERROR_CHECK(esp_wifi_connect());
         m_parent->m_timeout.start(
@@ -292,27 +294,26 @@ void ConnectState::onEnter() {
                                     detail::DisconnectState{m_parent}});
     }
 
-    //set default blinking
+    // set default blinking
     m_parent->led()->set(LedFlasher::BLINK);
 }
 
 wifi_mode_t ConnectState::mode() const {
-	wifi_mode_t mode;
-	esp_err_t err = esp_wifi_get_mode(&mode);
-	return err == ESP_OK ? mode : WIFI_MODE_NULL;
+    wifi_mode_t mode;
+    esp_err_t err = esp_wifi_get_mode(&mode);
+    return err == ESP_OK ? mode : WIFI_MODE_NULL;
 }
 
 void ConnectState::onLeave() {
-	wifi_sta_list_t sta_list;
-	wifi_mode_t _m = mode();
-	if ((_m == WIFI_MODE_AP || _m == WIFI_MODE_APSTA)) {
-		if ( ESP_OK == esp_wifi_ap_get_sta_list(&sta_list)) {
-			if(sta_list.num == 0) {
-				esp_wifi_disconnect();
-			}
-		}
-	}
-
+    wifi_sta_list_t sta_list;
+    wifi_mode_t _m = mode();
+    if ((_m == WIFI_MODE_AP || _m == WIFI_MODE_APSTA)) {
+        if (ESP_OK == esp_wifi_ap_get_sta_list(&sta_list)) {
+            if (sta_list.num == 0) {
+                esp_wifi_disconnect();
+            }
+        }
+    }
 }
 
 template <> WifiMode ConnectState::handle(const WifiEvent &e) {
@@ -382,9 +383,8 @@ void ScanMode::onEnter() {
     ESP_ERROR_CHECK(esp_wifi_start());
     ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, false));
     m_parent->m_timeout.start(
-                std::chrono::seconds(5),
-                detail::TransitionEvent{m_parent,
-                                        detail::DisconnectState{m_parent}});
+        std::chrono::seconds(5),
+        detail::TransitionEvent{m_parent, detail::DisconnectState{m_parent}});
 }
 
 template <> WifiMode ScanMode::handle(const WifiEvent &e) {
@@ -398,7 +398,7 @@ template <> WifiMode ScanMode::handle(const WifiEvent &e) {
             m_parent, detail::DisconnectState(m_parent)});
         break;
     default:
-        log_inst.info(TAG, "wifi event {:d}", int32_t(e.m_id));
+        log_inst.info(TAG, "wifi event %d", int32_t(e.m_id));
         break;
     }
     return (std::move(*this));
@@ -434,7 +434,7 @@ void ScanMode::onWifiScanDone() {
 
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
 
-    log_inst.debug(TAG, "scan found {:d} stations", ap_count);
+    log_inst.debug(TAG, "scan found %d stations", ap_count);
 
     if (ap_count > 0) {
         wifi_ap_record_t *ap_info =
@@ -447,7 +447,7 @@ void ScanMode::onWifiScanDone() {
             for (size_t i = 0; i < number; i++) {
                 if (i < ap_count) {
                     m_parent->m_repo.create(
-                        fmt::format("/network/wifi/state/scan/station{:d}", i),
+                        fmt::format("/network/wifi/state/scan/station%d", i),
                         {{
                             {"ssid", ssidToString(ap_info[i].ssid)},    //
                             {"auth", retauthMode(ap_info[i].authmode)}, //
@@ -455,7 +455,7 @@ void ScanMode::onWifiScanDone() {
                         }});
                 } else {
                     m_parent->m_repo.unlink(
-                        fmt::format("/network/wifi/state/scan/station{:d}", i));
+                        fmt::format("/network/wifi/state/scan/station%d", i));
                 }
             }
             free(ap_info);
@@ -482,25 +482,24 @@ template <> WifiMode WPSMode::handle(const WifiEvent &e) {
         wifi_event_sta_wps_er_success_t *evt =
             (wifi_event_sta_wps_er_success_t *)e.event_data;
         /*
-         * For only one AP credential don't sned event data, wps_finish() has already set
-         * the config. This is for backward compatibility.
+         * For only one AP credential don't sned event data, wps_finish() has
+         * already set the config. This is for backward compatibility.
          */
         if (evt && evt->ap_cred_cnt) {
             /* If multiple AP credentials are received from WPS, connect with
              * first one */
             char *ssid = reinterpret_cast<char *>(evt->ap_cred[0].ssid);
             char *pass = reinterpret_cast<char *>(evt->ap_cred[0].passphrase);
-            netConf.setStaSSID(//
-            		std::string(ssid, strnlen(ssid, MAX_SSID_LEN)));
-            netConf.setStaPass(//
-            		std::string(pass, strnlen(pass, MAX_PASSPHRASE_LEN)));
+            netConf.setStaSSID( //
+                std::string(ssid, strnlen(ssid, MAX_SSID_LEN)));
+            netConf.setStaPass( //
+                std::string(pass, strnlen(pass, MAX_PASSPHRASE_LEN)));
 
-            log_inst.debug(TAG, "Connecting to SSID: {}, Passphrase: {}", ssid,
-                           pass);
+            log_inst.debug(TAG, "Connecting to SSID: %s", ssid);
         } else {
-        	/*clear config, sta connect then will use system saved values*/
-        	netConf.setStaSSID("");
-        	netConf.setStaPass("");
+            /*clear config, sta connect then will use system saved values*/
+            netConf.setStaSSID("");
+            netConf.setStaPass("");
         }
         m_parent->m_events.push_back(detail::TransitionEvent{
             this->m_parent, detail::ConnectState(this->m_parent)});
@@ -533,9 +532,9 @@ template <> WifiMode WPSMode::handle(const WifiEvent &e) {
 }
 
 void WPSMode::onEnter() {
-	// start flashing led
-	m_parent->led()->set(LedFlasher::BLINK,
-			std::chrono::milliseconds(125), std::chrono::milliseconds(375));
+    // start flashing led
+    m_parent->led()->set(LedFlasher::BLINK, std::chrono::milliseconds(125),
+                         std::chrono::milliseconds(375));
 
     if (m_parent->m_wpsRetryCnt > 0) {
         m_parent->m_wpsRetryCnt--;

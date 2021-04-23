@@ -8,13 +8,13 @@
 #ifndef MAIN_LEDFLASHER_H_
 #define MAIN_LEDFLASHER_H_
 
-#include <chrono>
 #include "TimerCPP.h"
 #include "driver/gpio.h"
+#include <chrono>
 
 class LedFlasher {
   public:
-	enum state {OFF, ON, BLINK} ;
+    enum state { OFF, ON, BLINK };
     LedFlasher(gpio_num_t gpio, bool isHighActive);
     virtual ~LedFlasher();
     LedFlasher(const LedFlasher &other) = delete;
@@ -23,12 +23,10 @@ class LedFlasher {
     LedFlasher &operator=(LedFlasher &&other) = delete;
 
     void set(state,
-    		std::chrono::milliseconds on = std::chrono::milliseconds(250),
-			std::chrono::milliseconds off = std::chrono::milliseconds(250));
+             std::chrono::milliseconds on = std::chrono::milliseconds(250),
+             std::chrono::milliseconds off = std::chrono::milliseconds(250));
 
-    state get() {
-    	return m_state;
-    }
+    state get() { return m_state; }
 
   private:
     void onTimer();
@@ -39,7 +37,6 @@ class LedFlasher {
     TimerMember<LedFlasher> m_timer;
     std::chrono::milliseconds m_on;
     std::chrono::milliseconds m_off;
-
 };
 
 #endif /* MAIN_LEDFLASHER_H_ */

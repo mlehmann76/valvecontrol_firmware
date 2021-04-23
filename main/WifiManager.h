@@ -17,8 +17,8 @@
 #include <esp_wps.h>
 #include <mapbox/variant.hpp>
 #include <mutex> // std::mutex, std::unique_lock
-#include <vector>
 #include <thread>
+#include <vector>
 
 class LedFlasher;
 
@@ -28,12 +28,12 @@ class WifiManager;
 namespace detail {
 
 struct NoMode;
-struct DisconnectState ;
+struct DisconnectState;
 struct ConnectState;
 struct ScanMode;
 struct WPSMode;
-using WifiMode =
-    mapbox::util::variant<NoMode, DisconnectState, ConnectState, ScanMode, WPSMode>;
+using WifiMode = mapbox::util::variant<NoMode, DisconnectState, ConnectState,
+                                       ScanMode, WPSMode>;
 
 struct NoMode {
     template <class T> WifiMode handle(const T &);
@@ -84,7 +84,8 @@ struct WPSMode {
 };
 
 template <typename T, typename N> struct transition {
-    constexpr transition(T _mode, N _next) : m_mode(std::move(_mode)), m_next(std::move(_next)) {}
+    constexpr transition(T _mode, N _next)
+        : m_mode(std::move(_mode)), m_next(std::move(_next)) {}
     operator WifiMode() {
         m_mode.onLeave();
         mapbox::util::apply_visitor([](auto &&arg) { arg.onEnter(); }, m_next);
@@ -106,8 +107,8 @@ struct TransitionEvent {
 };
 
 struct WifiEvent {
-    WifiEvent(WifiManager *_p, wifi_event_t _id, void *_event_data) :
-    	m_parent(_p), m_id(_id), event_data(_event_data) {}
+    WifiEvent(WifiManager *_p, wifi_event_t _id, void *_event_data)
+        : m_parent(_p), m_id(_id), event_data(_event_data) {}
     WifiManager *m_parent;
     wifi_event_t m_id;
     void *event_data;
@@ -182,12 +183,12 @@ class WifiManager {
   public:
     WifiManager(repository &_repo, std::mutex &mutex,
                 std::condition_variable &cvInitDone,
-				std::shared_ptr<LedFlasher> led );
+                std::shared_ptr<LedFlasher> led);
     virtual ~WifiManager() {
-    	m_atexit=true;
-    	if(m_thread.joinable()){
-    		m_thread.join();
-    	}
+        m_atexit = true;
+        if (m_thread.joinable()) {
+            m_thread.join();
+        }
     }
     WifiManager &operator=(WifiManager &&other) = delete;
     WifiManager &operator=(const WifiManager &other) = delete;
@@ -206,9 +207,7 @@ class WifiManager {
     void startScan();
     void startWPS();
 
-    LedFlasher* led() const {
-    	return m_led.get();
-    }
+    LedFlasher *led() const { return m_led.get(); }
 
   private:
     static void event_handler_s(void *arg, esp_event_base_t event_base,

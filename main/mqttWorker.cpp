@@ -21,9 +21,9 @@
 #include "config.h"
 #include "config_user.h"
 
+#include "LedFlasher.h"
 #include "MainClass.h"
 #include "otaWorker.h"
-#include "LedFlasher.h"
 
 static const char *TAG = "MQTTS";
 
@@ -39,7 +39,7 @@ esp_err_t MqttWorker::mqtt_event_handler(esp_mqtt_event_handle_t event) {
 
         for (auto _s : mqtt->subTopics()) {
             msg_id = esp_mqtt_client_subscribe(client, _s.c_str(), 1);
-            log_inst.debug(TAG, "sent subscribe {} successful, msg_id={:d}",
+            log_inst.debug(TAG, "sent subscribe %s successful, msg_id=%d",
                            _s.c_str(), msg_id);
         }
         mqtt->isMqttConnected = true;
@@ -52,15 +52,14 @@ esp_err_t MqttWorker::mqtt_event_handler(esp_mqtt_event_handle_t event) {
         mqttConf.setConnected(false);
         break;
     case MQTT_EVENT_SUBSCRIBED:
-        log_inst.debug(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id={:d}",
-                       event->msg_id);
+        log_inst.debug(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
         break;
     case MQTT_EVENT_UNSUBSCRIBED:
-        log_inst.debug(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id={:d}",
+        log_inst.debug(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d",
                        event->msg_id);
         break;
     case MQTT_EVENT_PUBLISHED:
-        log_inst.debug(TAG, "MQTT_EVENT_PUBLISHED, msg_id={:d}", event->msg_id);
+        log_inst.debug(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
         break;
     case MQTT_EVENT_DATA:
         log_inst.debug(TAG, "MQTT_EVENT_DATA");
@@ -88,18 +87,18 @@ void MqttWorker::handle(esp_mqtt_event_handle_t event) {
     //    if (event->topic != nullptr && event->data != nullptr) {
     //        if (event->data_len < 64) {
     //            log_inst.debug(
-    //                TAG, "Topic received!: ({:d}) {} ({:d}) {}",
+    //                TAG, "Topic received!: (%d) {} (%d) {}",
     //                event->topic_len, std::string(event->topic,
     //                event->topic_len), event->data_len,
     //                std::string(event->data, event->data_len));
     //        } else {
-    //            log_inst.debug(TAG, "Topic received!: ({:d}) {}",
+    //            log_inst.debug(TAG, "Topic received!: (%d) {}",
     //            event->topic_len,
     //                           std::string(event->topic, event->topic_len));
     //        }
     //    }
 
-	m_led->set(LedFlasher::ON);
+    m_led->set(LedFlasher::ON);
     int ret = 0;
     // provide message to last handler for accelerated test
     if (m_lastMqttRec != nullptr) {
@@ -128,12 +127,12 @@ void MqttWorker::addHandle(AbstractMqttReceiver *_a) {
         if (isMqttConnected) {
             int msg_id =
                 esp_mqtt_client_subscribe(client, _a->topic().c_str(), 1);
-            log_inst.debug(TAG, "sent subscribe {} successful, msg_id={:d}",
-                           _a->topic(), msg_id);
+            log_inst.debug(TAG, "sent subscribe %s successful, msg_id=%d",
+                           _a->topic().c_str(), msg_id);
         }
     } else {
-        log_inst.debug(TAG, "addHandle, topic {} already registered",
-                       _a->topic());
+        log_inst.debug(TAG, "addHandle, topic %s already registered",
+                       _a->topic().c_str());
     }
 }
 
@@ -144,7 +143,7 @@ void MqttWorker::send(mqttMessage *rxData) {
         int msg_id = esp_mqtt_client_publish(client, rxData->m_topic.c_str(),
                                              rxData->m_data.c_str(),
                                              rxData->m_data.length() + 1, 1, 0);
-        log_inst.debug(TAG, "sent publish successful, msg_id={:d}", msg_id);
+        log_inst.debug(TAG, "sent publish successful, msg_id=%d", msg_id);
     }
 }
 

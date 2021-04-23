@@ -8,14 +8,14 @@
 #ifndef MAIN_CONFIG_H_
 #define MAIN_CONFIG_H_
 
-#include "TimerCPP.h"
 #include "Cipher.h"
+#include "TimerCPP.h"
 #include "nvs.h"
 #include "repository.h"
+#include "utilities.h"
 #include <chrono>
 #include <memory>
 #include <string>
-#include "utilities.h"
 
 class repository;
 
@@ -26,8 +26,7 @@ repository &repo();
 std::string bin2String(std::string s);
 std::string string2Bin(std::string s);
 
-template <typename T>
-struct doEncrypt {
+template <typename T> struct doEncrypt {
     doEncrypt(const T &_net, std::string _key)
         : net(_net), key(std::move(_key)) {}
     std::optional<property> operator()(const property &p) {
@@ -57,7 +56,7 @@ class ConfigBase {
 
     bool isInitialized() const { return m_isInitialized; }
     bool isKeyReset() const { return m_keyReset; }
-    const Cipher& crypt() const { return m_crypt; }
+    const Cipher &crypt() const { return m_crypt; }
     void onConfigNotify(const std::string &s);
     void resetToDefault();
 
@@ -69,7 +68,7 @@ class ConfigBase {
     void initNVSFlash(forceErase_t);
     void onTimeout();
     esp_err_t writeConfig();
-    esp_err_t readConfig(std::string&);
+    esp_err_t readConfig(std::string &);
     void spiffsInit();
     std::string configFileName() const;
 
@@ -91,7 +90,7 @@ class SysConfig {
     esp_err_t init();
     std::string getUser();
     std::string getPass();
-    const Cipher& crypt() const { return m_base.crypt(); }
+    const Cipher &crypt() const { return m_base.crypt(); }
 
   private:
     ConfigBase &m_base;
@@ -109,10 +108,10 @@ class MqttConfig {
     std::string getDevName() const { return mqtt_device_name; }
     std::string getPass() const;
     std::string getUser() const {
-    	return repo().get<std::string>("/network/mqtt/config", "user");
+        return repo().get<std::string>("/network/mqtt/config", "user");
     }
     std::string getServer() const {
-    	return repo().get<std::string>("/network/mqtt/config", "server");
+        return repo().get<std::string>("/network/mqtt/config", "server");
     }
 
     void setConnected(bool isCon) {
@@ -121,7 +120,7 @@ class MqttConfig {
     bool enabled() const {
         return repo()["/network/mqtt/config"]["enabled"].get<BoolType>();
     }
-    const Cipher& crypt() const { return m_base.crypt(); }
+    const Cipher &crypt() const { return m_base.crypt(); }
 
   private:
     ConfigBase &m_base;
@@ -141,15 +140,15 @@ class NetConfig {
     void setApPass(std::string s);
     unsigned getApChannel() const;
     std::string getStaSSID() const;
-    void setStaSSID(const std::string& s) {
-    	repo()["/network/wifi/config/STA"]["ssid"] = s;
+    void setStaSSID(const std::string &s) {
+        repo()["/network/wifi/config/STA"]["ssid"] = s;
     }
     std::string getStaPass() const;
-    void setStaPass(const std::string& s) {
-    	repo()["/network/wifi/config/STA"]["pass"] = s;
+    void setStaPass(const std::string &s) {
+        repo()["/network/wifi/config/STA"]["pass"] = s;
     }
     unsigned getMode() const;
-    const Cipher& crypt() const { return m_base.crypt(); }
+    const Cipher &crypt() const { return m_base.crypt(); }
 
   private:
     ConfigBase &m_base;

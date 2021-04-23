@@ -58,7 +58,8 @@ int MqttOtaHandler::onMessage(esp_mqtt_event_handle_t event) {
     } else if (event->topic &&
                event->topic ==
                    m_firmwaretopic.substr(0, m_firmwaretopic.length() - 2)) {
-        log_inst.info(TAG, "{}", std::string(event->topic, event->topic_len));
+        log_inst.info(TAG, "%s",
+                      std::string(event->topic, event->topic_len).c_str());
         Json root;
 
         // Json firmware = root.parse(event->data)["firmware"];
@@ -105,14 +106,14 @@ void MqttOtaHandler::handleFirmwareMessage(const Json *firmware) {
         }
 
         if (error) {
-            log_inst.error(TAG, "handleFirmwareMsg error {:d}", error);
+            log_inst.error(TAG, "handleFirmwareMsg error %d", error);
         } else {
             log_inst.debug(
                 TAG,
-                "fileSize :{:d} ->md5: "
-                "{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:"
-                "02x}{:02x}{:02x}{:02x}"
-                "{:02x}{:02x}",
+                "fileSize :%d ->md5: "
+                "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x{:"
+                "02x}%02x%02x%02x"
+                "%02x%02x",
                 md5_update.len, md5_update.md5[0], md5_update.md5[1],
                 md5_update.md5[2], md5_update.md5[3], md5_update.md5[4],
                 md5_update.md5[5], md5_update.md5[6], md5_update.md5[7],
@@ -127,7 +128,7 @@ void MqttOtaHandler::handleFirmwareMessage(const Json *firmware) {
 
 std::optional<std::string> MqttOtaHandler::readString(const Json &_item) {
     //	return _item.valid() ? std::optional<std::string>{_item.string()} :
-    //std::nullopt;
+    // std::nullopt;
     return _item.is_string()
                ? std::optional<std::string>{_item.get<std::string>()}
                : std::nullopt;
@@ -135,7 +136,7 @@ std::optional<std::string> MqttOtaHandler::readString(const Json &_item) {
 
 std::optional<double> MqttOtaHandler::readDouble(const Json &_item) {
     //	return _item.valid() ? std::optional<double>{_item.number()} :
-    //std::nullopt;
+    // std::nullopt;
     return _item.is_number_float() ? std::optional<double>{_item.get<double>()}
                                    : std::nullopt;
 }

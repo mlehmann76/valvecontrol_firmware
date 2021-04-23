@@ -12,21 +12,21 @@
 #include <array>
 #include <chrono>
 #include <iomanip>
+#include <logger.h>
 #include <sstream>
 #include <string>
-#include <logger.h>
 
 using namespace std::string_literals;
 using namespace std::chrono;
 
-static const char* TAG = "tasks";
+static const char *TAG = "tasks";
 
 namespace detail {
 
 TaskConfig::TaskConfig(repository &r) : m_repo(r) {}
 
 void TaskConfig::readTasks() {
-	m_tasks.clear();
+    m_tasks.clear();
     for (size_t i = 1; i <= 8; ++i) {
         std::stringstream _s;
         _s << "/tasks/task" << i;
@@ -117,10 +117,10 @@ Tasks::Tasks(repository &config)
       m_thread([=]() { this->task(); }), m_aexit(false) {}
 
 void Tasks::setup() {
-	//for restarting setup, make sure task is not using data
-	std::lock_guard<std::mutex> lock(m_lock);
-	m_activeTask = &NoneTask;
-	m_activeItem = &NoneTaskItem;
+    // for restarting setup, make sure task is not using data
+    std::lock_guard<std::mutex> lock(m_lock);
+    m_activeTask = &NoneTask;
+    m_activeItem = &NoneTaskItem;
     m_config->readTasks();
     // generate taskState for every task
     // register state variables for all tasks
@@ -142,6 +142,8 @@ void Tasks::onControl(const property &p) {
     m_nextRequest =
         p.name().erase(p.name().find_last_of("/"), p.name().length());
 
+    // log_inst.info(TAG, "onControl: {:s}", m_nextRequest);
+
     auto end = p.end();
     auto vit = p.find("value");
     if (vit != end && vit->second.is<StringType>()) {
@@ -159,8 +161,10 @@ std::string Tasks::activeTaskName() { return "/tasks/" + m_activeTask->m_name; }
 
 void Tasks::startTask() {
     // ON case
+    // FIXME stop active task
     // test, if task is already running
-    if (!m_states[m_nextRequest]->running()) {
+    // if (!m_states[m_nextRequest]->running()) {
+    if (!m_states[activeTaskName()]->running()) {
         std::lock_guard<std::mutex> lock(m_lock);
         // start task, if not
         m_activeTask = &m_config->get(m_nextRequest);
@@ -211,16 +215,16 @@ Tasks::~Tasks() {
 }
 
 void Tasks::task() {
-	//steady_clock::time_point _last = steady_clock::now();
+    // steady_clock::time_point _last = steady_clock::now();
     while (m_aexit == false) {
         if (m_activeTask != &NoneTask) {
             std::lock_guard<std::mutex> lock(m_lock);
             // make sure, that tdiff is positive even after system clock change
             auto tdiff = steady_clock::now() - m_start;
 
-			m_states[activeTaskName()]->update(
-				duration_cast<seconds>(tdiff),
-				m_remain - duration_cast<seconds>(tdiff));
+            m_states[activeTaskName()]->update(
+                duration_cast<seconds>(tdiff),
+                m_remain - duration_cast<seconds>(tdiff));
             //}
             if (tdiff >= m_activeItem->m_time) {
                 m_remain -= m_activeItem->m_time;

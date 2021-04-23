@@ -6,10 +6,10 @@
  */
 
 #include "utilities.h"
+#include <cassert>
+#include <iomanip>
 #include <memory>
 #include <sstream>
-#include <iomanip>
-#include <cassert>
 
 namespace utilities {
 
@@ -31,25 +31,25 @@ std::vector<std::string> split(const std::string &text,
 }
 
 std::string toHex(const std::string &in) {
-	std::stringstream _s;
-	for (const auto &e : in) {
-		_s << std::uppercase << std::setfill('0') << std::setw(2) << std::hex
-				<< unsigned(e);
-	}
-	return _s.str();
+    std::stringstream _s;
+    for (const auto &e : in) {
+        _s << std::uppercase << std::setfill('0') << std::setw(2) << std::hex
+           << unsigned(e);
+    }
+    return _s.str();
 }
 
 std::string fromHex(const std::string &in) {
-	assert(in.length() % 2 == 0);
-	std::string _out;
-	for (size_t i = 0; i < in.length() / 2; i++) {
-		unsigned x;
-		std::stringstream ss;
-		ss << std::hex << in.substr(2 * i, 2);
-		ss >> x;
-		_out += x;
-	}
-	return _out;
+    assert(in.length() % 2 == 0);
+    std::string _out;
+    for (size_t i = 0; i < in.length() / 2; i++) {
+        unsigned x;
+        std::stringstream ss;
+        ss << std::hex << in.substr(2 * i, 2);
+        ss >> x;
+        _out += x;
+    }
+    return _out;
 }
 
 std::string base64_encode(const std::string &in) {
@@ -61,12 +61,17 @@ std::string base64_encode(const std::string &in) {
         val = (val << 8) + c;
         valb += 8;
         while (valb >= 0) {
-            out.push_back("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"[(val>>valb)&0x3F]);
+            out.push_back("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+                          "0123456789+/"[(val >> valb) & 0x3F]);
             valb -= 6;
         }
     }
-    if (valb>-6) out.push_back("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"[((val<<8)>>(valb+8))&0x3F]);
-    while (out.size()%4) out.push_back('=');
+    if (valb > -6)
+        out.push_back(
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+                [((val << 8) >> (valb + 8)) & 0x3F]);
+    while (out.size() % 4)
+        out.push_back('=');
     return out;
 }
 
@@ -74,16 +79,19 @@ std::string base64_decode(const std::string &in) {
 
     std::string out;
 
-    std::vector<int> T(256,-1);
-    for (int i=0; i<64; i++) T["ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"[i]] = i;
+    std::vector<int> T(256, -1);
+    for (int i = 0; i < 64; i++)
+        T["ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+              [i]] = i;
 
-    int val = 0, valb =-8;
+    int val = 0, valb = -8;
     for (unsigned char c : in) {
-        if (T[c] == -1) break;
+        if (T[c] == -1)
+            break;
         val = (val << 6) + T[c];
         valb += 6;
         if (valb >= 0) {
-            out.push_back(char((val>>valb)&0xFF));
+            out.push_back(char((val >> valb) & 0xFF));
             valb -= 8;
         }
     }

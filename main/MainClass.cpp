@@ -18,6 +18,7 @@
 #include "FileHandler.h"
 #include "HttpAuth.h"
 #include "HttpServer.h"
+#include "LedFlasher.h"
 #include "MqttRepAdapter.h"
 #include "RepositoryHandler.h"
 #include "WifiManager.h"
@@ -29,6 +30,8 @@
 #include "esp_event.h"
 #include "esp_system.h"
 #include "esp_task_wdt.h"
+#include "libespfs/espfs.h"
+#include "libespfs/vfs.h"
 #include "logger.h"
 #include "mqttWorker.h"
 #include "otaHandler.h"
@@ -36,9 +39,6 @@
 #include "sntp.h"
 #include "statusnotifyer.h"
 #include "tasks.h"
-#include "LedFlasher.h"
-#include "libespfs/espfs.h"
-#include "libespfs/vfs.h"
 
 using namespace std::string_literals;
 
@@ -60,17 +60,14 @@ void MainClass::setup() {
 
     main_event_group = xEventGroupCreate();
 
-    espfs_config_t espfs_config = {
-        .addr = espfs_bin,
-		.part_label ="espfs"
-    };
+    espfs_config_t espfs_config = {.addr = espfs_bin, .part_label = "espfs"};
 
     espfs_fs_t *fs = espfs_init(&espfs_config);
     assert(fs != NULL);
 
     esp_vfs_espfs_conf_t vfs_espfs_conf = {
         .base_path = "/espfs",
-		.overlay_path = NULL,
+        .overlay_path = NULL,
         .fs = fs,
         .max_files = 5,
     };
@@ -78,19 +75,19 @@ void MainClass::setup() {
     ESP_ERROR_CHECK(esp_vfs_espfs_register(&vfs_espfs_conf));
 
     log_inst.setLogSeverity("I2C", logger::severity_type::warning);
-    log_inst.setLogSeverity("repository", logger::severity_type::warning);
-    log_inst.setLogSeverity("RepositoryHandler", logger::severity_type::warning);
+    log_inst.setLogSeverity("repository", logger::severity_type::debug);
+    log_inst.setLogSeverity("RepositoryHandler", logger::severity_type::debug);
 
-	baseConf.init();
-	sysConf.init();
-	mqttConf.init();
+    baseConf.init();
+    sysConf.init();
+    mqttConf.init();
     netConf.init();
 
     _led1 = std::make_shared<LedFlasher>(LED_YELLOW_GPIO_PIN, false);
     _led2 = std::make_shared<LedFlasher>(LED_GREEN_GPIO_PIN, false);
 
-    _wifi = std::make_shared<wifi::WifiManager>
-    			(Config::repo(), mutex, cvInitDone, _led1);
+    _wifi = std::make_shared<wifi::WifiManager>(Config::repo(), mutex,
+                                                cvInitDone, _led1);
     {
         std::unique_lock<std::mutex> lck(mutex);
         cvInitDone.wait(lck, [this] { return _wifi->initDone(); });
@@ -123,13 +120,15 @@ void MainClass::setup() {
     _tasks = std::make_shared<Tasks>(Config::repo());
 
     _sntp->init();
+
     _tasks->setup();
 
     //_wifi->addConnectionObserver(_http->obs());
     _http = (std::make_shared<http::HttpServer>(80));
     _http->start();
 
-    _jsonHandler = std::make_shared<http::RepositoryHandler>("GET,POST,DELETE", "/json");
+    _jsonHandler =
+        std::make_shared<http::RepositoryHandler>("GET,POST,DELETE", "/json");
     _appFileHandler = std::make_shared<http::FileHandler>("GET", "/", "/espfs");
 
     _jsonHandler->add("/json", Config::repo());
@@ -138,14 +137,13 @@ void MainClass::setup() {
 
     http::HttpAuth::AuthToken _token = {sysConf.getUser(), sysConf.getPass()};
     _http->addPathHandler(std::make_shared<http::HttpAuth>(
-		_jsonHandler.get(), _token, http::HttpAuth::BASIC_AUTH));
+        _jsonHandler.get(), _token, http::HttpAuth::BASIC_AUTH));
 
     for (size_t i = 0; i < _channels.size(); i++) {
         _channels[i] = std::shared_ptr<ChannelBase>(
             LedcChannelFactory::channel(i, chanConf.getTime(i)));
         _cex->setChannel(&*_channels[i]);
-        Config::repo()
-        	.create("/actors/" + _channels[i]->name() + "/state",
+        Config::repo().create("/actors/" + _channels[i]->name() + "/state",
                               {{{"value", "OFF"s}}});
 
         Config::repo()
@@ -174,7 +172,8 @@ void MainClass::setup() {
 
     sht1x.regProperty(&Config::repo(), "/sensors/sht1x/state");
 
-    Config::repo().create("/system/base/control/restart", {{{"start", false}}})
+    Config::repo()
+        .create("/system/base/control/restart", {{{"start", false}}})
         .set([this](const property &) -> std::optional<property> {
             this->restart();
             return {};
@@ -182,32 +181,33 @@ void MainClass::setup() {
     log_inst.setLogSeverity("repository", logger::severity_type::debug);
 }
 
-void MainClass::restart() {
-	doExit = true;
-}
+void MainClass::restart() { doExit = true; }
 
 void MainClass::checkWPSButton() {
+#ifdef WPS_BUTTON
     if ((gpio_get_level((gpio_num_t)WPS_BUTTON) == 0)) {
-    	m_wpsButtonCount++;
+        m_wpsButtonCount++;
         if (m_wpsButtonCount > (WPS_LONG_MS / portTICK_PERIOD_MS)) {
             _wifi->startWPS();
             m_wpsButtonCount = 0;
         }
     }
+#endif
 }
 
 void MainClass::checkRestartButton() {
 #ifdef RESTART_BUTTON
-	if ((gpio_get_level((gpio_num_t)RESTART_BUTTON) == 0)) {
-		m_restartButtonCount++;
-	} else {
-		if (m_restartButtonCount > (RESTART_LONG_MS / portTICK_PERIOD_MS)) {
-			baseConf.resetToDefault();
-		} else if (m_restartButtonCount > (RESTART_SHORT_MS / portTICK_PERIOD_MS)) {
-	        restart();
-	    }
-	    m_restartButtonCount = 0;
-	}
+    if ((gpio_get_level((gpio_num_t)RESTART_BUTTON) == 0)) {
+        m_restartButtonCount++;
+    } else {
+        if (m_restartButtonCount > (RESTART_LONG_MS / portTICK_PERIOD_MS)) {
+            baseConf.resetToDefault();
+        } else if (m_restartButtonCount >
+                   (RESTART_SHORT_MS / portTICK_PERIOD_MS)) {
+            restart();
+        }
+        m_restartButtonCount = 0;
+    }
 #endif
 }
 
@@ -228,14 +228,14 @@ int MainClass::loop() {
                 heapFree = esp_get_free_heap_size();
 #if 0
                 vTaskGetRunTimeStats(pcWriteBuffer.get());
-                log_inst.info(TAG, "[APP] Free memory: {:d} bytes\n{:s}",
+                log_inst.info(TAG, "[APP] Free memory: %d bytes\n{:s}",
                               esp_get_free_heap_size(),
 							  std::string(pcWriteBuffer.get()));
 #else
-                log_inst.info(TAG, "[APP] Free memory: {:d} bytes",
-                                              esp_get_free_heap_size());
-                #endif
-                count = 50;
+                log_inst.info(TAG, "[APP] Free memory: %d bytes",
+                              esp_get_free_heap_size());
+#endif
+                count = 500;
             }
         } else {
             count--;
@@ -244,7 +244,7 @@ int MainClass::loop() {
         checkWPSButton();
         checkRestartButton();
 
-        //std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
         std::this_thread::yield();
     }
     return 0;

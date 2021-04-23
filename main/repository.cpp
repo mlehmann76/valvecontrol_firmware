@@ -130,8 +130,8 @@ std::string repository::stringify(const mapType &_m, size_t spaces) const {
 std::string repository::stringify(const repository::StringMatch &_m,
                                   size_t spaces) const {
     nlohmann::json root;
-    for (auto it = m_properties.begin(), end = m_properties.end();
-    		it != end; ++it) {
+    for (auto it = m_properties.begin(), end = m_properties.end(); it != end;
+         ++it) {
         if (_m.match(it->first)) {
             for (auto &v : it->second->get()) {
                 mapbox::util::apply_visitor(
@@ -178,7 +178,7 @@ property &repository::link(const std::string &name, property &_p) {
     if (false == ret.second) {
         // insert failed, set existing entry if allowed by link policy
         if (true == link_policy()) {
-             set(ret.first, _p);
+            set(ret.first, _p);
         }
     } else {
         ret.first->second = mappedType(&_p, [](property *) {});
@@ -196,7 +196,7 @@ property &repository::create(const std::string &name, const property &_cp) {
     if (true == ret.second) {
         ret.first->second = std::make_shared<property>(_cp);
         ret.first->second->set(name, *this); // TODO name or cname
-        //FIXME log_inst.debug(TAG, "create {}", ret.first->second->name());
+        // FIXME log_inst.debug(TAG, "create {}", ret.first->second->name());
     }
 
     return *ret.first->second;
@@ -206,57 +206,55 @@ bool repository::unlink(const std::string &name) {
     std::lock_guard<std::mutex> lock(m_lock);
     bool isErased = m_properties.erase(propName(name)) != 0;
     if (isErased) {
-    	notify(name);
+        notify(name);
     }
     return isErased;
 }
 
-void repository::parse(const std::string &c) {
-	append(c);
+void repository::parse(const std::string &c) { append(c); }
+
+void repository::append(const std::string &_json) {
+#if (defined(__cpp_exceptions))
+    try {
+        nlohmann::json re = nlohmann::json::parse(_json);
+#else
+    nlohmann::json re = nlohmann::json::parse(_json, nullptr, false, true);
+    // allow_exceptions=false, ignore_comments = true
+    if (!re.is_discarded()) {
+#endif
+        std::string path;
+        recursive_iterate(
+            re, path,
+            [this](std::string ipath, nlohmann::json::const_iterator it) {
+                std::string propPath = propName(ipath);
+                std::stringstream ss;
+                ss << it.value();
+                log_inst.debug(TAG, "%s : %s < %s", propPath.c_str(),
+                               it.key().c_str(), ss.str().c_str());
+                property &_p = create(propPath, property());
+
+                if (it.value().is_boolean()) {
+                    _p[it.key()] = it->get<bool>();
+                } else if (it.value().is_number_integer()) {
+                    _p[it.key()] = it->get<int>();
+                } else if (it.value().is_number_float()) {
+                    _p[it.key()] = it->get<double>();
+                } else if (it.value().is_string()) {
+                    _p[it.key()] = it->get<std::string>();
+                } else {
+                    assert(false);
+                }
+            });
+#if (defined(__cpp_exceptions))
+    } catch (const std::exception &e) {
+        log_inst.error(TAG, "exception on create %s\n", e.what());
+    };
+#else
+    }
+#endif
 }
 
-void repository::append(const std::string& _json) {
-	#if (defined(__cpp_exceptions))
-	    try {
-	        nlohmann::json re = nlohmann::json::parse(_json);
-	#else
-	    nlohmann::json re = nlohmann::json::parse(_json, nullptr, false, true);
-	    // allow_exceptions=false, ignore_comments = true
-	    if (!re.is_discarded()) {
-	#endif
-	        std::string path;
-	        recursive_iterate(
-	            re, path,
-	            [this](std::string ipath, nlohmann::json::const_iterator it) {
-	                std::string propPath = propName(ipath);
-	                std::stringstream ss;
-	                ss << it.value();
-	                log_inst.debug(TAG, "{} : {} < {}", propPath, it.key(),
-	                               ss.str());
-	                property &_p = create(propPath, property());
-
-	                if (it.value().is_boolean()) {
-	                    _p[it.key()] = it->get<bool>();
-	                } else if (it.value().is_number_integer()) {
-	                    _p[it.key()] = it->get<int>();
-	                } else if (it.value().is_number_float()) {
-	                    _p[it.key()] = it->get<double>();
-	                } else if (it.value().is_string()) {
-	                    _p[it.key()] = it->get<std::string>();
-	                } else {
-	                    assert(false);
-	                }
-	            });
-	#if (defined(__cpp_exceptions))
-	    } catch (const std::exception &e) {
-	        log_inst.error(TAG, "exception on create {}\n", e.what());
-	    };
-	#else
-	    }
-	#endif
-}
-
-void repository::remove(const std::string& _json) {
+void repository::remove(const std::string &_json) {
 #if (defined(__cpp_exceptions))
     try {
         nlohmann::json re = nlohmann::json::parse(_json);
@@ -272,16 +270,15 @@ void repository::remove(const std::string& _json) {
                 std::string propPath = propName(ipath);
 
                 bool ret = unlink(propPath);
-                log_inst.debug(TAG, "delete {} : {}", propPath, ret);
+                log_inst.debug(TAG, "delete %s : %d", propPath.c_str(), ret);
             });
 #if (defined(__cpp_exceptions))
     } catch (const std::exception &e) {
-        log_inst.error(TAG, "exception on remove {}\n", e.what());
+        log_inst.error(TAG, "exception on remove %s\n", e.what());
     };
 #else
     }
 #endif
-
 }
 
 property &repository::operator[](const std::string &key) {
@@ -292,7 +289,7 @@ property &repository::operator[](std::string &&key) {
     return create(key, property());
 }
 
-bool repository::StringMatch::match(const std::string str) const{
+bool repository::StringMatch::match(const std::string str) const {
     bool ret = true;
     std::vector<std::string> m_parts = utilities::split(str, "/");
     for (size_t i = 0; (i < m_keys.size()) && (i < m_parts.size()); i++) {
@@ -316,14 +313,14 @@ repository::StringMatch::StringMatch(std::string &&key) {
 }
 
 void repository::notify(const std::string &s) {
-	for (auto &i : m_notify) {
-		StringMatch m(i.first);
-		if (m.match(s)) {
-			i.second(s);
-		}
-	}
+    for (auto &i : m_notify) {
+        StringMatch m(i.first);
+        if (m.match(s)) {
+            i.second(s);
+        }
+    }
 }
 
-void repository::addNotify(const keyType& key, notifyFuncType &&func) {
-	m_notify.emplace_back(key, func);
+void repository::addNotify(const keyType &key, notifyFuncType &&func) {
+    m_notify.emplace_back(key, func);
 }
