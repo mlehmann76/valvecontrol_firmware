@@ -8,7 +8,6 @@
 #include "HttpAuth.h"
 
 #include <cstring>
-#include <fmt/printf.h>
 #include <iomanip>
 #include <iostream>
 #include <iterator>
@@ -50,7 +49,7 @@ bool HttpAuth::handle(const HttpRequest &_req, HttpResponse &_res) {
 }
 
 std::string HttpAuth::_getRandomHexString() {
-    return fmt::sprintf("%08x%08x%08x%08x", (uint32_t)rand(), (uint32_t)rand(),
+    return utilities::string_format("%08x%08x%08x%08x", (uint32_t)rand(), (uint32_t)rand(),
                         (uint32_t)rand(), (uint32_t)rand());
 }
 
@@ -75,7 +74,7 @@ std::string HttpAuth::ToSHA256HexStr(const std::string &s) {
 }
 
 void HttpAuth::genrealm(const char *realm, const char *method) {
-    pbrealm = fmt::sprintf(
+    pbrealm = utilities::string_format(
         "%s%s\", qop=\"auth\", algorithm=\"%s\", nonce=\"%s\", opaque=\"%s\"",
         digestRealm, realm, method, nonce.c_str(), opaque.c_str());
 }
@@ -93,7 +92,7 @@ void HttpAuth::requestAuth(HTTPAuthMethod mode, const char *realm,
 
         switch (mode) {
         case BASIC_AUTH:
-            pbrealm = fmt::sprintf("%s%s\"", basicRealm, realm);
+            pbrealm = utilities::string_format("%s%s\"", basicRealm, realm);
             break;
         case DIGEST_AUTH_MD5:
             genrealm(realm, "MD5");

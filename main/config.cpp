@@ -4,7 +4,6 @@
  *  Created on: 19.06.2020
  *      Author: marco
  */
-#include <fmt/printf.h>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -293,12 +292,12 @@ esp_err_t MqttConfig::init() {
         /* set default device name */
         uint8_t mac[6] = {0};
         esp_efuse_mac_get_default(mac);
-        mqtt_device_name = fmt::sprintf(MQTT_PUB_MESSAGE_FORMAT, //
+        mqtt_device_name = utilities::string_format(MQTT_PUB_MESSAGE_FORMAT, //
                                         MQTT_DEVICE, mac[0], mac[1], mac[2],
                                         mac[3], mac[4], mac[5], "/");
     }
 
-    mqtt_pub_msg = fmt::format("{}state", mqtt_device_name);
+    mqtt_pub_msg = utilities::string_format("%sstate", mqtt_device_name.c_str());
 
     return ESP_OK;
 }
@@ -347,7 +346,7 @@ esp_err_t NetConfig::init() {
         uint8_t mac[6] = {0};
         esp_efuse_mac_get_default(mac);
         repo()["/network/wifi/config/AP"]["ssid"] =
-            fmt::sprintf("%s_%02X%02X%02X%02X", "espressif", //
+        		utilities::string_format("%s_%02X%02X%02X%02X", "espressif", //
                          mac[2], mac[3], mac[4], mac[5]);
     }
 

@@ -6,7 +6,6 @@
  */
 
 #include "FileHandler.h"
-#include <fmt/printf.h>
 #include <fstream>
 #include <iostream>
 

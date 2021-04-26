@@ -7,4 +7,4 @@ idf_component_register(SRCS "DefaultHandler.cpp"
                             "RequestHandlerBase.cpp"
                             "utilities.cpp"
                             "socket.cpp" INCLUDE_DIRS "." REQUIRES FreeRTOScpp
-                                mbedtls wpa_supplicant fmt logger)
+                                mbedtls wpa_supplicant logger)

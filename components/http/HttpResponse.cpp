@@ -7,7 +7,6 @@
 
 #include "HttpResponse.h"
 #include "HttpRequest.h"
-#include <fmt/printf.h>
 
 #include "socket.h"
 #include "utilities.h"
@@ -98,7 +97,7 @@ void HttpResponse::headerAddEntries() {
 }
 
 void HttpResponse::setContentType(ContentType _c) {
-    m_headerEntries.push_back(fmt::sprintf("Content-Type: %s", s_ctMap[_c]));
+    m_headerEntries.push_back(utilities::string_format("Content-Type: %s", s_ctMap[_c]));
 }
 
 void HttpResponse::headerAddStatusLine() {
@@ -128,7 +127,7 @@ void HttpResponse::send_chunk(const std::string &_chunk) {
 void HttpResponse::send(const char *_buf, size_t _s) {
     if (!m_headerFinished) {
         if (_buf != nullptr) {
-            m_headerEntries.push_back(fmt::sprintf("Content-Length: %d", _s));
+            m_headerEntries.push_back(utilities::string_format("Content-Length: %d", _s));
         }
         endHeader();
     }
@@ -147,7 +146,7 @@ void HttpResponse::send_chunk(const char *_buf, size_t _s) {
         m_firstChunkSent = true;
     } // else {
     if (_buf != nullptr) {
-        std::string _chunkLen = fmt::sprintf("%x\r\n", _s);
+        std::string _chunkLen = utilities::string_format("%x\r\n", _s);
         m_request->socket()->write(_chunkLen, _chunkLen.length());
         if (_s) {
         	m_request->socket()->write(_buf, _s);

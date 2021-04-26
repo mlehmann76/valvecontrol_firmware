@@ -7,7 +7,6 @@
 
 #include "MainClass.h"
 
-#include <fmt/format.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -98,13 +97,13 @@ void MainClass::setup() {
 
         _mqttOtaHandler = (std::make_shared<MqttOtaHandler>(
             _otaWorker, *_mqttUser,
-            fmt::format("{}ota/#", mqttConf.getDevName()),
-            fmt::format("{}ota/$implementation/binary",
-                        mqttConf.getDevName())));
+            utilities::string_format("%sota/#", mqttConf.getDevName().c_str()),
+            utilities::string_format("%sota/$implementation/binary",
+                        mqttConf.getDevName().c_str())));
 
         _configRepAdapter = (std::make_shared<MqttRepAdapter>(
             Config::repo(), *_mqttUser,
-            fmt::format("{}config", mqttConf.getDevName())));
+            utilities::string_format("%sconfig", mqttConf.getDevName().c_str())));
 
         _wifi->addConnectionObserver(_mqttUser->obs());
 
@@ -112,7 +111,7 @@ void MainClass::setup() {
 
         _statusNotifyer = std::make_shared<StatusNotifyer>(
             Config::repo(), *_mqttUser,
-            fmt::format("{}state", mqttConf.getDevName()));
+            utilities::string_format("%sstate", mqttConf.getDevName().c_str()));
 
         Config::repo().addNotify("/*/*/state", onStateNotify(*_statusNotifyer));
     }

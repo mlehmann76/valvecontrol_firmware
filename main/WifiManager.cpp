@@ -24,7 +24,6 @@
 #include "repository.h"
 #include <esp_netif.h>
 #include <esp_pthread.h>
-#include <fmt/printf.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -447,7 +446,8 @@ void ScanMode::onWifiScanDone() {
             for (size_t i = 0; i < number; i++) {
                 if (i < ap_count) {
                     m_parent->m_repo.create(
-                        fmt::format("/network/wifi/state/scan/station%d", i),
+                        utilities::string_format(
+                        		"/network/wifi/state/scan/station%d", i),
                         {{
                             {"ssid", ssidToString(ap_info[i].ssid)},    //
                             {"auth", retauthMode(ap_info[i].authmode)}, //
@@ -455,7 +455,8 @@ void ScanMode::onWifiScanDone() {
                         }});
                 } else {
                     m_parent->m_repo.unlink(
-                        fmt::format("/network/wifi/state/scan/station%d", i));
+                    		utilities::string_format(
+                    				"/network/wifi/state/scan/station%d", i));
                 }
             }
             free(ap_info);
