@@ -74,8 +74,10 @@ void MainClass::setup() {
     ESP_ERROR_CHECK(esp_vfs_espfs_register(&vfs_espfs_conf));
 
     log_inst.setLogSeverity("I2C", logger::severity_type::warning);
-    log_inst.setLogSeverity("repository", logger::severity_type::debug);
-    log_inst.setLogSeverity("RepositoryHandler", logger::severity_type::debug);
+    log_inst.setLogSeverity("repository", logger::severity_type::info);
+    log_inst.setLogSeverity("RepositoryHandler", logger::severity_type::info);
+    log_inst.setLogSeverity("MQTTS", logger::severity_type::error);
+    log_inst.setLogSeverity("MQTTOTA", logger::severity_type::error);
 
     baseConf.init();
     sysConf.init();
@@ -177,6 +179,7 @@ void MainClass::setup() {
             this->restart();
             return {};
         });
+
     log_inst.setLogSeverity("repository", logger::severity_type::debug);
 }
 

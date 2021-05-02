@@ -163,9 +163,13 @@ void Tasks::startTask() {
     // ON case
     // FIXME stop active task
     // test, if task is already running
-    // if (!m_states[m_nextRequest]->running()) {
-    if (!m_states[activeTaskName()]->running()) {
-        std::lock_guard<std::mutex> lock(m_lock);
+	log_inst.debug(TAG, "activeTaskName() %s", activeTaskName().c_str());
+
+	//if (!m_states[m_nextRequest]->running()) {
+	if (m_activeTask == &NoneTask ||
+			!m_states[activeTaskName()]->running()) {
+
+		std::lock_guard<std::mutex> lock(m_lock);
         // start task, if not
         m_activeTask = &m_config->get(m_nextRequest);
         m_activeItem = ((*m_activeTask->m_taskitems.begin()).get());

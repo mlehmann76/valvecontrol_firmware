@@ -48,8 +48,8 @@ class HttpResponse {
 
     enum ContentEncoding { CT_ENC_IDENTITY, CT_ENC_GZIP };
 
-    using ResponseMapType = std::map<ResponseCode, std::string_view>;
-    using ContentTypeMapType = std::map<ContentType, std::string_view>;
+    using ResponseMapType = std::map<ResponseCode, const char*>;
+    using ContentTypeMapType = std::map<ContentType, const char*>;
     using FileContentMapType = std::map<std::string_view, ContentType>;
 
     static ResponseMapType s_respMap;

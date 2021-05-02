@@ -51,7 +51,7 @@ int MqttOtaHandler::onMessage(esp_mqtt_event_handle_t event) {
     int ret = 0;
     if (((event->topic_len == 0) && m_ota.isRunning()) ||
         (event->topic && event->topic == m_updatetopic)) {
-        log_inst.error(TAG, "OTA update topic {}",
+        log_inst.info(TAG, "OTA update topic %s",
                        event->data_len < 64 ? event->data : "data");
         Ota::OtaPacket p(event->data, event->data_len);
         ret = m_ota.handle(p);
@@ -62,11 +62,14 @@ int MqttOtaHandler::onMessage(esp_mqtt_event_handle_t event) {
                       std::string(event->topic, event->topic_len).c_str());
         Json root;
 
-        // Json firmware = root.parse(event->data)["firmware"];
         Json firmware =
-            nlohmann::json::parse(event->data, nullptr, false, true);
+            nlohmann::json::parse(std::string(event->data, event->data_len),
+            		nullptr, false, true);
         if (!firmware.is_discarded()) {
             handleFirmwareMessage(&firmware["firmware"]);
+        } else {
+        	log_inst.error(TAG, "message discarded (%.*s)",
+        			event->data_len, event->data);
         }
 
         ret = 1;
@@ -81,7 +84,7 @@ void MqttOtaHandler::handleFirmwareMessage(const Json *firmware) {
     if (firmware != nullptr && firmware->is_structured()) {
         auto update = readString((*firmware)["update"]);
         auto md5 = readString((*firmware)["md5"]);
-        auto len = readDouble((*firmware)["len"]);
+        auto len = readNumber((*firmware)["len"]);
 
         if (update && update != "ota") {
             error = 1;
@@ -134,9 +137,9 @@ std::optional<std::string> MqttOtaHandler::readString(const Json &_item) {
                : std::nullopt;
 }
 
-std::optional<double> MqttOtaHandler::readDouble(const Json &_item) {
+std::optional<long> MqttOtaHandler::readNumber(const Json &_item) {
     //	return _item.valid() ? std::optional<double>{_item.number()} :
     // std::nullopt;
-    return _item.is_number_float() ? std::optional<double>{_item.get<double>()}
+    return _item.is_number() ? std::optional<long>{_item.get<long>()}
                                    : std::nullopt;
 }

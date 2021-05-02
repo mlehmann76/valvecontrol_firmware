@@ -59,7 +59,8 @@ inline void StatusNotifyer::onTimeout() {
     lock1.lock();
     updateDateTime();
     mqtt::MqttQueueType message(
-        new mqtt::mqttMessage(m_topic, m_rep.stringify()));
+        new mqtt::mqttMessage(m_topic, m_rep.stringify(
+        		std::string("/*/*/state"))));
     m_mqtt->send(std::move(message));
 }
 

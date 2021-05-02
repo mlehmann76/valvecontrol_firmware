@@ -32,7 +32,7 @@ class MqttOtaHandler : public mqtt::AbstractMqttReceiver {
     static int md5StrToAr(const char *pMD5, uint8_t *md5);
     void handleFirmwareMessage(const Json *firmware);
     std::optional<std::string> readString(const Json &_item);
-    std::optional<double> readDouble(const Json &_item);
+    std::optional<long> readNumber(const Json &_item);
 
     Ota::OtaWorker &m_ota;
     mqtt::MqttWorker &m_messager;
