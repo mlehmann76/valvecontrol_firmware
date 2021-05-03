@@ -91,6 +91,7 @@ void WifiManager::init() {
             this->startScan();
             return {};
         });
+
     m_repo.create("/network/wifi/control/wps", {{{"start", false}}})
         .set([this](const property &) -> std::optional<property> {
             this->startWPS();
@@ -108,6 +109,14 @@ void WifiManager::task() {
             auto event = m_events.front();
             m_events.pop_front();
             m_mode = mapbox::util::apply_visitor(EventVisitor(m_mode), event);
+        }
+        wifi_mode_t actmode;
+        esp_err_t err = esp_wifi_get_mode(&actmode);
+        wifi_mode_t repmode = static_cast<wifi_mode_t>(netConf.getMode());
+
+        if( err == ESP_OK && actmode != repmode) {
+        	esp_wifi_set_mode(repmode);
+        	m_events.push_back(detail::ModeChangeEvent{});
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
@@ -230,6 +239,12 @@ void DisconnectState::onEnter() {
 template <class T> WifiMode ConnectState::handle(const T &) { return *this; }
 template <> WifiMode ConnectState::handle(const TransitionEvent &e) {
     return transition(*this, e.m_next);
+}
+
+template <> WifiMode ConnectState::handle(const ModeChangeEvent &e) {
+	m_parent->m_events.push_back(detail::TransitionEvent{
+	                m_parent, detail::DisconnectState{m_parent}});
+	return *this;
 }
 
 void ConnectState::setAPConfig(wifi_config_t &wifi_config) {

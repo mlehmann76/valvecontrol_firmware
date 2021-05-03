@@ -114,7 +114,11 @@ struct WifiEvent {
     void *event_data;
 };
 
-using Events = mapbox::util::variant<TimeOutEvent, TransitionEvent, WifiEvent>;
+struct ModeChangeEvent {};
+
+using Events = mapbox::util::variant<
+		TimeOutEvent, TransitionEvent, WifiEvent, ModeChangeEvent
+		>;
 /**
  *
  **/
