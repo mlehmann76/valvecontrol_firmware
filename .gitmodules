@@ -7,3 +7,6 @@
 [submodule "components/logger"]
 	path = components/logger
 	url = https://github.com/mlehmann76/logger.git
+[submodule "components/njson"]
+	path = components/njson
+	url = https://github.com/astoeckel/json.git
