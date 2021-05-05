@@ -1,0 +1,12 @@
+[submodule "components/variant"]
+	path = components/variant
+	url = https://github.com/mapbox/variant.git
+[submodule "components/libespfs"]
+	path = components/libespfs
+	url = https://github.com/mlehmann76/libespfs.git
+[submodule "components/logger"]
+	path = components/logger
+	url = https://github.com/mlehmann76/logger.git
+[submodule "components/njson"]
+	path = components/njson
+	url = https://github.com/astoeckel/json.git

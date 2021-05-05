@@ -1,0 +1,8 @@
+
+filters:
+    'espfs.paths': discard
+    'espfs.yaml': discard
+    '*.js': [no-compressors, no-filters, no-preprocessors]
+    '*.css': [no-compressors, no-filters, no-preprocessors]
+    '*.html': [no-compressors, no-filters, no-preprocessors]
+    '*' : cache

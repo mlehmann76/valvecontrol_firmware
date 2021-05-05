@@ -8,9 +8,15 @@
 #ifndef MAIN_SNTP_H_
 #define MAIN_SNTP_H_
 
-void sntp_support(void);
-esp_err_t update_time(void);
+#include <string>
 
+class SntpSupport {
+  public:
+    void init();
+    bool update();
 
-
+  private:
+    std::string server;
+    std::string timeZone;
+};
 #endif /* MAIN_SNTP_H_ */

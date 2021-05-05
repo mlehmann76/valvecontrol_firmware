@@ -40,9 +40,9 @@ class deviceControl():
         json_string = '{"firmware":{"update": "ota","md5": "' + md5.hexdigest() + '","len": ' + str(size) + '}}'
         
         data = json.loads(json_string)
-        #print(data)
+        print(data)
     
-        ret = self.client.publish(self.device + "/system", json_string, qos=1, retain=False)
+        ret = self.client.publish(self.device + "/ota", json_string, qos=1, retain=False)
         while not ret.is_published():
             self.client.loop()
             
