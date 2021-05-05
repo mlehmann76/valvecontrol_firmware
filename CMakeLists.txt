@@ -26,5 +26,5 @@ set(COMPONENTS "main")
 target_add_binary_data(${My_Project_Binary} "main/config.json" TEXT)
 #spiffs_create_partition_image(storage spiffs_image FLASH_IN_PROJECT)
 
-include(components/espfs/cmake/include.cmake)
+include(components/libespfs/cmake/include.cmake)
 target_add_espfs(${My_Project_Binary} espfs app)

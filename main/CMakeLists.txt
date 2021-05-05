@@ -22,7 +22,7 @@ idf_component_register(SRCS "base85.c"
                             "LedFlasher.cpp"
                             INCLUDE_DIRS
                             "." REQUIRES FreeRTOScpp mqtt http variant nvs_flash
-                                json njson app_update pthread logger spiffs espfs)
+                                json njson app_update pthread logger spiffs libespfs)
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -fstack-usage -Wstack-usage=128)
 #target_compile_options(${COMPONENT_LIB} PRIVATE -fstack-usage )

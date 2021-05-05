@@ -1,6 +1,9 @@
 [submodule "components/variant"]
 	path = components/variant
 	url = https://github.com/mapbox/variant.git
-[submodule "components/fmt/fmt"]
-	path = components/fmt/fmt
-	url = https://github.com/fmtlib/fmt.git
+[submodule "components/libespfs"]
+	path = components/libespfs
+	url = https://github.com/mlehmann76/libespfs.git
+[submodule "components/logger"]
+	path = components/logger
+	url = https://github.com/mlehmann76/logger.git
