@@ -9,11 +9,12 @@
 #define MAIN_PROPERTY_H_
 
 #include <assert.h>
+#include <functional>
 #include <initializer_list>
-#include <mapbox/variant.hpp>
 #include <memory>
 #include <optional>
 #include <unordered_map>
+#include <variant>
 
 struct monostate {};
 
@@ -27,8 +28,8 @@ class repository;
 class property {
   public:
     using key_type = std::string;
-    using mapped_type = mapbox::util::variant<monostate, BoolType, IntType,
-                                              FloatType, StringType>;
+    using mapped_type =
+        std::variant<monostate, BoolType, IntType, FloatType, StringType>;
     using property_base = std::unordered_map<key_type, mapped_type>;
 
     using write_hook_t =
@@ -55,7 +56,8 @@ class property {
         }
 #else
         template <typename T> T get() const {
-            return m_p.get().at(m_n).get_unchecked<T>();
+            auto ret = std::get_if<T>(&m_p.get().at(m_n));
+            return ret ? *ret : T{};
         }
 #endif
     };

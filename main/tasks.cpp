@@ -146,8 +146,8 @@ void Tasks::onControl(const property &p) {
 
     auto end = p.end();
     auto vit = p.find("value");
-    if (vit != end && vit->second.is<StringType>()) {
-        std::string s = vit->second.get_unchecked<StringType>();
+    if (vit != end && std::get_if<StringType>(&vit->second)) {
+        std::string s = *std::get_if<StringType>(&vit->second);
         if (s == "on" || s == "ON" || s == "On") {
             startTask();
         } else {
@@ -163,13 +163,12 @@ void Tasks::startTask() {
     // ON case
     // FIXME stop active task
     // test, if task is already running
-	log_inst.debug(TAG, "activeTaskName() %s", activeTaskName().c_str());
+    log_inst.debug(TAG, "activeTaskName() %s", activeTaskName().c_str());
 
-	//if (!m_states[m_nextRequest]->running()) {
-	if (m_activeTask == &NoneTask ||
-			!m_states[activeTaskName()]->running()) {
+    // if (!m_states[m_nextRequest]->running()) {
+    if (m_activeTask == &NoneTask || !m_states[activeTaskName()]->running()) {
 
-		std::lock_guard<std::mutex> lock(m_lock);
+        std::lock_guard<std::mutex> lock(m_lock);
         // start task, if not
         m_activeTask = &m_config->get(m_nextRequest);
         m_activeItem = ((*m_activeTask->m_taskitems.begin()).get());

@@ -107,7 +107,7 @@ std::string repository::debug(const mapType &_m) {
          ++it) {
         for (auto &v : it->second->get()) {
             _ss << it->first << " : ";
-            mapbox::util::apply_visitor(DebugVisitor(_ss, v.first), v.second);
+            std::visit(DebugVisitor(_ss, v.first), v.second);
         }
     }
     _ss << "End of map"
@@ -120,7 +120,7 @@ std::string repository::stringify(const mapType &_m, size_t spaces) const {
     for (mapType::const_iterator it = _m.begin(), end = _m.end(); it != end;
          ++it) {
         for (auto &v : it->second->get()) {
-            mapbox::util::apply_visitor(JsonVisitor(it->first, v.first, root),
+            std::visit(JsonVisitor(it->first, v.first, root),
                                         v.second);
         }
     }
@@ -134,8 +134,7 @@ std::string repository::stringify(const repository::StringMatch &_m,
          ++it) {
         if (_m.match(it->first)) {
             for (auto &v : it->second->get()) {
-                mapbox::util::apply_visitor(
-                    JsonVisitor(it->first, v.first, root), v.second);
+                std::visit(JsonVisitor(it->first, v.first, root), v.second);
             }
         }
     }

@@ -101,11 +101,12 @@ void MainClass::setup() {
             _otaWorker, *_mqttUser,
             utilities::string_format("%sota/#", mqttConf.getDevName().c_str()),
             utilities::string_format("%sota/$implementation/binary",
-                        mqttConf.getDevName().c_str())));
+                                     mqttConf.getDevName().c_str())));
 
         _configRepAdapter = (std::make_shared<MqttRepAdapter>(
             Config::repo(), *_mqttUser,
-            utilities::string_format("%sconfig", mqttConf.getDevName().c_str())));
+            utilities::string_format("%sconfig",
+                                     mqttConf.getDevName().c_str())));
 
         _wifi->addConnectionObserver(_mqttUser->obs());
 
@@ -152,8 +153,8 @@ void MainClass::setup() {
                     {{{"value", "OFF"s}}})
             .set([=](const property &p) -> std::optional<property> {
                 auto it = p.find("value");
-                if (it != p.end() && it->second.is<StringType>()) {
-                    std::string s = it->second.get_unchecked<StringType>();
+                if (it != p.end() && std::get_if<StringType>(&it->second)) {
+                    std::string s = *std::get_if<StringType>(&it->second);
                     _channels[i]->set(s == "on" || s == "ON" || s == "On",
                                       chanConf.getTime(i));
                 }

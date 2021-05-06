@@ -16,7 +16,7 @@
 #include <mutex>
 #include <string>
 
-#include <mapbox/variant.hpp>
+#include <variant>
 
 struct DefaultLinkPolicy : std::false_type {};
 struct ReplaceLinkPolicy : std::true_type {};
@@ -80,8 +80,8 @@ class repository {
                 const T &_default = T{}) {
         iterator _it = find(propName(name));
         if (_it != end() && (*_it->second).find(key) != (*_it->second).end()) {
-            return mapbox::util::get_unchecked<T>(
-                (*_it->second).find(key)->second);
+            auto ret = std::get_if<T>(&((*_it->second).find(key)->second));
+            return ret ? *ret : _default;
         } else {
             return _default;
         }

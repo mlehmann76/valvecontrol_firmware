@@ -31,10 +31,10 @@ template <typename T> struct doEncrypt {
         : net(_net), key(std::move(_key)) {}
     std::optional<property> operator()(const property &p) {
         auto it = p.find(key);
-        if (it != p.end() && it->second.is<StringType>()) {
+        if (it != p.end() && std::get_if<StringType>(&it->second)) {
             property temp;
             temp[key] = std::move(bin2String(
-                net.crypt().encrypt(it->second.get_unchecked<StringType>())));
+                net.crypt().encrypt(*std::get_if<StringType>(&it->second))));
             return temp;
         }
         return {};

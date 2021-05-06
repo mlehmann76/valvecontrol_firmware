@@ -15,9 +15,9 @@
 #include <deque>
 #include <esp_wifi.h>
 #include <esp_wps.h>
-#include <mapbox/variant.hpp>
 #include <mutex> // std::mutex, std::unique_lock
 #include <thread>
+#include <variant>
 #include <vector>
 
 class LedFlasher;
@@ -32,8 +32,8 @@ struct DisconnectState;
 struct ConnectState;
 struct ScanMode;
 struct WPSMode;
-using WifiMode = mapbox::util::variant<NoMode, DisconnectState, ConnectState,
-                                       ScanMode, WPSMode>;
+using WifiMode =
+    std::variant<NoMode, DisconnectState, ConnectState, ScanMode, WPSMode>;
 
 struct NoMode {
     template <class T> WifiMode handle(const T &);
@@ -88,7 +88,7 @@ template <typename T, typename N> struct transition {
         : m_mode(std::move(_mode)), m_next(std::move(_next)) {}
     operator WifiMode() {
         m_mode.onLeave();
-        mapbox::util::apply_visitor([](auto &&arg) { arg.onEnter(); }, m_next);
+        std::visit([](auto &&arg) { arg.onEnter(); }, m_next);
         return std::move(m_next);
     }
     T m_mode;
@@ -116,9 +116,8 @@ struct WifiEvent {
 
 struct ModeChangeEvent {};
 
-using Events = mapbox::util::variant<
-		TimeOutEvent, TransitionEvent, WifiEvent, ModeChangeEvent
-		>;
+using Events =
+    std::variant<TimeOutEvent, TransitionEvent, WifiEvent, ModeChangeEvent>;
 /**
  *
  **/

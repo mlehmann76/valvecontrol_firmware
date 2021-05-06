@@ -48,8 +48,8 @@ struct EventVisitor {
     EventVisitor(detail::WifiMode &_p) : m_mode(_p) {}
 
     template <typename T> detail::WifiMode operator()(const T &event) const {
-        return mapbox::util::apply_visitor(
-            [event](auto &&mode) { return mode.handle(event); }, m_mode);
+        return std::visit([event](auto &&mode) { return mode.handle(event); },
+                          m_mode);
     }
     detail::WifiMode &m_mode;
 };
@@ -80,7 +80,7 @@ void WifiManager::init() {
         detail::Events event =
             detail::TransitionEvent{this, detail::DisconnectState{this}};
 
-        m_mode = mapbox::util::apply_visitor(EventVisitor(m_mode), event);
+        m_mode = std::visit(EventVisitor(m_mode), event);
         m_led->set(LedFlasher::OFF);
         m_initDone = true;
     }
@@ -108,15 +108,15 @@ void WifiManager::task() {
         if (!m_events.empty()) {
             auto event = m_events.front();
             m_events.pop_front();
-            m_mode = mapbox::util::apply_visitor(EventVisitor(m_mode), event);
+            m_mode = std::visit(EventVisitor(m_mode), event);
         }
         wifi_mode_t actmode;
         esp_err_t err = esp_wifi_get_mode(&actmode);
         wifi_mode_t repmode = static_cast<wifi_mode_t>(netConf.getMode());
 
-        if( err == ESP_OK && actmode != repmode) {
-        	esp_wifi_set_mode(repmode);
-        	m_events.push_back(detail::ModeChangeEvent{});
+        if (err == ESP_OK && actmode != repmode) {
+            esp_wifi_set_mode(repmode);
+            m_events.push_back(detail::ModeChangeEvent{});
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
@@ -242,9 +242,9 @@ template <> WifiMode ConnectState::handle(const TransitionEvent &e) {
 }
 
 template <> WifiMode ConnectState::handle(const ModeChangeEvent &e) {
-	m_parent->m_events.push_back(detail::TransitionEvent{
-	                m_parent, detail::DisconnectState{m_parent}});
-	return *this;
+    m_parent->m_events.push_back(
+        detail::TransitionEvent{m_parent, detail::DisconnectState{m_parent}});
+    return *this;
 }
 
 void ConnectState::setAPConfig(wifi_config_t &wifi_config) {
@@ -462,16 +462,15 @@ void ScanMode::onWifiScanDone() {
                 if (i < ap_count) {
                     m_parent->m_repo.create(
                         utilities::string_format(
-                        		"/network/wifi/state/scan/station%d", i),
+                            "/network/wifi/state/scan/station%d", i),
                         {{
                             {"ssid", ssidToString(ap_info[i].ssid)},    //
                             {"auth", retauthMode(ap_info[i].authmode)}, //
                             {"rssi", IntType(ap_info[i].rssi)}          //
                         }});
                 } else {
-                    m_parent->m_repo.unlink(
-                    		utilities::string_format(
-                    				"/network/wifi/state/scan/station%d", i));
+                    m_parent->m_repo.unlink(utilities::string_format(
+                        "/network/wifi/state/scan/station%d", i));
                 }
             }
             free(ap_info);
