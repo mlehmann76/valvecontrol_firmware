@@ -11,4 +11,5 @@ extern "C" void app_main() {
     MainClass main;
     main.setup();
     main.loop();
+    esp_restart();
 }

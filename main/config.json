@@ -1,5 +1,12 @@
 {
     "actors": {
+        "channels": {
+            "config" : {
+                "freq" : 50,
+                "invert" : false,
+                "factor" : 0.5
+            }
+        },
         "channel1": {
             "config": {
                 "alt": "channel1",

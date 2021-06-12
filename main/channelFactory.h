@@ -5,18 +5,14 @@
  *      Author: marco
  */
 
-#ifndef MAIN_ABSTRACTCHANNELFACTORY_H_
-#define MAIN_ABSTRACTCHANNELFACTORY_H_
+#ifndef MAIN_CHANNELFACTORY_H_
+#define MAIN_CHANNELFACTORY_H_
 
 #include "TimerCPP.h"
 #include "channelBase.h"
 #include "config_user.h"
 #include "driver/gpio.h"
 #include "driver/ledc.h"
-
-#define LEDC_RESOLUTION LEDC_TIMER_13_BIT
-#define LEDC_MAX ((1 << LEDC_RESOLUTION) - 1)
-#define LED_C_OFF LEDC_MAX
 
 class ChannelFacory {
   public:
@@ -26,9 +22,6 @@ class ChannelFacory {
 };
 
 class LedcChan : public ChannelBase {
-    static const uint32_t LED_C_ON = 0;
-    static const uint32_t LED_C_HALF =
-        ((LEDC_MAX * CONFIG_CHANOUT_PWM_DUTY) / 100);
     static constexpr std::chrono::milliseconds LED_C_TIME =
         std::chrono::milliseconds(250);
     enum mode { eoff, ehalf, efull };
@@ -43,6 +36,7 @@ class LedcChan : public ChannelBase {
   private:
     void onTimer();
     void half();
+    uint32_t get(mode m) const;
 
     ledc_channel_config_t _config;
     mode _mode;
@@ -51,7 +45,6 @@ class LedcChan : public ChannelBase {
 };
 
 class LedcChannelFactory {
-    static const uint32_t LED_FREQ = (CONFIG_CHANOUT_PWM_FREQ);
     static const ledc_channel_config_t ledc_channel[];
 
   public:
@@ -60,4 +53,4 @@ class LedcChannelFactory {
     static ChannelBase *channel(uint32_t index, std::chrono::seconds _p);
     static uint32_t count();
 };
-#endif /* MAIN_ABSTRACTCHANNELFACTORY_H_ */
+#endif /* MAIN_CHANNELFACTORY_H_ */

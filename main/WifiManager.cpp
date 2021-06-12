@@ -335,7 +335,7 @@ template <> WifiMode ConnectState::handle(const WifiEvent &e) {
     case WIFI_EVENT_WIFI_READY: /**< ESP32 WiFi ready */
         break;
     case WIFI_EVENT_STA_START: /**< ESP32 station start */
-        ESP_ERROR_CHECK(esp_wifi_connect());
+        esp_wifi_connect();
         break;
     case WIFI_EVENT_STA_STOP: /**< ESP32 station stop */
         break;

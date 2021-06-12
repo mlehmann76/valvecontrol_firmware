@@ -141,9 +141,11 @@ void MainClass::setup() {
     _http->addPathHandler(std::make_shared<http::HttpAuth>(
         _jsonHandler.get(), _token, http::HttpAuth::BASIC_AUTH));
 
+    LedcChannelFactory _led;
+
     for (size_t i = 0; i < _channels.size(); i++) {
         _channels[i] = std::shared_ptr<ChannelBase>(
-            LedcChannelFactory::channel(i, chanConf.getTime(i)));
+            _led.channel(i, chanConf.getTime(i)));
         _cex->setChannel(&*_channels[i]);
         Config::repo().create("/actors/" + _channels[i]->name() + "/state",
                               {{{"value", "OFF"s}}});
