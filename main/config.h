@@ -115,7 +115,7 @@ class MqttConfig {
     }
 
     void setConnected(bool isCon) {
-        repo()["/network/mqtt/state"]["connected"] = isCon;
+        //repo()["/network/mqtt/state"]["connected"] = isCon;
     }
     bool enabled() const {
         return repo()["/network/mqtt/config"]["enabled"].get<BoolType>();

@@ -2,9 +2,9 @@
     "actors": {
         "channels": {
             "config" : {
-                "freq" : 50,
+                "freq" : 80,
                 "invert" : false,
-                "factor" : 0.5
+                "factor" : 0.95
             }
         },
         "channel1": {

@@ -27,7 +27,7 @@ extern logType log_inst;
 #define WPS_SHORT_MS 100
 #define WPS_LONG_MS 500
 
-//#define RESTART_BUTTON
+#define RESTART_BUTTON (GPIO_NUM_0)
 #define RESTART_SHORT_MS 50
 #define RESTART_LONG_MS 5000
 

@@ -16,7 +16,6 @@
 #include "TimerCPP.h"
 #include "WifiManager.h"
 #include "otaWorker.h"
-#include "sht1x.h"
 #include <esp_event.h>
 #include <freertos/event_groups.h>
 
@@ -66,7 +65,6 @@ class MainClass {
     std::mutex mutex;
     std::condition_variable cvInitDone;
     std::shared_ptr<wifi::WifiManager> _wifi;
-    Sht1x sht1x = {GPIO_NUM_21, GPIO_NUM_22};
     Ota::OtaWorker _otaWorker;
     std::shared_ptr<mqtt::MqttWorker> _mqttUser;
     std::shared_ptr<MqttOtaHandler> _mqttOtaHandler;

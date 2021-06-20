@@ -176,7 +176,7 @@ void OtaWorker::start(const md5_update &_d) {
     mbedtls_md5_starts(&m_md5ctx);
     m_decodeCtx->init();
     m_isRunning = true;
-    m_timeout.start();
+    ESP_ERROR_CHECK_WITHOUT_ABORT(!m_timeout.start(1));
     // while(!m_timeout.active()) {}
     sum = 0;
     task();

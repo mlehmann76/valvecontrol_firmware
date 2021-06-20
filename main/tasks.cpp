@@ -15,6 +15,7 @@
 #include <logger.h>
 #include <sstream>
 #include <string>
+#include <esp_pthread.h>
 
 using namespace std::string_literals;
 using namespace std::chrono;
@@ -84,10 +85,11 @@ void TaskState::regStateVariables() {
 }
 
 void TaskState::update(bool run, const system_clock::time_point &_start) {
-    auto t_c = system_clock::to_time_t(_start);
     m_stateRep[m_taskId]["running"] = run;
-    if (run)
+    if (run) {
+        auto t_c = system_clock::to_time_t(_start);
         m_stateRep[m_taskId]["starttime"] = std::string(std::ctime(&t_c));
+    }
 }
 
 void TaskState::update(const detail::TaskConfig::Task &task,
@@ -114,7 +116,12 @@ detail::TaskConfig::Task::TasksItem Tasks::NoneTaskItem =
 Tasks::Tasks(repository &config)
     : m_repo(config), m_config(std::make_shared<detail::TaskConfig>(config)),
       m_activeTask(&NoneTask), m_activeItem(&NoneTaskItem),
-      m_thread([=]() { this->task(); }), m_aexit(false) {}
+      m_thread(), m_aexit(false) {
+    auto cfg = esp_pthread_get_default_config();
+    cfg.thread_name = "tasks task";
+    esp_pthread_set_cfg(&cfg);
+    m_thread = std::thread([this]() { this->task(); });
+}
 
 void Tasks::setup() {
     // for restarting setup, make sure task is not using data
@@ -163,10 +170,11 @@ void Tasks::startTask() {
     // ON case
     // FIXME stop active task
     // test, if task is already running
-    log_inst.debug(TAG, "activeTaskName() %s", activeTaskName().c_str());
+    log_inst.debug(TAG, "startTask: activeTaskName() %s",
+                   activeTaskName().c_str());
 
-    // if (!m_states[m_nextRequest]->running()) {
-    if (m_activeTask == &NoneTask || !m_states[activeTaskName()]->running()) {
+    if (m_activeTask == &NoneTask || (m_states.count(activeTaskName()) &&
+                                      !m_states[activeTaskName()]->running())) {
 
         std::lock_guard<std::mutex> lock(m_lock);
         // start task, if not
@@ -193,21 +201,24 @@ void Tasks::start(listIterator _findIter) {
 void Tasks::stopTask() {
     // OFF case
     // test, if task running
-    if (m_states[m_nextRequest]->running()) {
+    log_inst.debug(TAG, "stopTask: m_nextRequest() %s",
+                   activeTaskName().c_str());
+    if (m_states.count(m_nextRequest) && m_states[m_nextRequest]->running()) {
         std::lock_guard<std::mutex> lock(m_lock);
         // update channel
         setChannel(m_activeItem->m_channel, false);
         // stop task
-        stop();
+        stop(m_nextRequest);
     }
 }
 
-void Tasks::stop() {
-    m_states[activeTaskName()]->update(false, system_clock::now());
-    m_states[activeTaskName()]->update(*m_activeTask, *m_activeItem);
-    m_remain = seconds(0);
-    m_states[activeTaskName()]->update(seconds(0), seconds(0));
-
+void Tasks::stop(const std::string &req) {
+    if (m_states.count(req)) {
+        m_states[req]->update(false, system_clock::now());
+        m_states[req]->update(*m_activeTask, *m_activeItem);
+        m_remain = seconds(0);
+        m_states[req]->update(seconds(0), seconds(0));
+    }
     m_activeItem = &NoneTaskItem;
     m_activeTask = &NoneTask;
 }
@@ -224,11 +235,11 @@ void Tasks::task() {
             std::lock_guard<std::mutex> lock(m_lock);
             // make sure, that tdiff is positive even after system clock change
             auto tdiff = steady_clock::now() - m_start;
-
-            m_states[activeTaskName()]->update(
-                duration_cast<seconds>(tdiff),
-                m_remain - duration_cast<seconds>(tdiff));
-            //}
+            if (m_states.count(activeTaskName())) {
+                m_states[activeTaskName()]->update(
+                    duration_cast<seconds>(tdiff),
+                    m_remain - duration_cast<seconds>(tdiff));
+            }
             if (tdiff >= m_activeItem->m_time) {
                 m_remain -= m_activeItem->m_time;
                 setChannel(m_activeItem->m_channel, false);
@@ -244,7 +255,7 @@ void Tasks::task() {
                 if (++_findIter != _iterend) {
                     start(_findIter);
                 } else {
-                    stop();
+                    stop(activeTaskName());
                 }
             }
         } else {

@@ -12,7 +12,7 @@
 
 LedFlasher::LedFlasher(gpio_num_t gpio, bool isHighActive)
     : m_gpio(gpio), m_highActive(isHighActive), m_state(OFF),
-      m_timer("ledflash", this, &LedFlasher::onTimer, 0, false) {
+      m_timer("ledflash", this, &LedFlasher::onTimer, 1, false) {
     gpio_config_t io_conf = {(1ULL << (uint64_t)gpio), GPIO_MODE_OUTPUT,
                              GPIO_PULLUP_DISABLE, GPIO_PULLDOWN_DISABLE,
                              GPIO_INTR_DISABLE};
@@ -36,8 +36,8 @@ void LedFlasher::set(state state, std::chrono::milliseconds on,
         gpio_set_level(m_gpio, m_highActive ? 0 : 1);
         break;
     case BLINK:
-        m_timer.period(std::chrono::duration_cast<portTick>(m_on).count());
-        m_timer.start();
+    	ESP_ERROR_CHECK_WITHOUT_ABORT(!m_timer.period(std::chrono::duration_cast<portTick>(m_on).count(),1));
+    	ESP_ERROR_CHECK_WITHOUT_ABORT(!m_timer.start(1));
         gpio_set_level(m_gpio, m_highActive ? 1 : 0);
         break;
     }
@@ -46,11 +46,11 @@ void LedFlasher::set(state state, std::chrono::milliseconds on,
 void LedFlasher::onTimer() {
     if (m_state == BLINK) {
         if (gpio_get_level(m_gpio) == (m_highActive ? 1 : 0)) { // ON
-            m_timer.period(std::chrono::duration_cast<portTick>(m_off).count());
-            m_timer.start();
+        	ESP_ERROR_CHECK_WITHOUT_ABORT(!m_timer.period(std::chrono::duration_cast<portTick>(m_off).count(),1));
+        	ESP_ERROR_CHECK_WITHOUT_ABORT(!m_timer.start(1));
         } else {
-            m_timer.period(std::chrono::duration_cast<portTick>(m_on).count());
-            m_timer.start();
+        	ESP_ERROR_CHECK_WITHOUT_ABORT(!m_timer.period(std::chrono::duration_cast<portTick>(m_on).count(),1));
+        	ESP_ERROR_CHECK_WITHOUT_ABORT(!m_timer.start(1));
         }
     }
 }

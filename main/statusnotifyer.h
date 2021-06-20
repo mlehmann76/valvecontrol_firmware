@@ -25,10 +25,11 @@ class StatusNotifyer {
   public:
     StatusNotifyer(repository &rep, mqtt::MqttWorker &mqtt, std::string topic)
         : m_timeout("ConfigTimer", this, &StatusNotifyer::onTimeout,
-                    (1000 / portTICK_PERIOD_MS), false),
-          m_rep(rep), m_mqtt(&mqtt), m_topic(topic) {
+                    (1000 / portTICK_PERIOD_MS), true),
+          m_rep(rep), m_mqtt(&mqtt), m_topic(topic), m_notifyCount(0) {
         m_rep.create("/system/change/state/dateTime",
                      {{{"date", ""s}, {"time", ""s}}});
+        m_timeout.reset();
     }
 
     virtual ~StatusNotifyer() = default;
@@ -45,23 +46,23 @@ class StatusNotifyer {
     mqtt::MqttWorker *m_mqtt;
     std::mutex m_lock;
     std::string m_topic;
+    size_t m_notifyCount;
 };
 
 inline void StatusNotifyer::onSetNotify(const std::string &_name) {
-    std::unique_lock<std::mutex> lock1(m_lock, std::defer_lock);
-    if (lock1.try_lock()) {
-        m_timeout.start();
-    }
+    std::lock_guard<std::mutex> lock(m_lock);
+    m_notifyCount++;
 }
 
 inline void StatusNotifyer::onTimeout() {
-    std::unique_lock<std::mutex> lock1(m_lock, std::defer_lock);
-    lock1.lock();
-    updateDateTime();
-    mqtt::MqttQueueType message(
-        new mqtt::mqttMessage(m_topic, m_rep.stringify(
-        		std::string("/*/*/state"))));
-    m_mqtt->send(std::move(message));
+    if (m_notifyCount) {
+        updateDateTime();
+        mqtt::MqttQueueType message(new mqtt::mqttMessage(
+            m_topic, m_rep.stringify(std::string("/*/*/state"))));
+        m_mqtt->send(std::move(message));
+        std::lock_guard<std::mutex> lock(m_lock);
+        m_notifyCount = 0;
+    }
 }
 
 inline void StatusNotifyer::updateDateTime() {

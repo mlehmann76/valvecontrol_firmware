@@ -22,11 +22,55 @@ struct DefaultLinkPolicy : std::false_type {};
 struct ReplaceLinkPolicy : std::true_type {};
 template <class T> struct tag { using type = T; };
 
+/**
+ *
+ */
+template <typename T> class LockedContainer {
+  public:
+    using container_type = T;
+    using iterator = typename T::iterator;
+    using const_iterator = typename T::const_iterator;
+    using key_type = typename T::key_type;
+    using size_type = typename T::size_type;
+
+  public:
+    LockedContainer() : m_container{} {}
+    LockedContainer(const T &_c) : m_container{_c} {}
+    LockedContainer(const LockedContainer<T>& _c) :
+    	m_container{_c.m_container}, m_lock{} {}
+    LockedContainer(T &&_c) : m_container{std::move(_c)} {}
+    ~LockedContainer() {}
+    //
+    iterator begin() { return m_container.begin(); }
+    const_iterator begin() const { return m_container.begin(); }
+    iterator end() { return m_container.end(); }
+    const_iterator end() const { return m_container.end(); }
+
+    iterator find(const key_type &key) { return m_container.find(key); }
+    const_iterator find(const key_type &key) const {
+        return m_container.find(key);
+    }
+    template <class... Args> std::pair<iterator, bool> emplace(Args &&...args) {
+        std::lock_guard<std::mutex> lock(m_lock);
+        return m_container.emplace(args...);
+    }
+    size_type erase(const key_type &key) {
+        std::lock_guard<std::mutex> lock(m_lock);
+        return m_container.erase(key);
+    }
+
+  private:
+    container_type m_container;
+    std::mutex m_lock;
+};
+/**
+ *
+ */
 class repository {
 
     using keyType = std::string;
     using mappedType = std::shared_ptr<property>;
-    using mapType = std::map<keyType, mappedType>;
+    using mapType = LockedContainer<std::unordered_map<keyType, mappedType>>;
     using notifyFuncType = std::function<void(const std::string &s)>;
     using notifyType = std::pair<std::string, notifyFuncType>;
 
@@ -41,7 +85,7 @@ class repository {
         std::vector<std::string> m_keys;
         StringMatch(const std::string &key);
         StringMatch(std::string &&key);
-        bool match(const std::string str) const;
+        bool match(const std::string &str) const;
     };
 
   public:
@@ -133,7 +177,6 @@ class repository {
     std::string m_repName;
     mapType m_properties;
     link_policy_t link_policy;
-    std::mutex m_lock;
     std::vector<notifyType> m_notify;
 };
 

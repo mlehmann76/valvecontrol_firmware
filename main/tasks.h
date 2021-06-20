@@ -114,7 +114,7 @@ class Tasks {
   private:
     void task();
     void start(listIterator _findIter);
-    void stop();
+    void stop(const std::string& req);
     void checkTimeString();
     bool checkWeekDay(const std::string &d);
     bool checkTimePoint(const std::string &d);

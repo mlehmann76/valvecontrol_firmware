@@ -53,6 +53,14 @@ MainClass::MainClass()
 
 void MainClass::setup() {
 
+#ifdef RESTART_BUTTON
+    gpio_config_t io_conf = {(1ULL << (uint64_t)RESTART_BUTTON), GPIO_MODE_INPUT,
+                             GPIO_PULLUP_ENABLE, GPIO_PULLDOWN_DISABLE,
+                             GPIO_INTR_DISABLE};
+    gpio_config(&io_conf);
+#endif
+
+
     ESP_ERROR_CHECK(esp_netif_init());
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -125,7 +133,6 @@ void MainClass::setup() {
 
     _tasks->setup();
 
-    //_wifi->addConnectionObserver(_http->obs());
     _http = (std::make_shared<http::HttpServer>(80));
     _http->start();
 
@@ -173,8 +180,6 @@ void MainClass::setup() {
             return {};
         });
     }
-
-    sht1x.regProperty(&Config::repo(), "/sensors/sht1x/state");
 
     Config::repo()
         .create("/system/base/control/restart", {{{"start", false}}})

@@ -186,7 +186,7 @@ esp_err_t ConfigBase::writeStr(nvs_handle *pHandle, const char *pName,
 
 void ConfigBase::onConfigNotify(const std::string &s) {
     std::lock_guard<std::mutex> lock(m_lock);
-    m_timeout.start();
+    ESP_ERROR_CHECK_WITHOUT_ABORT(!m_timeout.start(1));
 }
 
 void ConfigBase::resetToDefault() {

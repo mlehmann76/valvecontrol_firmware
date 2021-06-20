@@ -89,21 +89,19 @@ repository::mapType repository::partial(const std::string &_part) {
     mapType ret;
     std::string part = propName(_part);
     StringMatch smatch(_part);
-    auto it = m_properties.begin();
-    const auto end = m_properties.end();
-    for (; it != end; ++it) {
+    for (auto it = m_properties.begin(), end = m_properties.end(); it != end; ++it) {
         if (smatch.match(it->first)) {
             ret.emplace(it->first, it->second);
         }
     }
-    return ret;
+    return std::move(ret);
 }
 
 std::string repository::debug(const mapType &_m) {
     std::stringstream _ss;
     _ss << "map<property>"
         << "\n";
-    for (mapType::const_iterator it = _m.begin(), end = _m.end(); it != end;
+    for (auto it = _m.begin(), end = _m.end(); it != end;
          ++it) {
         for (auto &v : it->second->get()) {
             _ss << it->first << " : ";
@@ -117,7 +115,7 @@ std::string repository::debug(const mapType &_m) {
 
 std::string repository::stringify(const mapType &_m, size_t spaces) const {
     nlohmann::json root;
-    for (mapType::const_iterator it = _m.begin(), end = _m.end(); it != end;
+    for (auto it = _m.begin(), end = _m.end(); it != end;
          ++it) {
         for (auto &v : it->second->get()) {
             std::visit(JsonVisitor(it->first, v.first, root),
@@ -153,7 +151,6 @@ std::string repository::propName(const std::string &name) const {
 
 bool repository::set(const std::string &_name,
                      const property::property_base &p) {
-    std::lock_guard<std::mutex> lock(m_lock);
     /*set works w/wo omitting repository name */
     return set(find(propName(_name)), p);
 }
@@ -168,7 +165,6 @@ bool repository::set(mapType::iterator it, const property::property_base &p) {
 }
 
 property &repository::link(const std::string &name, property &_p) {
-    std::lock_guard<std::mutex> lock(m_lock);
     std::string cname = propName(name);
     std::pair<mapType::iterator, bool> ret =
         m_properties.emplace(cname, nullptr);
@@ -187,7 +183,6 @@ property &repository::link(const std::string &name, property &_p) {
 }
 
 property &repository::create(const std::string &name, const property &_cp) {
-    std::lock_guard<std::mutex> lock(m_lock);
     std::string cname = propName(name);
     std::pair<mapType::iterator, bool> ret =
         m_properties.emplace(cname, nullptr);
@@ -202,7 +197,6 @@ property &repository::create(const std::string &name, const property &_cp) {
 }
 
 bool repository::unlink(const std::string &name) {
-    std::lock_guard<std::mutex> lock(m_lock);
     bool isErased = m_properties.erase(propName(name)) != 0;
     if (isErased) {
         notify(name);
@@ -288,7 +282,7 @@ property &repository::operator[](std::string &&key) {
     return create(key, property());
 }
 
-bool repository::StringMatch::match(const std::string str) const {
+bool repository::StringMatch::match(const std::string& str) const {
     bool ret = true;
     std::vector<std::string> m_parts = utilities::split(str, "/");
     for (size_t i = 0; (i < m_keys.size()) && (i < m_parts.size()); i++) {

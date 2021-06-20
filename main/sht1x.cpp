@@ -39,7 +39,7 @@ Sht1x::Sht1x(gpio_num_t _sda, gpio_num_t _scl)
     gpio_config(&io_conf);
     gpio_set_level(GPIO_NUM_21, 1);
     gpio_set_level(GPIO_NUM_22, 1);
-    m_timeout.start();
+    ESP_ERROR_CHECK_WITHOUT_ABORT(!m_timeout.start(1));
 }
 
 double Sht1x::readSHT1xTemp() {
@@ -115,16 +115,16 @@ void Sht1x::updateProperty() {
 
 void Sht1x::readSensor() {
     if (hasError()) {
-        m_timeout.period(
+    	ESP_ERROR_CHECK_WITHOUT_ABORT(!m_timeout.period(
             std::chrono::duration_cast<portTick>(std::chrono::seconds(60))
-                .count());
-        m_timeout.start();
+                .count(),1));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(!m_timeout.start(1));
         reset();
     } else {
-        m_timeout.period(
+    	ESP_ERROR_CHECK_WITHOUT_ABORT(!m_timeout.period(
             std::chrono::duration_cast<portTick>(std::chrono::seconds(10))
-                .count());
-        m_timeout.start();
+                .count(),1));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(!m_timeout.start(1));
         m_temp = readSHT1xTemp();
         m_hum = readSHT1xHum();
         updateProperty();
