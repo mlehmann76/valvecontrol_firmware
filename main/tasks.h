@@ -108,8 +108,8 @@ class Tasks {
     ~Tasks();
     void setup();
     void onControl(const property &p);
-    void startTask();
-    void stopTask();
+    void startTask(const std::string&);
+    void stopTask(const std::string&);
 
   private:
     void task();
@@ -122,11 +122,11 @@ class Tasks {
     void setChannel(const std::string &c, bool isOn);
     std::string activeTaskName();
     void regTaskControl(const std::string &name);
+    std::string trimTaskName(const std::string &name);
 
     repository &m_repo;
     std::shared_ptr<detail::TaskConfig> m_config;
     std::map<std::string, std::shared_ptr<detail::TaskState>> m_states;
-    std::string m_nextRequest;
     detail::TaskConfig::Task *m_activeTask;
     detail::TaskConfig::Task::TasksItem *m_activeItem;
     std::chrono::seconds m_remain;

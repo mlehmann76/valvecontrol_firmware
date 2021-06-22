@@ -289,7 +289,6 @@ void ConnectState::onEnter() {
         const std::string ssid = netConf.getStaSSID();
         if (ssid != "") {
             setSTAConfig(ssid, wifi_config);
-            // log_inst.debug(TAG, "trying ssid {} {}", wifi_config.sta.ssid,
             // wifi_config.sta.password);
             log_inst.debug(TAG, "trying ssid %s", wifi_config.sta.ssid);
 
@@ -333,25 +332,32 @@ void ConnectState::onLeave() {
 template <> WifiMode ConnectState::handle(const WifiEvent &e) {
     switch (e.m_id) {
     case WIFI_EVENT_WIFI_READY: /**< ESP32 WiFi ready */
+        log_inst.debug(TAG, "wifi ready");
         break;
     case WIFI_EVENT_STA_START: /**< ESP32 station start */
+        log_inst.debug(TAG, "sta start");
         esp_wifi_connect();
         break;
     case WIFI_EVENT_STA_STOP: /**< ESP32 station stop */
+        log_inst.debug(TAG, "sta stop");
         break;
     case WIFI_EVENT_STA_CONNECTED: /**< ESP32 station connected to AP */
         // do not notify here, we have no ip ! m_parent->notifyConnect();
+        log_inst.debug(TAG, "sta connected");
         break;
     case WIFI_EVENT_STA_DISCONNECTED: /**< ESP32 station disconnected from
                                        * AP
                                        */
         // stay in State if AP Mode
+        log_inst.debug(TAG, "sta disconnected");
         if (mode() == WIFI_MODE_STA) {
             // return to disconnect state for further processing
-            m_parent->m_events.push_back(detail::TransitionEvent{
-                m_parent, detail::DisconnectState{m_parent}});
-            // xEventGroupClearBits(main_event_group, CONNECTED_BIT);
-            // m_parent->notifyDisconnect();
+            //m_parent->m_events.push_back(detail::TransitionEvent{
+            //    m_parent, detail::DisconnectState{m_parent}});
+            m_parent->m_timeout.start(
+                std::chrono::seconds(10),
+                detail::TransitionEvent{m_parent,
+                                        detail::DisconnectState{m_parent}});
         }
         break;
     case WIFI_EVENT_STA_AUTHMODE_CHANGE: /**< the auth mode of AP connected

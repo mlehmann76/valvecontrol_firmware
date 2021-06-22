@@ -11,11 +11,11 @@
 #include "utilities.h"
 #include <array>
 #include <chrono>
+#include <esp_pthread.h>
 #include <iomanip>
 #include <logger.h>
 #include <sstream>
 #include <string>
-#include <esp_pthread.h>
 
 using namespace std::string_literals;
 using namespace std::chrono;
@@ -56,6 +56,7 @@ TaskConfig::readTaskItemDetail(const std::string &_next) const {
 bool TaskConfig::readTask(const std::string &name) {
     const std::string _taskName = name + "/config";
     if (m_repo.find(_taskName) != m_repo.end()) {
+        log_inst.info(TAG, "TaskConfig::readTask: {%s}", name.c_str());
         auto _task = std::make_shared<Task>();
         m_tasks[name] = _task;
         readTaskDetail(_taskName, *_task);
@@ -115,8 +116,8 @@ detail::TaskConfig::Task::TasksItem Tasks::NoneTaskItem =
 
 Tasks::Tasks(repository &config)
     : m_repo(config), m_config(std::make_shared<detail::TaskConfig>(config)),
-      m_activeTask(&NoneTask), m_activeItem(&NoneTaskItem),
-      m_thread(), m_aexit(false) {
+      m_activeTask(&NoneTask), m_activeItem(&NoneTaskItem), m_thread(),
+      m_aexit(false) {
     auto cfg = esp_pthread_get_default_config();
     cfg.thread_name = "tasks task";
     esp_pthread_set_cfg(&cfg);
@@ -140,53 +141,56 @@ void Tasks::setup() {
     }
 }
 
+std::string Tasks::trimTaskName(const std::string &name) {
+    return std::string(name).erase(name.find_last_of("/"), name.length());
+}
+
 void Tasks::onControl(const property &p) {
     /*
      * control Message
      * "{ \"tasks\" : { \"task5\" : { \"control\" : { \"value\" : \"ON|OFF\" } }
      * } }")
      */
-    m_nextRequest =
-        p.name().erase(p.name().find_last_of("/"), p.name().length());
+    const std::string name = trimTaskName(p.name());
 
-    // log_inst.info(TAG, "onControl: {:s}", m_nextRequest);
+    log_inst.info(TAG, "onControl: {%s}", name.c_str());
 
     auto end = p.end();
     auto vit = p.find("value");
     if (vit != end && std::get_if<StringType>(&vit->second)) {
         std::string s = *std::get_if<StringType>(&vit->second);
         if (s == "on" || s == "ON" || s == "On") {
-            startTask();
+            startTask(name);
         } else {
-            stopTask();
+            stopTask(name);
         }
-        m_nextRequest = "";
     }
 }
 
 std::string Tasks::activeTaskName() { return "/tasks/" + m_activeTask->m_name; }
 
-void Tasks::startTask() {
+void Tasks::startTask(const std::string &req) {
     // ON case
     // FIXME stop active task
     // test, if task is already running
-    log_inst.debug(TAG, "startTask: activeTaskName() %s",
-                   activeTaskName().c_str());
+    log_inst.debug(TAG, "startTask: %s",  req.c_str());
 
     if (m_activeTask == &NoneTask || (m_states.count(activeTaskName()) &&
                                       !m_states[activeTaskName()]->running())) {
 
         std::lock_guard<std::mutex> lock(m_lock);
         // start task, if not
-        m_activeTask = &m_config->get(m_nextRequest);
-        m_activeItem = ((*m_activeTask->m_taskitems.begin()).get());
-        // set remain to sum of all times
-        m_remain = seconds(0);
-        for (auto &_t : m_activeTask->m_taskitems) {
-            m_remain += _t->m_time;
+        if (m_config->map().count(req)) {
+			m_activeTask = &m_config->get(req);
+			m_activeItem = ((*m_activeTask->m_taskitems.begin()).get());
+			// set remain to sum of all times
+			m_remain = seconds(0);
+			for (auto &_t : m_activeTask->m_taskitems) {
+				m_remain += _t->m_time;
+			}
+			start(m_activeTask->m_taskitems.begin());
+			m_states[activeTaskName()]->update(true, system_clock::now());
         }
-        start(m_activeTask->m_taskitems.begin());
-        m_states[activeTaskName()]->update(true, system_clock::now());
     }
 }
 
@@ -198,17 +202,16 @@ void Tasks::start(listIterator _findIter) {
     m_start = steady_clock::now();
 }
 
-void Tasks::stopTask() {
+void Tasks::stopTask(const std::string &req) {
     // OFF case
     // test, if task running
-    log_inst.debug(TAG, "stopTask: m_nextRequest() %s",
-                   activeTaskName().c_str());
-    if (m_states.count(m_nextRequest) && m_states[m_nextRequest]->running()) {
+    log_inst.debug(TAG, "stopTask: m_nextRequest() %s", req.c_str());
+    if (m_states.count(req) && m_states[req]->running()) {
         std::lock_guard<std::mutex> lock(m_lock);
         // update channel
         setChannel(m_activeItem->m_channel, false);
         // stop task
-        stop(m_nextRequest);
+        stop(req);
     }
 }
 
@@ -272,8 +275,7 @@ void Tasks::checkTimeString() {
             auto parts = utilities::split(_item.second->m_autoTime, " ");
             if (parts.size() > 1 && checkWeekDay(parts[0]) &&
                 checkTimePoint(parts[1])) {
-                m_nextRequest = _item.second->m_name;
-                startTask();
+                startTask("/tasks/" + _item.second->m_name);
                 break;
             }
         }
@@ -284,34 +286,36 @@ bool Tasks::checkWeekDay(const std::string &d) {
     auto parts = utilities::split(d, ",");
     std::time_t t = std::time(nullptr);
     std::stringstream wd;
-    wd << std::put_time(std::gmtime(&t), "%w");
+    wd << std::put_time(std::gmtime(&t), "%u");
     // writes weekday as a decimal number, where
-    // Sunday is 0 (range [0-6])
+    // Sunday is 7 (range [1-7])
     const std::string today = wd.str();
     for (const auto &s : parts) {
-        if (s == today)
+        if (s == today) {
             return true;
+        }
     }
     return false;
 }
 
 bool Tasks::checkTimePoint(const std::string &d) {
-    auto now = system_clock::now();
-    auto in_time_t = system_clock::to_time_t(now);
+    std::time_t t = std::time(nullptr);
+    std::tm tm = *std::localtime(&t);
     std::stringstream ss;
-    ss << std::put_time(std::localtime(&in_time_t), "%T");
-
+    ss << std::put_time(&tm, "%R");
+    std::string str = ss.str();
     auto tp = toTimePoint(d);
-    auto tpn = toTimePoint(ss.str());
-
+    auto tpn = toTimePoint(str);
+    //
     auto diff = tp > tpn ? tp - tpn : tpn - tp;
+    //log_inst.debug(TAG, "diff: %s",d.c_str());
     return diff < seconds(1) ? true : false;
 }
 
 system_clock::time_point Tasks::toTimePoint(const std::string &d) {
     std::tm tm = {};
     std::stringstream ss(d);
-    ss >> std::get_time(&tm, "%H:%M:%S");
+    ss >> std::get_time(&tm, "%H:%M");
     return system_clock::from_time_t(std::mktime(&tm));
 }
 

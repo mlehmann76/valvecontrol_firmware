@@ -152,18 +152,22 @@ class EventQueue {
 struct Timeout {
     void start(std::chrono::milliseconds t, const detail::Events &ev) {
         std::lock_guard<std::mutex> lck(mutex);
-        _end = std::chrono::system_clock::now() + t;
+        _end = std::chrono::duration_cast<std::chrono::milliseconds>(
+                   std::chrono::system_clock::now().time_since_epoch()) +
+               t;
         active = true;
         event = ev;
     }
     void stop() { active = false; }
     bool expired() {
         std::lock_guard<std::mutex> lck(mutex);
-        bool ret = std::chrono::system_clock::now() > _end;
+        bool ret =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()) > _end;
         active = ret ? false : true;
         return ret;
     }
-    std::chrono::time_point<std::chrono::system_clock> _end;
+    std::chrono::milliseconds _end;
     bool active = false;
     detail::Events event;
     std::mutex mutex;

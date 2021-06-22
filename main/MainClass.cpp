@@ -245,7 +245,7 @@ int MainClass::loop() {
                 log_inst.info(TAG, "[APP] Free memory: %d bytes",
                               esp_get_free_heap_size());
 #endif
-                count = 500;
+                count = 5000;
             }
         } else {
             count--;
