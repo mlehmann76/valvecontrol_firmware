@@ -11,6 +11,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <optional>
 
 namespace utilities {
 
@@ -35,6 +36,8 @@ std::string string_format(const std::string &format, Args... args) {
     return std::string(buf.get(),
                        buf.get() + size - 1); // We don't want the '\0' inside
 }
+
+std::optional<long> strtol(const std::string&, int base);
 
 } // namespace utilities
 

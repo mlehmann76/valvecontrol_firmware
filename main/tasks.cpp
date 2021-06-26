@@ -24,55 +24,6 @@ static const char *TAG = "tasks";
 
 namespace detail {
 
-TaskConfig::TaskConfig(repository &r) : m_repo(r) {}
-
-void TaskConfig::readTasks() {
-    m_tasks.clear();
-    for (size_t i = 1; i <= 8; ++i) {
-        std::stringstream _s;
-        _s << "/tasks/task" << i;
-        if (!readTask(_s.str()))
-            break;
-        _s.clear();
-    }
-}
-
-void TaskConfig::readTaskDetail(const std::string &name, Task &_t) const {
-    _t.m_name = m_repo.get<StringType>(name, "name"); // task1
-    _t.m_alt = m_repo.get<StringType>(name, "alt-name");
-    _t.m_enabled = m_repo.get<BoolType>(name, "enabled");
-    _t.m_autoMode = m_repo.get<BoolType>(name, "auto");
-    _t.m_autoTime = m_repo.get<StringType>(name, "starttime");
-}
-
-TaskConfig::Task::TasksItem
-TaskConfig::readTaskItemDetail(const std::string &_next) const {
-    Task::TasksItem _item;
-    _item.m_channel = m_repo.get<StringType>(_next, "name");
-    _item.m_time = seconds((long)(m_repo.get<IntType>(_next, "time")));
-    return _item;
-}
-
-bool TaskConfig::readTask(const std::string &name) {
-    const std::string _taskName = name + "/config";
-    if (m_repo.find(_taskName) != m_repo.end()) {
-        log_inst.info(TAG, "TaskConfig::readTask: {%s}", name.c_str());
-        auto _task = std::make_shared<Task>();
-        m_tasks[name] = _task;
-        readTaskDetail(_taskName, *_task);
-        // node name is "/tasks/task1/config/node1"
-        std::string _next = m_repo.get<StringType>(_taskName, "first");
-        do {
-            _task->m_taskitems.push_back(
-                std::make_shared<Task::TasksItem>(readTaskItemDetail(_next)));
-            _next = m_repo.get<StringType>(_next, "next", "");
-        } while (_next != "");
-        return true;
-    } else {
-        return false;
-    }
-}
-
 TaskState::TaskState(repository &state, std::string &&taskId)
     : m_stateRep(state), m_taskId(taskId + "/state") {}
 
@@ -93,10 +44,10 @@ void TaskState::update(bool run, const system_clock::time_point &_start) {
     }
 }
 
-void TaskState::update(const detail::TaskConfig::Task &task,
-                       const TaskConfig::Task::TasksItem &item) {
-    m_stateRep[m_taskId]["channel"] = item.m_channel;
-    m_stateRep[m_taskId]["auto"] = task.m_autoMode;
+void TaskState::update(const TaskConfig::TaskWrap &task,
+                       const TaskConfig::TasksItemWrap &item) {
+    m_stateRep[m_taskId]["channel"] = item.channel();
+    m_stateRep[m_taskId]["auto"] = task.autoMode();
 }
 
 void TaskState::update(seconds time, seconds remain) {
@@ -110,35 +61,34 @@ bool TaskState::running() const {
 
 } // namespace detail
 
-detail::TaskConfig::Task Tasks::NoneTask = detail::TaskConfig::Task();
-detail::TaskConfig::Task::TasksItem Tasks::NoneTaskItem =
-    detail::TaskConfig::Task::TasksItem();
-
 Tasks::Tasks(repository &config)
-    : m_repo(config), m_config(std::make_shared<detail::TaskConfig>(config)),
-      m_activeTask(&NoneTask), m_activeItem(&NoneTaskItem), m_thread(),
-      m_aexit(false) {
-    auto cfg = esp_pthread_get_default_config();
-    cfg.thread_name = "tasks task";
-    esp_pthread_set_cfg(&cfg);
-    m_thread = std::thread([this]() { this->task(); });
-}
+    : m_repo(config), m_activeTask{config, ""}, m_activeItem{config, ""},
+      m_thread(), m_aexit(false) {}
 
 void Tasks::setup() {
     // for restarting setup, make sure task is not using data
     std::lock_guard<std::mutex> lock(m_lock);
-    m_activeTask = &NoneTask;
-    m_activeItem = &NoneTaskItem;
-    m_config->readTasks();
+    m_activeTask.reset();
+    m_activeItem.reset();
     // generate taskState for every task
     // register state variables for all tasks
-    for (const auto &_item : m_config->map()) {
-        auto _state = std::make_shared<detail::TaskState>(
-            m_repo, std::string(_item.first));
-        m_states[_item.first] = _state; // tasks/task1
-        _state->regStateVariables();
-        regTaskControl(_item.first);
+    for (int i = 0; i < 8; i++) {
+        detail::TaskConfig::TaskWrap _task = {m_repo, i};
+        if (_task.valid()) {
+            log_inst.debug(TAG, "setup: {%d-%s} valid", i,
+                           _task.taskName().c_str());
+
+            auto _state =
+                std::make_shared<detail::TaskState>(m_repo, _task.taskName());
+            m_states[_task.taskName()] = _state; // tasks/task1
+            _state->regStateVariables();
+            regTaskControl(_task.taskName());
+        }
     }
+    auto cfg = esp_pthread_get_default_config();
+    cfg.thread_name = "tasks task";
+    esp_pthread_set_cfg(&cfg);
+    m_thread = std::thread([this]() { this->task(); });
 }
 
 std::string Tasks::trimTaskName(const std::string &name) {
@@ -167,39 +117,48 @@ void Tasks::onControl(const property &p) {
     }
 }
 
-std::string Tasks::activeTaskName() { return "/tasks/" + m_activeTask->m_name; }
+std::string Tasks::activeTaskName() { return m_activeTask.taskName(); }
 
 void Tasks::startTask(const std::string &req) {
     // ON case
     // FIXME stop active task
     // test, if task is already running
-    log_inst.debug(TAG, "startTask: %s",  req.c_str());
+    log_inst.debug(TAG, "startTask: %s, active valid %d", req.c_str(),
+                   m_activeTask.valid());
 
-    if (m_activeTask == &NoneTask || (m_states.count(activeTaskName()) &&
-                                      !m_states[activeTaskName()]->running())) {
+    if (!m_activeTask.valid() || (m_states.count(activeTaskName()) &&
+                                  !m_states[activeTaskName()]->running())) {
 
         std::lock_guard<std::mutex> lock(m_lock);
+        detail::TaskConfig::TaskWrap _task = {repo(), req};
+        auto first = _task.first();
+        detail::TaskConfig::TasksItemWrap _item = {repo(), first};
+        log_inst.debug(TAG, "Task: valid %d, Item: %s valid %d", _task.valid(),
+                       first.c_str(), _item.valid());
         // start task, if not
-        if (m_config->map().count(req)) {
-			m_activeTask = &m_config->get(req);
-			m_activeItem = ((*m_activeTask->m_taskitems.begin()).get());
-			// set remain to sum of all times
-			m_remain = seconds(0);
-			for (auto &_t : m_activeTask->m_taskitems) {
-				m_remain += _t->m_time;
-			}
-			start(m_activeTask->m_taskitems.begin());
-			m_states[activeTaskName()]->update(true, system_clock::now());
+        if (_task.valid() && _item.valid()) {
+            m_activeTask = _task;
+            m_activeItem = _item;
+            // set remain to sum of all times
+            m_remain = seconds(0);
+            while (_item.valid()) {
+                m_remain += _item.time();
+                _item = {repo(), _item.next()};
+            }
+            start(m_activeTask.first());
+            m_states[activeTaskName()]->update(true, system_clock::now());
         }
     }
 }
 
-void Tasks::start(listIterator _findIter) {
-    m_activeItem = &**_findIter;
-    setChannel(m_activeItem->m_channel, true);
-    m_states[activeTaskName()]->update(*m_activeTask, *m_activeItem);
-    m_states[activeTaskName()]->update(seconds(0), m_remain);
-    m_start = steady_clock::now();
+void Tasks::start(const std::string &item) {
+    m_activeItem = {repo(), item};
+    if (m_activeItem.valid()) {
+        setChannel(m_activeItem.channel(), true);
+        m_states[activeTaskName()]->update(m_activeTask, m_activeItem);
+        m_states[activeTaskName()]->update(seconds(0), m_remain);
+        m_start = steady_clock::now();
+    }
 }
 
 void Tasks::stopTask(const std::string &req) {
@@ -209,7 +168,7 @@ void Tasks::stopTask(const std::string &req) {
     if (m_states.count(req) && m_states[req]->running()) {
         std::lock_guard<std::mutex> lock(m_lock);
         // update channel
-        setChannel(m_activeItem->m_channel, false);
+        setChannel(m_activeItem.channel(), false);
         // stop task
         stop(req);
     }
@@ -218,12 +177,12 @@ void Tasks::stopTask(const std::string &req) {
 void Tasks::stop(const std::string &req) {
     if (m_states.count(req)) {
         m_states[req]->update(false, system_clock::now());
-        m_states[req]->update(*m_activeTask, *m_activeItem);
+        m_states[req]->update(m_activeTask, m_activeItem);
         m_remain = seconds(0);
         m_states[req]->update(seconds(0), seconds(0));
     }
-    m_activeItem = &NoneTaskItem;
-    m_activeTask = &NoneTask;
+    m_activeItem.reset();
+    m_activeTask.reset();
 }
 
 Tasks::~Tasks() {
@@ -234,7 +193,7 @@ Tasks::~Tasks() {
 void Tasks::task() {
     // steady_clock::time_point _last = steady_clock::now();
     while (m_aexit == false) {
-        if (m_activeTask != &NoneTask) {
+        if (m_activeTask.valid()) {
             std::lock_guard<std::mutex> lock(m_lock);
             // make sure, that tdiff is positive even after system clock change
             auto tdiff = steady_clock::now() - m_start;
@@ -243,20 +202,14 @@ void Tasks::task() {
                     duration_cast<seconds>(tdiff),
                     m_remain - duration_cast<seconds>(tdiff));
             }
-            if (tdiff >= m_activeItem->m_time) {
-                m_remain -= m_activeItem->m_time;
-                setChannel(m_activeItem->m_channel, false);
+            if (tdiff >= m_activeItem.time()) {
+                m_remain -= m_activeItem.time();
+                setChannel(m_activeItem.channel(), false);
                 // switch to the next channel
-                auto _iterend = m_activeTask->m_taskitems.end();
-                auto _findIter = m_activeTask->m_taskitems.begin();
-
-                while (_findIter != _iterend &&
-                       (&**_findIter != m_activeItem)) {
-                    ++_findIter;
-                }
-
-                if (++_findIter != _iterend) {
-                    start(_findIter);
+                detail::TaskConfig::TasksItemWrap _item = {repo(),
+                                                           m_activeItem.next()};
+                if (_item.valid()) {
+                    start(m_activeItem.next());
                 } else {
                     stop(activeTaskName());
                 }
@@ -270,13 +223,16 @@ void Tasks::task() {
 
 void Tasks::checkTimeString() {
     // timeString "weekday,weekday,... time (H:M)"
-    for (auto &_item : m_config->map()) {
-        if (_item.second->m_autoMode) {
-            auto parts = utilities::split(_item.second->m_autoTime, " ");
-            if (parts.size() > 1 && checkWeekDay(parts[0]) &&
-                checkTimePoint(parts[1])) {
-                startTask("/tasks/" + _item.second->m_name);
-                break;
+    for (int i = 0; i < 8; i++) {
+        detail::TaskConfig::TaskWrap _task = {m_repo, i};
+        if (_task.valid()) {
+            if (_task.enabled() && _task.autoMode()) {
+                auto parts = utilities::split(_task.autoTime(), " ");
+                if (parts.size() > 1 && checkWeekDay(parts[0]) &&
+                    checkTimePoint(parts[1])) {
+                    startTask(_task.taskName());
+                    break;
+                }
             }
         }
     }
@@ -301,26 +257,19 @@ bool Tasks::checkWeekDay(const std::string &d) {
 bool Tasks::checkTimePoint(const std::string &d) {
     std::time_t t = std::time(nullptr);
     std::tm tm = *std::localtime(&t);
-    std::stringstream ss;
-    ss << std::put_time(&tm, "%R");
-    std::string str = ss.str();
-    auto tp = toTimePoint(d);
-    auto tpn = toTimePoint(str);
-    //
-    auto diff = tp > tpn ? tp - tpn : tpn - tp;
-    //log_inst.debug(TAG, "diff: %s",d.c_str());
-    return diff < seconds(1) ? true : false;
-}
-
-system_clock::time_point Tasks::toTimePoint(const std::string &d) {
-    std::tm tm = {};
-    std::stringstream ss(d);
-    ss >> std::get_time(&tm, "%H:%M");
-    return system_clock::from_time_t(std::mktime(&tm));
+    auto parts = utilities::split(d, ":");
+    if (parts.size()==2) {
+    	auto _h = utilities::strtol(parts[0],10);
+    	auto _m = utilities::strtol(parts[1],10);
+    	if (_h && *_h == tm.tm_hour && _m && *_m == tm.tm_min) {
+    		return true;
+    	}
+    }
+    return false;
 }
 
 void Tasks::setChannel(const std::string &c, bool isOn) {
-    m_repo["/actors/" + m_activeItem->m_channel + "/control"]["value"] =
+    m_repo["/actors/" + m_activeItem.channel() + "/control"]["value"] =
         isOn ? "ON"s : "OFF"s; // FIXME Magic Strings
 }
 

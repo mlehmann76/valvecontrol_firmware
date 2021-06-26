@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <memory>
 #include <sstream>
+#include <string>
 
 namespace utilities {
 
@@ -97,4 +98,15 @@ std::string base64_decode(const std::string &in) {
     }
     return out;
 }
+
+std::optional<long> strtol(const std::string& s, int base=10) {
+    errno = 0;
+	long ret = ::strtol(s.c_str(), nullptr, base);
+	if (errno == 0) {
+		return {ret};
+	}else{
+		return {};
+	}
+}
+
 } // namespace utilities

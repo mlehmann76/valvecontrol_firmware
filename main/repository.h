@@ -50,6 +50,7 @@ template <typename T> class LockedContainer {
     const_iterator find(const key_type &key) const {
         return m_container.find(key);
     }
+    size_type count (const key_type& k) const { return m_container.count(k); }
     template <class... Args> std::pair<iterator, bool> emplace(Args &&...args) {
         std::lock_guard<std::mutex> lock(m_lock);
         return m_container.emplace(args...);
@@ -73,6 +74,7 @@ class repository {
     using mapType = LockedContainer<std::unordered_map<keyType, mappedType>>;
     using notifyFuncType = std::function<void(const std::string &s)>;
     using notifyType = std::pair<std::string, notifyFuncType>;
+    using size_type = size_t;
 
     struct link_policy_t {
         const bool value = false;
@@ -168,7 +170,9 @@ class repository {
     const_iterator find(const keyType &key) const {
         return m_properties.find(propName(key));
     }
-
+    size_type count (const keyType& k) const {
+    	return m_properties.count(k);
+    }
   protected:
     std::string propName(const std::string &name) const;
     bool set(mapType::iterator it, const property::property_base &p);
