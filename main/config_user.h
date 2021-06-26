@@ -15,7 +15,7 @@
 #include <logger.h>
 
 using logType =
-    logger::Logger<logger::severity_type::debug, logger::ColoredTerminal,
+    logger::Logger<logger::severity_type::info, logger::ColoredTerminal,
                    logger::CircularLogPolicy<4>>;
 
 extern logType log_inst;

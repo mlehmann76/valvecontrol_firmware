@@ -139,7 +139,7 @@ uint32_t LedcChan::get(mode m) const {
         ret = invert ? 0 : LEDC_MAX;
         break;
     }
-    log_inst.info(TAG, "channel %s, mode %d, invert %d, factor %f, value %d",
+    log_inst.debug(TAG, "channel %s, mode %d, invert %d, factor %f, value %d",
                   this->m_name.c_str(), _mode, invert, factor, (uint32_t)ret);
     return ret;
 }

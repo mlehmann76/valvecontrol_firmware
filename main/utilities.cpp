@@ -101,8 +101,10 @@ std::string base64_decode(const std::string &in) {
 
 std::optional<long> strtol(const std::string& s, int base=10) {
     errno = 0;
-	long ret = ::strtol(s.c_str(), nullptr, base);
-	if (errno == 0) {
+    const char *ptr = s.c_str();
+    char *endptr;
+	long ret = ::strtol(ptr, &endptr, base);
+	if (ptr != endptr && errno == 0) {
 		return {ret};
 	}else{
 		return {};
