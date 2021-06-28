@@ -118,6 +118,7 @@ void WifiManager::task() {
             esp_wifi_set_mode(repmode);
             m_events.push_back(detail::ModeChangeEvent{});
         }
+
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
@@ -150,11 +151,12 @@ void WifiManager::got_ip_event_handler(esp_event_base_t event_base,
                       "%d.%d.%d.%d",
                       IP2STR(&event->ip_info.ip));
         // FIXME xEventGroupSetBits(main_event_group, CONNECTED_BIT);
-        notifyConnect();
+        // notifyConnect();
         m_timeout.stop();
         break;
     case IP_EVENT_STA_LOST_IP:
-        notifyDisconnect();
+        log_inst.info(TAG, "ip lost");
+        // notifyDisconnect();
         break;
     }
 }
@@ -242,6 +244,7 @@ template <> WifiMode ConnectState::handle(const TransitionEvent &e) {
 }
 
 template <> WifiMode ConnectState::handle(const ModeChangeEvent &e) {
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_stop());
     m_parent->m_events.push_back(
         detail::TransitionEvent{m_parent, detail::DisconnectState{m_parent}});
     return *this;
@@ -276,6 +279,13 @@ void ConnectState::onEnter() {
     log_inst.info(TAG, "ConnectState start");
     wifi_mode_t mode = static_cast<wifi_mode_t>(netConf.getMode());
     wifi_config_t wifi_config;
+    wifi_sta_list_t sta;
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&sta));
+
+    // stop wifi if no station connected
+    if (sta.num == 0) {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_stop());
+    }
 
     if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA) {
         log_inst.debug(TAG, "ap ssid %s", netConf.getApSSID().c_str());
@@ -336,7 +346,7 @@ template <> WifiMode ConnectState::handle(const WifiEvent &e) {
         break;
     case WIFI_EVENT_STA_START: /**< ESP32 station start */
         log_inst.debug(TAG, "sta start");
-        esp_wifi_connect();
+        // esp_wifi_connect();
         break;
     case WIFI_EVENT_STA_STOP: /**< ESP32 station stop */
         log_inst.debug(TAG, "sta stop");
@@ -344,16 +354,16 @@ template <> WifiMode ConnectState::handle(const WifiEvent &e) {
     case WIFI_EVENT_STA_CONNECTED: /**< ESP32 station connected to AP */
         // do not notify here, we have no ip ! m_parent->notifyConnect();
         log_inst.debug(TAG, "sta connected");
+        m_parent->notifyConnect();
         break;
     case WIFI_EVENT_STA_DISCONNECTED: /**< ESP32 station disconnected from
                                        * AP
                                        */
         // stay in State if AP Mode
         log_inst.debug(TAG, "sta disconnected");
+        m_parent->notifyDisconnect();
         if (mode() == WIFI_MODE_STA) {
             // return to disconnect state for further processing
-            //m_parent->m_events.push_back(detail::TransitionEvent{
-            //    m_parent, detail::DisconnectState{m_parent}});
             m_parent->m_timeout.start(
                 std::chrono::seconds(10),
                 detail::TransitionEvent{m_parent,

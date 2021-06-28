@@ -69,10 +69,10 @@ esp_err_t MqttWorker::mqtt_event_handler(esp_mqtt_event_handle_t event) {
         log_inst.error(TAG, "MQTT_EVENT_ERROR");
         break;
     case MQTT_EVENT_BEFORE_CONNECT:
-        log_inst.error(TAG, "MQTT_EVENT_BEFORE_CONNECT");
+        log_inst.debug(TAG, "MQTT_EVENT_BEFORE_CONNECT");
         break;
     case MQTT_EVENT_ANY:
-        log_inst.error(TAG, "MQTT_EVENT_ANY");
+        log_inst.info(TAG, "MQTT_EVENT_ANY");
     }
     return ESP_OK;
 }
