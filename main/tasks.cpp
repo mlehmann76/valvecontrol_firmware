@@ -140,11 +140,6 @@ void Tasks::startTask(const std::string &req) {
             m_activeTask = _task;
             m_activeItem = _item;
             // set remain to sum of all times
-            m_remain = seconds(0);
-            while (_item.valid()) {
-                m_remain += _item.time();
-                _item = {repo(), _item.next()};
-            }
             start(m_activeTask.first());
             m_states[activeTaskName()]->update(true, system_clock::now());
         }
@@ -154,6 +149,7 @@ void Tasks::startTask(const std::string &req) {
 void Tasks::start(const std::string &item) {
     m_activeItem = {repo(), item};
     if (m_activeItem.valid()) {
+    	m_remain = m_activeItem.time();
         setChannel(m_activeItem.channel(), true);
         m_states[activeTaskName()]->update(m_activeTask, m_activeItem);
         m_states[activeTaskName()]->update(seconds(0), m_remain);
@@ -178,7 +174,6 @@ void Tasks::stop(const std::string &req) {
     if (m_states.count(req)) {
         m_states[req]->update(false, system_clock::now());
         m_states[req]->update(m_activeTask, m_activeItem);
-        m_remain = seconds(0);
         m_states[req]->update(seconds(0), seconds(0));
     }
     m_activeItem.reset();
@@ -203,7 +198,6 @@ void Tasks::task() {
                     m_remain - duration_cast<seconds>(tdiff));
             }
             if (tdiff >= m_activeItem.time()) {
-                m_remain -= m_activeItem.time();
                 setChannel(m_activeItem.channel(), false);
                 // switch to the next channel
                 detail::TaskConfig::TasksItemWrap _item = {repo(),
