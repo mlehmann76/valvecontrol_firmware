@@ -37,7 +37,7 @@ WifiManager::WifiManager(repository &_repo, std::mutex &m,
                          std::condition_variable &cv,
                          std::shared_ptr<LedFlasher> led)
     : mutex(m), cvInitDone(cv), m_mode(detail::NoMode()), m_repo(_repo),
-      m_led(led) {
+      m_led(led), m_isConnected(false) {
     auto cfg = esp_pthread_get_default_config();
     cfg.thread_name = "wifi task";
     esp_pthread_set_cfg(&cfg);
@@ -151,12 +151,12 @@ void WifiManager::got_ip_event_handler(esp_event_base_t event_base,
                       "%d.%d.%d.%d",
                       IP2STR(&event->ip_info.ip));
         // FIXME xEventGroupSetBits(main_event_group, CONNECTED_BIT);
-        // notifyConnect();
+        notifyConnect();
         m_timeout.stop();
         break;
     case IP_EVENT_STA_LOST_IP:
         log_inst.info(TAG, "ip lost");
-        // notifyDisconnect();
+        notifyDisconnect();
         break;
     }
 }
@@ -166,13 +166,17 @@ void WifiManager::notifyConnect() {
         _c->onConnect();
     }
     m_led->set(LedFlasher::ON);
+    m_isConnected = true;
 }
 
 void WifiManager::notifyDisconnect() {
-    for (auto _c : m_observer) {
-        _c->onDisconnect();
+    if (m_isConnected) {
+        for (auto _c : m_observer) {
+            _c->onDisconnect();
+        }
+        m_led->set(LedFlasher::OFF);
+        m_isConnected = false;
     }
-    m_led->set(LedFlasher::OFF);
 }
 
 void WifiManager::addConnectionObserver(iConnectionObserver &_obs) {
@@ -279,11 +283,17 @@ void ConnectState::onEnter() {
     log_inst.info(TAG, "ConnectState start");
     wifi_mode_t mode = static_cast<wifi_mode_t>(netConf.getMode());
     wifi_config_t wifi_config;
-    wifi_sta_list_t sta;
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&sta));
+    bool stopRequired = true;
 
-    // stop wifi if no station connected
-    if (sta.num == 0) {
+    if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA) {
+        wifi_sta_list_t sta;
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&sta));
+        // stop wifi if no station connected
+        if (sta.num != 0) {
+            stopRequired = false;
+        }
+    }
+    if (stopRequired) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_stop());
     }
 
@@ -292,7 +302,9 @@ void ConnectState::onEnter() {
         setAPConfig(wifi_config);
         ESP_ERROR_CHECK(esp_wifi_set_mode(mode));
         ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config));
-        ESP_ERROR_CHECK(esp_wifi_start());
+        if (stopRequired && mode == WIFI_MODE_AP) {
+            ESP_ERROR_CHECK(esp_wifi_start());
+        }
     }
 
     if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA) {
@@ -309,14 +321,15 @@ void ConnectState::onEnter() {
             ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
         }
         /* TODO fallback, if two many tries ? */
-        ESP_ERROR_CHECK(esp_wifi_start());
+        if (stopRequired) {
+            ESP_ERROR_CHECK(esp_wifi_start());
+        }
         ESP_ERROR_CHECK(esp_wifi_connect());
         m_parent->m_timeout.start(
             std::chrono::seconds(60),
             detail::TransitionEvent{m_parent,
                                     detail::DisconnectState{m_parent}});
     }
-
     // set default blinking
     m_parent->led()->set(LedFlasher::BLINK);
 }
@@ -354,7 +367,6 @@ template <> WifiMode ConnectState::handle(const WifiEvent &e) {
     case WIFI_EVENT_STA_CONNECTED: /**< ESP32 station connected to AP */
         // do not notify here, we have no ip ! m_parent->notifyConnect();
         log_inst.debug(TAG, "sta connected");
-        m_parent->notifyConnect();
         break;
     case WIFI_EVENT_STA_DISCONNECTED: /**< ESP32 station disconnected from
                                        * AP
@@ -362,7 +374,7 @@ template <> WifiMode ConnectState::handle(const WifiEvent &e) {
         // stay in State if AP Mode
         log_inst.debug(TAG, "sta disconnected");
         m_parent->notifyDisconnect();
-        if (mode() == WIFI_MODE_STA) {
+        if (mode() == WIFI_MODE_STA || mode() == WIFI_MODE_APSTA) {
             // return to disconnect state for further processing
             m_parent->m_timeout.start(
                 std::chrono::seconds(10),
@@ -382,12 +394,15 @@ template <> WifiMode ConnectState::handle(const WifiEvent &e) {
         break;
     case WIFI_EVENT_AP_STACONNECTED: /**< a station connected to ESP32 soft-AP
                                       */
+        log_inst.debug(TAG, "station connected");
         break;
     case WIFI_EVENT_AP_STADISCONNECTED: /**< a station disconnected from ESP32
                                            soft-AP */
+        log_inst.debug(TAG, "station disconnected");
         break;
     case WIFI_EVENT_AP_PROBEREQRECVED: /**< Receive probe request packet in
                                           soft-AP interface */
+        log_inst.debug(TAG, "station probereq");
         break;
     default:
         break;

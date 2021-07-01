@@ -30,7 +30,8 @@ class HttpServer {
     using PathHandlerSetType = std::list<PathHandlerType>;
 
   public:
-    HttpServer(int _port, size_t maxCons = 8);
+    HttpServer(int _port, size_t maxCons = 8,
+               std::chrono::seconds _timeout = std::chrono::seconds(5));
     virtual ~HttpServer();
     HttpServer(const HttpServer &other) = delete;
     HttpServer(HttpServer &&other) = delete;
@@ -54,6 +55,8 @@ class HttpServer {
   private:
     virtual void task();
     void handleConnection(std::unique_ptr<Socket> _con);
+    void setSocketTimeouts(const std::unique_ptr<Socket> &s);
+
     template <typename R> bool is_ready(std::future<R> const &f) {
         return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
     }
@@ -66,6 +69,7 @@ class HttpServer {
     PathHandlerSetType m_pathhandler;
     std::vector<std::future<void>> m_cons;
     const size_t m_maxCons;
+    const std::chrono::seconds m_timeout;
 };
 
 class HttpServerConnectionObserver : public iConnectionObserver {

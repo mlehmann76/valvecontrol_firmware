@@ -46,6 +46,7 @@ bool FileHandler::doGet(const HttpRequest &_req, HttpResponse &_res) {
         _res.setContentType(_res.nameToContentType(_filename));
         _res.setContentEncoding(compressed ? HttpResponse::CT_ENC_GZIP
                                            : HttpResponse::CT_ENC_IDENTITY);
+
         _sendFile(_res, ifs, length);
         //fmt::print("file send\n");
         ret = true;
@@ -99,6 +100,7 @@ bool FileHandler::doPut(const HttpRequest &_req, HttpResponse &_res) {
 }
 
 bool FileHandler::handle(const HttpRequest &_req, HttpResponse &_res) {
+	_res.reset();
     if (_req.hasMethod(HttpRequest::GET)) {
         return doGet(_req, _res);
     } else if (_req.hasMethod(HttpRequest::PUT)) {

@@ -243,6 +243,7 @@ class WifiManager {
     int m_wpsRetryCnt;
     bool m_atexit = false;
     std::shared_ptr<LedFlasher> m_led;
+    bool m_isConnected;
 };
 
 } // namespace wifi

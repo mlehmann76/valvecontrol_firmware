@@ -19,6 +19,7 @@ bool DefaultHandler::match(const std::string &method, const std::string &path) {
 }
 
 bool DefaultHandler::handle(const HttpRequest &_req, HttpResponse &_res) {
+	_res.reset();
     if (_req.method() == "OPTIONS") {
         _res.setResponse(HttpResponse::HTTP_204);
         _res.setHeader("Allow", "OPTIONS, GET, HEAD, POST, PUT, DELETE");

@@ -5,6 +5,7 @@
  *      Author: marco
  */
 
+#include <esp_log.h>
 #include "HttpRequest.h"
 #include "socket.h"
 
@@ -32,7 +33,7 @@ HttpRequest::ParseResult HttpRequest::parse() {
     ParseResult ret = PARSE_NODATA;
     if (m_socket != nullptr) {
         std::string _buf;
-        switch (m_socket->pollConnectionState(std::chrono::milliseconds(10))) {
+        switch (m_socket->pollConnectionState(std::chrono::milliseconds(100))) {
         case Socket::noData:
             ret = PARSE_NODATA;
             break;
@@ -45,6 +46,7 @@ HttpRequest::ParseResult HttpRequest::parse() {
             if (readSize > 0) {
                 // TODO just forward if part of a bigger message
                 analyze(_buf);
+                _buf.clear();
                 ret = PARSE_OK;
             } else if (readSize == -1) {
                 ret = PARSE_ERROR;
@@ -87,6 +89,10 @@ std::vector<std::string> HttpRequest::split(const std::string &text,
 
 void HttpRequest::analyze(const std::string &r) {
     m_header.clear();
+    m_method.clear();
+    m_path.clear();
+    m_version.clear();
+
     std::vector<std::string> lines = split(r, LineEnd);
     if (lines.size()) {
         std::vector<std::string> first = split(lines[0], " ");

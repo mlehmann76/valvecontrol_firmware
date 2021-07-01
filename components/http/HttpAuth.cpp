@@ -38,6 +38,7 @@ bool HttpAuth::match(const std::string &_method, const std::string &_path) {
 }
 
 bool HttpAuth::handle(const HttpRequest &_req, HttpResponse &_res) {
+	_res.reset();
     m_response = &_res;
     m_request = &_req;
     auto it = _req.header().find(AUTHORIZATION_HEADER);

@@ -23,6 +23,7 @@ RepositoryHandler::RepositoryHandler(const std::string &_method,
 
 bool RepositoryHandler::handle(const HttpRequest &_req, HttpResponse &_res) {
     // log_inst.debug(TAG, "{},  {}", _req.method(), _req.path());
+	_res.reset();
     for (auto &v : m_repositories) {
         const std::string attr =
             std::string(_req.path()).erase(0, v.first.length());

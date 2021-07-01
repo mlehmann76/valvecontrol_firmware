@@ -174,7 +174,7 @@ void MqttWorker::connect(void) {
 }
 
 void MqttWorker::disconnect(void) {
-    log_inst.error(TAG, "stopping client");
+    log_inst.debug(TAG, "stopping client");
 
     if (client != NULL)
         esp_mqtt_client_stop(client);

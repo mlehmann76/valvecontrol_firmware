@@ -70,7 +70,7 @@ void HttpResponse::setHeaderDefaults() {
     setHeader("Access-Control-Allow-Methods",
     		"GET, PUT, POST, DELETE, HEAD, OPTIONS"); // FIXME
     setHeader("Access-Control-Allow-Credentials", "true"); // FIXME
-    setHeader("Connection", "keep-alive");
+    setHeader("Connection", "keep-alive, Keep-Alive");
     setHeader("Access-Control-Allow-Headers",
     		"X-PINGOTHER, X-Requested-With, origin, "
     		"content-type, accept, authorization");
@@ -146,14 +146,18 @@ void HttpResponse::send_chunk(const char *_buf, size_t _s) {
         m_firstChunkSent = true;
     } // else {
     if (_buf != nullptr) {
-        std::string _chunkLen = utilities::string_format("%x\r\n", _s);
-        m_request->socket()->write(_chunkLen, _chunkLen.length());
+    	std::string _chunkLen = utilities::string_format("%x\r\n", _s);
+    	m_request->socket()->write(_chunkLen, _chunkLen.length());
         if (_s) {
-        	m_request->socket()->write(_buf, _s);
+            m_request->socket()->write(_buf,_s);
+            m_request->socket()->write(LineEnd, 2);
         } else {
-        	m_request->socket()->write("", 0);
+        	m_request->socket()->write(LineEnd, 2);
+        	//m_request->socket()->write(LineEnd, 2);
+        	m_request->socket()->write(nullptr, 0);
         }
-        m_request->socket()->write(LineEnd, strlen(LineEnd));
+    } else {
+    	m_request->socket()->write("", 0);
     }
     //}
 }
@@ -171,6 +175,7 @@ void HttpResponse::reset() {
     m_header.clear();
     m_headerEntries.clear();
     m_headerFinished = false;
+    m_firstChunkSent = false;
 }
 
 HttpResponse::ContentType

@@ -133,7 +133,7 @@ void MainClass::setup() {
 
     _tasks->setup();
 
-    _http = (std::make_shared<http::HttpServer>(80));
+    _http = (std::make_shared<http::HttpServer>(80,6));
     _http->start();
 
     _jsonHandler =
