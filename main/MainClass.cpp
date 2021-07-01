@@ -133,7 +133,7 @@ void MainClass::setup() {
 
     _tasks->setup();
 
-    _http = (std::make_shared<http::HttpServer>(80,6));
+    _http = (std::make_shared<http::HttpServer>(80,2));
     _http->start();
 
     _jsonHandler =
@@ -223,7 +223,7 @@ void MainClass::checkRestartButton() {
 
 int MainClass::loop() {
     int count = 0;
-    uint32_t heapFree = 0;
+    int heapFree = 0;
     std::unique_ptr<char[]> pcWriteBuffer(new char[2048]);
 
     while (!doExit) {
@@ -234,18 +234,21 @@ int MainClass::loop() {
         }
 
         if (0 == count) {
-            if (esp_get_free_heap_size() != heapFree) {
+        	const int diff = (int)esp_get_free_heap_size() - heapFree;
+            if (diff < -8192) {
                 heapFree = esp_get_free_heap_size();
+                const size_t freeblock =
+                		heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
 #if 0
                 vTaskGetRunTimeStats(pcWriteBuffer.get());
                 log_inst.info(TAG, "[APP] Free memory: %d bytes\n{:s}",
                               esp_get_free_heap_size(),
 							  std::string(pcWriteBuffer.get()));
 #else
-                log_inst.info(TAG, "[APP] Free memory: %d bytes",
-                              esp_get_free_heap_size());
+                log_inst.info(TAG, "[APP] Free memory: %d bytes, block %d",
+                              esp_get_free_heap_size(), freeblock);
 #endif
-                count = 5000;
+                //count = 5000;
             }
         } else {
             count--;

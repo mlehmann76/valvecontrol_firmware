@@ -137,8 +137,8 @@ class repository {
     std::string stringify() const { return stringify(m_properties); }
 
     /* create json representation of a part the repository */
-    std::string stringify(const mapType &_m, size_t spaces = 4) const;
-    std::string stringify(const StringMatch &_m, size_t spaces = 4) const;
+    std::string stringify(const mapType &_m, int spaces = -1) const;
+    std::string stringify(const StringMatch &_m, int spaces = -1) const;
 
     std::string debug() { return debug(m_properties); }
 

@@ -167,7 +167,7 @@ std::string HttpResponse::getTime() {
     gettimeofday(&curTime, NULL);
     char buf[sizeof "Wed, 21 Oct 2015 07:28:00 GMT"];
     strftime(buf, sizeof buf, "%a, %d %b %Y %T %Z", gmtime(&curTime.tv_sec));
-    return buf;
+    return {buf};
 }
 
 void HttpResponse::reset() {

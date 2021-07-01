@@ -113,7 +113,7 @@ std::string repository::debug(const mapType &_m) {
     return _ss.str();
 }
 
-std::string repository::stringify(const mapType &_m, size_t spaces) const {
+std::string repository::stringify(const mapType &_m, int spaces) const {
     nlohmann::json root;
     for (auto it = _m.begin(), end = _m.end(); it != end;
          ++it) {
@@ -122,11 +122,11 @@ std::string repository::stringify(const mapType &_m, size_t spaces) const {
                                         v.second);
         }
     }
-    return root.dump(spaces);
+    return std::move(root.dump(spaces));
 }
 
 std::string repository::stringify(const repository::StringMatch &_m,
-                                  size_t spaces) const {
+                                  int spaces) const {
     nlohmann::json root;
     for (auto it = m_properties.begin(), end = m_properties.end(); it != end;
          ++it) {
@@ -136,7 +136,7 @@ std::string repository::stringify(const repository::StringMatch &_m,
             }
         }
     }
-    return root.dump(spaces);
+    return std::move(root.dump(spaces));
 }
 
 std::string repository::propName(const std::string &name) const {
@@ -146,7 +146,7 @@ std::string repository::propName(const std::string &name) const {
     std::string path = name;
     path.erase(std::unique(path.begin(), path.end(), both_slashes()),
                path.end());
-    return path;
+    return std::move(path);
 }
 
 bool repository::set(const std::string &_name,
@@ -274,11 +274,11 @@ void repository::remove(const std::string &_json) {
 #endif
 }
 
-property &repository::operator[](const std::string &key) {
+property& repository::operator[](const std::string &key) {
     return create(key, property());
 }
 
-property &repository::operator[](std::string &&key) {
+property& repository::operator[](std::string &&key) {
     return create(key, property());
 }
 

@@ -38,7 +38,6 @@ bool RepositoryHandler::handle(const HttpRequest &_req, HttpResponse &_res) {
                 _res.setContentType(HttpResponse::CT_APP_JSON);
                 _res.setHeaderDefaults();
                 _res.send(v.second->stringify(v.second->partial(attr)));
-                _res.reset();
                 return true;
             } else if (_req.hasMethod(HttpRequest::POST)) {
                 _res.setResponse(HttpResponse::HTTP_201);
@@ -46,7 +45,6 @@ bool RepositoryHandler::handle(const HttpRequest &_req, HttpResponse &_res) {
                 _res.setHeader("Content-Location", _req.path());
                 _res.send("");
                 v.second->append(_req.body());
-                _res.reset();
                 return true;
             } else if (_req.hasMethod(HttpRequest::DELETE)) {
                 _res.setResponse(HttpResponse::HTTP_201);
@@ -54,7 +52,6 @@ bool RepositoryHandler::handle(const HttpRequest &_req, HttpResponse &_res) {
                 _res.setHeader("Content-Location", _req.path());
                 _res.send("");
                 v.second->remove(_req.body());
-                _res.reset();
                 return true;
             }
         }
@@ -63,7 +60,6 @@ bool RepositoryHandler::handle(const HttpRequest &_req, HttpResponse &_res) {
     _res.setResponse(HttpResponse::HTTP_404);
     _res.endHeader();
     _res.send(nullptr, 0);
-    _res.reset();
     return false;
 }
 

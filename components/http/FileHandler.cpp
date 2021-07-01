@@ -8,6 +8,7 @@
 #include "FileHandler.h"
 #include <fstream>
 #include <iostream>
+#include <memory.h>
 
 using namespace std::string_literals;
 
@@ -48,7 +49,7 @@ bool FileHandler::doGet(const HttpRequest &_req, HttpResponse &_res) {
                                            : HttpResponse::CT_ENC_IDENTITY);
 
         _sendFile(_res, ifs, length);
-        //fmt::print("file send\n");
+        _res.reset();
         ret = true;
     } else {
         _res.setResponse(HttpResponse::HTTP_404);
@@ -62,31 +63,29 @@ bool FileHandler::doGet(const HttpRequest &_req, HttpResponse &_res) {
 void FileHandler::_sendFile(HttpResponse &_res, std::ifstream &ifs,
                             size_t length) {
     const size_t blockl = length < s_maxBlockSize ? length : s_maxBlockSize;
-    char *buffer = new char[blockl];
+    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(s_maxBlockSize);
     //fmt::print("file length: {:d}\n",length);
     if (length < s_maxBlockSize) {
         // simple file send
-        ifs.read(buffer, blockl);
-        _res.send(buffer, blockl);
-        _res.reset();
+        ifs.read(buffer.get(), blockl);
+        _res.send(buffer.get(), blockl);
     } else {
         // sending in chunks
         while (ifs) {
             // read data as a block:
         	size_t readl = length > blockl ? blockl : length;
         	//fmt::print("read length: {:d}, remain: {:d}\n",readl, length-readl);
-            ifs.read(buffer, readl);
-            _res.send_chunk(buffer, readl);
+            ifs.read(buffer.get(), readl);
+            _res.send_chunk(buffer.get(), readl);
             if (length > readl) {
             	length -= readl;
             } else {
             	break;
             }
         }
-        _res.send_chunk(buffer, 0); /// finalize chunk
+        _res.send_chunk(buffer.get(), 0); /// finalize chunk
         ifs.close();
     }
-    delete[] buffer;
 }
 bool FileHandler::doPut(const HttpRequest &_req, HttpResponse &_res) {
     const std::string _p = _req.path();

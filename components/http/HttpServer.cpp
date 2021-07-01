@@ -52,9 +52,11 @@ void HttpServer::task() {
             socket().hasNewConnection(std::chrono::milliseconds(10))) {
             std::unique_ptr<Socket> s(
                 socket().accept(std::chrono::milliseconds(10)));
-            setSocketTimeouts(s);
-            m_cons.emplace_back(
-                std::async(&HttpServer::handleConnection, this, std::move(s)));
+            if (s.get() != nullptr) {
+                setSocketTimeouts(s);
+                m_cons.emplace_back(std::async(&HttpServer::handleConnection,
+                                               this, std::move(s)));
+            }
         } // if
         // check if thread is done, remove thread
         for (auto i = 0; i < m_cons.size(); ++i) {
@@ -122,7 +124,7 @@ void HttpServer::remPathHandler(PathHandlerType _p) {
 }
 
 void HttpServer::handleConnection(std::unique_ptr<Socket> _con) {
-	using namespace std::chrono;
+    using namespace std::chrono;
     std::unique_ptr<HttpRequest> req = std::make_unique<HttpRequest>(&*_con);
     std::unique_ptr<HttpResponse> resp = std::make_unique<HttpResponse>(*req);
     auto _end = steady_clock::now() + m_timeout;
