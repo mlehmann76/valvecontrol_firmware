@@ -20,6 +20,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <deque>
 
 class repository;
 class Tasks;
@@ -108,6 +109,38 @@ class TaskState {
  *
  */
 class Tasks {
+
+	template<typename container>
+	class EventQueue {
+	    using value_type = container;
+	    using reference = container &;
+	    using const_reference = const container &;
+
+	  public:
+	    void push_back(const_reference &d) {
+	        std::lock_guard<std::mutex> lck(mutex);
+	        m_data.push_back(d);
+	    }
+	    reference front() {
+	        std::lock_guard<std::mutex> lck(mutex);
+	        return m_data.front();
+	    }
+	    void pop_front() {
+	        std::lock_guard<std::mutex> lck(mutex);
+	        m_data.pop_front();
+	    }
+	    bool empty() {
+	        std::lock_guard<std::mutex> lck(mutex);
+	        return m_data.empty();
+	    }
+
+	  private:
+	    std::deque<value_type> m_data;
+	    std::mutex mutex;
+	};
+
+	enum event_e {e_Start, e_Stop};
+
   public:
     Tasks(repository &config);
     ~Tasks();
@@ -139,6 +172,7 @@ class Tasks {
     std::atomic<bool> m_aexit;
     std::chrono::steady_clock::time_point m_start;
     std::mutex m_lock;
+    EventQueue<std::pair<event_e, std::string>> m_eventq;
 };
 
 #endif /* TASKS_H_ */

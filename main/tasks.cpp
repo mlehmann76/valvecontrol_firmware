@@ -110,9 +110,9 @@ void Tasks::onControl(const property &p) {
     if (vit != end && std::get_if<StringType>(&vit->second)) {
         std::string s = *std::get_if<StringType>(&vit->second);
         if (s == "on" || s == "ON" || s == "On") {
-            startTask(name);
+            m_eventq.push_back(std::make_pair(e_Start, name));
         } else {
-            stopTask(name);
+            m_eventq.push_back(std::make_pair(e_Stop, name));
         }
     }
 }
@@ -149,7 +149,7 @@ void Tasks::startTask(const std::string &req) {
 void Tasks::start(const std::string &item) {
     m_activeItem = {repo(), item};
     if (m_activeItem.valid()) {
-    	m_remain = m_activeItem.time();
+        m_remain = m_activeItem.time();
         setChannel(m_activeItem.channel(), true);
         m_states[activeTaskName()]->update(m_activeTask, m_activeItem);
         m_states[activeTaskName()]->update(seconds(0), m_remain);
@@ -188,6 +188,18 @@ Tasks::~Tasks() {
 void Tasks::task() {
     // steady_clock::time_point _last = steady_clock::now();
     while (m_aexit == false) {
+        if (!m_eventq.empty()) {
+            auto event = m_eventq.front();
+            switch (event.first) {
+            case e_Start:
+                startTask(event.second);
+                break;
+            case e_Stop:
+                stopTask(event.second);
+                break;
+            }
+            m_eventq.pop_front();
+        }
         if (m_activeTask.valid()) {
             std::lock_guard<std::mutex> lock(m_lock);
             // make sure, that tdiff is positive even after system clock change
@@ -235,13 +247,12 @@ void Tasks::checkTimeString() {
 bool Tasks::checkWeekDay(const std::string &d) {
     auto parts = utilities::split(d, ",");
     std::time_t t = std::time(nullptr);
-    std::stringstream wd;
-    wd << std::put_time(std::gmtime(&t), "%u");
-    // writes weekday as a decimal number, where
+    std::tm tm = *std::localtime(&t);
     // Sunday is 7 (range [1-7])
-    const std::string today = wd.str();
+    int wd = tm.tm_wday ? tm.tm_wday : tm.tm_wday + 7;
+    char today = wd + '0';
     for (const auto &s : parts) {
-        if (s == today) {
+        if (s[0] == today) {
             return true;
         }
     }
@@ -251,13 +262,13 @@ bool Tasks::checkWeekDay(const std::string &d) {
 bool Tasks::checkTimePoint(const std::string &d) {
     std::time_t t = std::time(nullptr);
     std::tm tm = *std::localtime(&t);
-    auto parts = utilities::split(d, ":");
-    if (parts.size()==2) {
-    	auto _h = utilities::strtol(parts[0],10);
-    	auto _m = utilities::strtol(parts[1],10);
-    	if (_h && *_h == tm.tm_hour && _m && *_m == tm.tm_min) {
-    		return true;
-    	}
+    auto pos = d.find(':');
+    if (pos != std::string::npos) {
+        auto _h = utilities::strtol(d.substr(0, pos), 10);
+        auto _m = utilities::strtol(d.substr(pos + 1), 10);
+        if (_h && *_h == tm.tm_hour && _m && *_m == tm.tm_min) {
+            return true;
+        }
     }
     return false;
 }
