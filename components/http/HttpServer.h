@@ -55,7 +55,8 @@ class HttpServer {
   private:
     virtual void task();
     void handleConnection(std::unique_ptr<Socket> _con);
-    void setSocketTimeouts(const std::unique_ptr<Socket> &s);
+    void setSocketTimeouts(const std::unique_ptr<Socket> &s,
+                           const std::chrono::seconds &sec);
 
     template <typename R> bool is_ready(std::future<R> const &f) {
         return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;

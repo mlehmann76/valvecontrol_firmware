@@ -32,9 +32,10 @@ HttpServer::~HttpServer() {
     delete m_obs;
 }
 
-void HttpServer::setSocketTimeouts(const std::unique_ptr<Socket> &s) {
+void HttpServer::setSocketTimeouts(const std::unique_ptr<Socket>& s,
+		const std::chrono::seconds& sec) {
     struct timeval tv;
-    tv.tv_sec = 1;
+    tv.tv_sec = sec.count();
     tv.tv_usec = 0;
     s->setSocketOption(SO_RCVTIMEO, &tv, sizeof(tv));
     s->setSocketOption(SO_SNDTIMEO, &tv, sizeof(tv));
@@ -47,36 +48,36 @@ void HttpServer::task() {
             sem().unlock();
             return;
         }
-#if 1
-        if (m_cons.size() < m_maxCons &&
-            socket().hasNewConnection(std::chrono::milliseconds(10))) {
-            std::unique_ptr<Socket> s(
-                socket().accept(std::chrono::milliseconds(10)));
-            if (s.get() != nullptr) {
-                setSocketTimeouts(s);
-                m_cons.emplace_back(std::async(&HttpServer::handleConnection,
-                                               this, std::move(s)));
-            }
-        } // if
-        // check if thread is done, remove thread
-        for (auto i = 0; i < m_cons.size(); ++i) {
-            if (is_ready(m_cons[i])) {
-                std::swap(m_cons[i], m_cons.back());
-                m_cons.pop_back();
-                break;
+        if (m_maxCons > 1) {
+            if (m_cons.size() < m_maxCons &&
+                socket().hasNewConnection(std::chrono::milliseconds(10))) {
+                std::unique_ptr<Socket> s(
+                    socket().accept(std::chrono::milliseconds(10)));
+                if (s.get() != nullptr) {
+                    setSocketTimeouts(s, std::chrono::seconds(1));
+                    m_cons.emplace_back(std::async(
+                        &HttpServer::handleConnection, this, std::move(s)));
+                }
             } // if
-        }     // for
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-#else
-        if (socket().hasNewConnection(std::chrono::milliseconds(100))) {
-            std::unique_ptr<Socket> s(
-                socket().accept(std::chrono::milliseconds(100)));
-            setSocketTimeouts(s);
-            handleConnection(std::move(s));
+            // check if thread is done, remove thread
+            for (auto i = 0; i < m_cons.size(); ++i) {
+                if (is_ready(m_cons[i])) {
+                    std::swap(m_cons[i], m_cons.back());
+                    m_cons.pop_back();
+                    break;
+                } // if
+            }     // for
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         } else {
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            if (socket().hasNewConnection(std::chrono::milliseconds(100))) {
+                std::unique_ptr<Socket> s(
+                    socket().accept(std::chrono::milliseconds(100)));
+                setSocketTimeouts(s, std::chrono::seconds(1));
+                handleConnection(std::move(s));
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
         }
-#endif
     }
 }
 
